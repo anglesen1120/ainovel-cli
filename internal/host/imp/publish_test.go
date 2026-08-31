@@ -9,7 +9,7 @@ import (
 	"github.com/voocel/ainovel-cli/internal/store"
 )
 
-// spyCommitter 记录 Execute 调用次数，供发布幂等/恢复路径测试。
+// spyCommitter ghi lại số lần gọi Execute, dùng cho kiểm thử đường dẫn idempotent/khôi phục khi phát hành.
 type spyCommitter struct{ calls int }
 
 func (s *spyCommitter) Execute(context.Context, json.RawMessage) (json.RawMessage, error) {
@@ -22,19 +22,20 @@ func TestCheckFoundationConflictsNormalizesBookMetadata(t *testing.T) {
 	if err := st.Init(); err != nil {
 		t.Fatal(err)
 	}
-	if err := st.Book.Save(domain.BookMetadata{Title: "测试书", Synopsis: "测试简介"}); err != nil {
+	if err := st.Book.Save(domain.BookMetadata{Title: "Sách kiểm thử", Synopsis: "Tóm tắt kiểm thử"}); err != nil {
 		t.Fatal(err)
 	}
-	f := &Foundation{Book: domain.BookMetadata{Title: " 测试书 ", Synopsis: " 测试简介 "}}
+	f := &Foundation{Book: domain.BookMetadata{Title: " Sách kiểm thử ", Synopsis: " Tóm tắt kiểm thử "}}
 	if err := checkFoundationConflicts(st, f); err != nil {
-		t.Fatalf("规范化后相同的作品信息不应冲突: %v", err)
+		t.Fatalf("Thông tin tác phẩm giống nhau sau khi chuẩn hóa không nên xung đột: %v", err)
 	}
 }
 
-// TestPublishChapterHandlesStalePendingCommit 守护发布崩溃窗口的恢复：崩溃落在
-// MarkChapterComplete 与 ClearPendingCommit 之间会残留指向本章的 pending_commit。
-// 已完成章若直接跳过会绕开 commit 工具的清理分支，下一章 Execute 以 ErrToolConflict
-// 拒绝，导入每次重跑死在同一处——命中残留时必须仍走一次工具幂等路径。
+// TestPublishChapterHandlesStalePendingCommit bảo vệ quá trình khôi phục của cửa sổ sự cố khi phát hành:
+// nếu sự cố xảy ra giữa MarkChapterComplete và ClearPendingCommit thì sẽ còn lại pending_commit trỏ tới chương này.
+// Nếu chương đã hoàn tất bị bỏ qua trực tiếp thì sẽ né nhánh dọn dẹp của công cụ commit, và Execute của chương kế tiếp sẽ
+// bị ErrToolConflict từ chối, khiến mỗi lần nhập lại đều chết ở cùng một chỗ — khi chạm vào phần còn sót, vẫn phải đi qua
+// đúng một đường dẫn idempotent của công cụ.
 func TestPublishChapterHandlesStalePendingCommit(t *testing.T) {
 	st := store.NewStore(t.TempDir())
 	if err := st.Init(); err != nil {
@@ -54,23 +55,23 @@ func TestPublishChapterHandlesStalePendingCommit(t *testing.T) {
 	}
 	f := ImportedChapterFacts{Chapter: 1, Summary: "s", CoreEvent: "c", HookType: "mystery", DominantStrand: "quest"}
 
-	// 无残留：已完成章零成本跳过，不触发 commit。
+	// Không có phần còn sót: chương đã hoàn tất sẽ bị bỏ qua với chi phí bằng không, không kích hoạt commit.
 	spy := &spyCommitter{}
-	if err := publishChapter(context.Background(), st, spy, 1, "正文", f); err != nil {
-		t.Fatalf("已完成章应幂等跳过：%v", err)
+	if err := publishChapter(context.Background(), st, spy, 1, "phần thân", f); err != nil {
+		t.Fatalf("Chương đã hoàn tất nên được bỏ qua một cách idempotent: %v", err)
 	}
 	if spy.calls != 0 {
-		t.Fatalf("无残留不应调用 commit，得 %d 次", spy.calls)
+		t.Fatalf("Không có phần còn sót thì không nên gọi commit, nhận %d lần", spy.calls)
 	}
 
-	// 残留指向本章：必须走一次 commit 幂等路径完成清理。
+	// Phần còn sót trỏ tới chương này: phải đi qua đúng một đường dẫn commit idempotent để hoàn tất dọn dẹp.
 	if err := st.Signals.SavePendingCommit(domain.PendingCommit{Chapter: 1}); err != nil {
 		t.Fatal(err)
 	}
-	if err := publishChapter(context.Background(), st, spy, 1, "正文", f); err != nil {
-		t.Fatalf("残留清理路径不应失败：%v", err)
+	if err := publishChapter(context.Background(), st, spy, 1, "phần thân", f); err != nil {
+		t.Fatalf("Đường dẫn dọn dẹp phần còn sót không nên thất bại: %v", err)
 	}
 	if spy.calls != 1 {
-		t.Fatalf("命中残留应恰好调用 commit 一次，得 %d 次", spy.calls)
+		t.Fatalf("Chạm vào phần còn sót phải gọi commit đúng một lần, nhận %d lần", spy.calls)
 	}
 }

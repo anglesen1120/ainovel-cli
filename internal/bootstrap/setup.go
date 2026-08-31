@@ -84,7 +84,7 @@ func RunSetup() (Config, error) {
 	fmt.Fprintf(os.Stderr, "  完成后可随时编辑该文件调整高级设置。\n")
 	fmt.Fprintln(os.Stderr)
 
-	// Step 1: 选择 Provider
+	// Bước 1: chọn Provider
 	sp, err := runProviderSelect()
 	if err != nil {
 		return Config{}, err
@@ -107,7 +107,7 @@ func RunSetup() (Config, error) {
 		pc.Type = providerType
 	}
 
-	// Step 2: 输入 API Key
+	// Bước 2: nhập API Key
 	var apiKey string
 	if sp.apiKeyOptional {
 		apiKey, err = runOptionalTextInput("[2/4] API Key（可留空）", "留空表示不使用 API Key")
@@ -124,7 +124,7 @@ func RunSetup() (Config, error) {
 		printStepDone("API Key", maskKey(apiKey))
 	}
 
-	// Step 3: Base URL（直接回车使用官方默认地址）
+	// Bước 3: Base URL (nhấn Enter trực tiếp để dùng địa chỉ mặc định chính thức)
 	baseDefault := sp.baseURL
 	baseHint := "留空使用官方地址"
 	if baseDefault != "" {
@@ -141,7 +141,7 @@ func RunSetup() (Config, error) {
 		printStepDone("Base URL", "默认")
 	}
 
-	// Step 4: 模型名（必填）
+	// Bước 4: tên model (bắt buộc)
 	modelName, err := runTextInput("[4/4] 模型名称", "例如：gpt-4o / claude-sonnet-4 / gemini-2.5-pro")
 	if err != nil {
 		return Config{}, err
@@ -205,7 +205,7 @@ func maskKey(key string) string {
 	return key[:4] + "****" + key[len(key)-4:]
 }
 
-// ---------- TUI 组件 ----------
+// ---------- 选择器 ----------
 
 func runProviderSelect() (setupProvider, error) {
 	m := setupSelectModel{

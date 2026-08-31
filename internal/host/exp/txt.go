@@ -56,8 +56,9 @@ func buildLocations(volumes []domain.VolumeOutline) map[int]chapterLocation {
 	return locs
 }
 
-// chapterHeaderRe 匹配带章号的 Markdown 标题首行（# 第N章 / ## 第 12 章 ...）。
-var chapterHeaderRe = regexp.MustCompile(`^#+\s+第.+?章`)
+// chapterHeaderRe khớp dòng đầu là tiêu đề Markdown có số chương (ví dụ: # Chương 1,
+// # Chuong 12), đồng thời hỗ trợ tiêu đề cũ dạng # 第N章.
+var chapterHeaderRe = regexp.MustCompile(`^#+\s+(?:Ch(?:ương|uong)\s+\d+\b|第.+?章)`)
 
 // atxTitleRe 提取 ATX 标题（# 标题）的文字部分。
 var atxTitleRe = regexp.MustCompile(`^#{1,6}\s+(.+?)\s*$`)

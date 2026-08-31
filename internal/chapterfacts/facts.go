@@ -9,70 +9,70 @@ import (
 	"github.com/voocel/ainovel-cli/internal/llmcontract"
 )
 
-// Properties 返回完整章节事实共用的 JSON Schema 字段。
+// Properties trả về các trường JSON Schema dùng chung cho toàn bộ dữ kiện chương.
 func Properties(includeFeedback bool) []schema.Prop {
 	textList := func(description string) map[string]any {
 		return schema.Array(description, schema.String(description))
 	}
 	timeline := schema.Object(
-		schema.Property("time", schema.String("故事内时间")).Required(),
-		schema.Property("event", schema.String("事件")).Required(),
-		schema.Property("characters", textList("涉及角色")).Required(),
+		schema.Property("time", schema.String("Thời điểm trong truyện")).Required(),
+		schema.Property("event", schema.String("Sự kiện")).Required(),
+		schema.Property("characters", textList("Nhân vật liên quan")).Required(),
 	)
 	foreshadow := schema.Object(
-		schema.Property("id", schema.String("伏笔 ID")).Required(),
-		schema.Property("action", schema.Enum("操作", "plant", "advance", "resolve")).Required(),
-		schema.Property("description", llmcontract.Nullable(schema.String("plant 描述，其它操作为 null"))).Required(),
+		schema.Property("id", schema.String("ID tình tiết gài trước")).Required(),
+		schema.Property("action", schema.Enum("Thao tác", "plant", "advance", "resolve")).Required(),
+		schema.Property("description", llmcontract.Nullable(schema.String("Mô tả khi plant; null cho các thao tác khác"))).Required(),
 	)
 	relationship := schema.Object(
-		schema.Property("character_a", schema.String("角色 A")).Required(),
-		schema.Property("character_b", schema.String("角色 B")).Required(),
-		schema.Property("relation", schema.String("本章结束时关系")).Required(),
+		schema.Property("character_a", schema.String("Nhân vật A")).Required(),
+		schema.Property("character_b", schema.String("Nhân vật B")).Required(),
+		schema.Property("relation", schema.String("Mối quan hệ khi chương kết thúc")).Required(),
 	)
 	stateChange := schema.Object(
-		schema.Property("entity", schema.String("实体")).Required(),
-		schema.Property("field", schema.String("属性")).Required(),
-		schema.Property("old_value", llmcontract.Nullable(schema.String("变化前值"))).Required(),
-		schema.Property("new_value", schema.String("变化后值")).Required(),
-		schema.Property("reason", llmcontract.Nullable(schema.String("原因"))).Required(),
+		schema.Property("entity", schema.String("Thực thể")).Required(),
+		schema.Property("field", schema.String("Thuộc tính")).Required(),
+		schema.Property("old_value", llmcontract.Nullable(schema.String("Giá trị trước khi thay đổi"))).Required(),
+		schema.Property("new_value", schema.String("Giá trị sau khi thay đổi")).Required(),
+		schema.Property("reason", llmcontract.Nullable(schema.String("Lý do"))).Required(),
 	)
 	props := []schema.Prop{
-		schema.Property("title", schema.String("最终标题")).Required(),
-		schema.Property("summary", schema.String("章节摘要")).Required(),
-		schema.Property("characters", textList("出场角色")).Required(),
-		schema.Property("key_events", textList("关键事件")).Required(),
-		schema.Property("timeline_events", schema.Array("时间线事件", timeline)).Required(),
-		schema.Property("foreshadow_updates", schema.Array("伏笔操作", foreshadow)).Required(),
-		schema.Property("relationship_changes", schema.Array("关系变化", relationship)).Required(),
-		schema.Property("state_changes", schema.Array("状态变化", stateChange)).Required(),
-		schema.Property("cast_intros", schema.Array("新配角", schema.Object(
-			schema.Property("name", schema.String("姓名")).Required(),
-			schema.Property("brief_role", schema.String("定位")).Required(),
+		schema.Property("title", schema.String("Tiêu đề cuối cùng")).Required(),
+		schema.Property("summary", schema.String("Tóm tắt chương")).Required(),
+		schema.Property("characters", textList("Nhân vật xuất hiện")).Required(),
+		schema.Property("key_events", textList("Sự kiện then chốt")).Required(),
+		schema.Property("timeline_events", schema.Array("Sự kiện dòng thời gian", timeline)).Required(),
+		schema.Property("foreshadow_updates", schema.Array("Thao tác tình tiết gài trước", foreshadow)).Required(),
+		schema.Property("relationship_changes", schema.Array("Thay đổi mối quan hệ", relationship)).Required(),
+		schema.Property("state_changes", schema.Array("Thay đổi trạng thái", stateChange)).Required(),
+		schema.Property("cast_intros", schema.Array("Nhân vật phụ mới", schema.Object(
+			schema.Property("name", schema.String("Tên")).Required(),
+			schema.Property("brief_role", schema.String("Vai trò")).Required(),
 		))).Required(),
-		schema.Property("hook_type", llmcontract.Nullable(schema.Enum("章末钩子", domain.HookTypes()...))).Required(),
-		schema.Property("dominant_strand", llmcontract.Nullable(schema.Enum("主导叙事线", domain.DominantStrands()...))).Required(),
+		schema.Property("hook_type", llmcontract.Nullable(schema.Enum("Móc câu cuối chương", domain.HookTypes()...))).Required(),
+		schema.Property("dominant_strand", llmcontract.Nullable(schema.Enum("Tuyến tự sự chủ đạo", domain.DominantStrands()...))).Required(),
 	}
 	if includeFeedback {
 		feedback := schema.Object(
-			schema.Property("deviation", schema.String("偏离大纲的描述")).Required(),
-			schema.Property("suggestion", schema.String("对后续大纲的调整建议")).Required(),
+			schema.Property("deviation", schema.String("Mô tả điểm lệch khỏi dàn ý")).Required(),
+			schema.Property("suggestion", schema.String("Đề xuất điều chỉnh dàn ý tiếp theo")).Required(),
 		)
-		feedback["description"] = "对后续大纲的建议对象；必须直接传 JSON object，不要传字符串化 JSON"
+		feedback["description"] = "Đối tượng đề xuất cho dàn ý tiếp theo; phải truyền trực tiếp JSON object, không truyền JSON đã chuỗi hóa"
 		props = append(props, schema.Property("feedback", llmcontract.Nullable(feedback)).Required())
 	}
 	return props
 }
 
-// Validate 校验普通提交与人工修订共用的确定性约束。
+// Validate kiểm tra các ràng buộc xác định dùng chung cho lần gửi thông thường và lần chỉnh sửa thủ công.
 func Validate(facts domain.ChapterFacts) error {
 	if strings.TrimSpace(facts.Title) == "" {
-		return fmt.Errorf("title is required")
+		return fmt.Errorf("title là bắt buộc")
 	}
 	if strings.TrimSpace(facts.Summary) == "" {
-		return fmt.Errorf("summary is required")
+		return fmt.Errorf("summary là bắt buộc")
 	}
 	if len(facts.KeyEvents) == 0 {
-		return fmt.Errorf("key_events must contain at least one event")
+		return fmt.Errorf("key_events phải chứa ít nhất một sự kiện")
 	}
 	if err := validateTextItems("characters", facts.Characters); err != nil {
 		return err
@@ -82,7 +82,7 @@ func Validate(facts domain.ChapterFacts) error {
 	}
 	for i, event := range facts.TimelineEvents {
 		if strings.TrimSpace(event.Time) == "" || strings.TrimSpace(event.Event) == "" {
-			return fmt.Errorf("timeline_events[%d] requires time and event", i)
+			return fmt.Errorf("timeline_events[%d] yêu cầu time và event", i)
 		}
 		if err := validateTextItems(fmt.Sprintf("timeline_events[%d].characters", i), event.Characters); err != nil {
 			return err
@@ -90,44 +90,44 @@ func Validate(facts domain.ChapterFacts) error {
 	}
 	for i, update := range facts.ForeshadowUpdates {
 		if strings.TrimSpace(update.ID) == "" {
-			return fmt.Errorf("foreshadow_updates[%d].id is required", i)
+			return fmt.Errorf("foreshadow_updates[%d].id là bắt buộc", i)
 		}
 		switch update.Action {
 		case "plant":
 			if strings.TrimSpace(update.Description) == "" {
-				return fmt.Errorf("foreshadow_updates[%d] plant requires description", i)
+				return fmt.Errorf("foreshadow_updates[%d] với plant yêu cầu description", i)
 			}
 		case "advance", "resolve":
 		default:
-			return fmt.Errorf("foreshadow_updates[%d].action invalid: %q", i, update.Action)
+			return fmt.Errorf("foreshadow_updates[%d].action không hợp lệ: %q", i, update.Action)
 		}
 	}
 	for i, change := range facts.RelationshipChanges {
 		if strings.TrimSpace(change.CharacterA) == "" || strings.TrimSpace(change.CharacterB) == "" || strings.TrimSpace(change.Relation) == "" {
-			return fmt.Errorf("relationship_changes[%d] requires character_a, character_b and relation", i)
+			return fmt.Errorf("relationship_changes[%d] yêu cầu character_a, character_b và relation", i)
 		}
 		if change.CharacterA == change.CharacterB {
-			return fmt.Errorf("relationship_changes[%d] cannot relate a character to itself", i)
+			return fmt.Errorf("relationship_changes[%d] không thể liên hệ một nhân vật với chính mình", i)
 		}
 	}
 	for i, change := range facts.StateChanges {
 		if strings.TrimSpace(change.Entity) == "" || strings.TrimSpace(change.Field) == "" || strings.TrimSpace(change.NewValue) == "" {
-			return fmt.Errorf("state_changes[%d] requires entity, field and new_value", i)
+			return fmt.Errorf("state_changes[%d] yêu cầu entity, field và new_value", i)
 		}
 	}
 	for i, intro := range facts.CastIntros {
 		if strings.TrimSpace(intro.Name) == "" || strings.TrimSpace(intro.BriefRole) == "" {
-			return fmt.Errorf("cast_intros[%d] requires name and brief_role", i)
+			return fmt.Errorf("cast_intros[%d] yêu cầu name và brief_role", i)
 		}
 	}
 	if facts.HookType != "" && !domain.ValidHookType(facts.HookType) {
-		return fmt.Errorf("invalid hook_type %q", facts.HookType)
+		return fmt.Errorf("hook_type không hợp lệ %q", facts.HookType)
 	}
 	if facts.DominantStrand != "" && !domain.ValidDominantStrand(facts.DominantStrand) {
-		return fmt.Errorf("invalid dominant_strand %q", facts.DominantStrand)
+		return fmt.Errorf("dominant_strand không hợp lệ %q", facts.DominantStrand)
 	}
 	if facts.Feedback != nil && (strings.TrimSpace(facts.Feedback.Deviation) == "" || strings.TrimSpace(facts.Feedback.Suggestion) == "") {
-		return fmt.Errorf("feedback requires deviation and suggestion")
+		return fmt.Errorf("feedback yêu cầu deviation và suggestion")
 	}
 	return nil
 }
@@ -135,7 +135,7 @@ func Validate(facts domain.ChapterFacts) error {
 func validateTextItems(name string, items []string) error {
 	for i, item := range items {
 		if strings.TrimSpace(item) == "" {
-			return fmt.Errorf("%s[%d] cannot be empty", name, i)
+			return fmt.Errorf("%s[%d] không được để trống", name, i)
 		}
 	}
 	return nil

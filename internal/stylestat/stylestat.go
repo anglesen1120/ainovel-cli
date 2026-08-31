@@ -75,7 +75,7 @@ var patternDefs = []struct {
 	name string
 	re   *regexp.Regexp
 }{
-	{"矫正句『不是…(而)是…』", regexp.MustCompile(`不是[^。！？\n]{1,24}?[，、]?(?:而)?是`)},
+	{"Câu chỉnh hướng ‘không phải…mà là…’", regexp.MustCompile(`(?:(?i:không phải)[^.!?\n]{1,24}?[,.]?[[:space:]]*(?i:mà là)|不是[^。！？\n]{1,24}?[，、]?(?:而)?是)`)},
 	{"计时量词『X息/X瞬』", regexp.MustCompile(`[一两二三四五六七八九十几数半][息瞬]`)},
 	{"明喻『像一/仿佛/如同/宛如』", regexp.MustCompile(`像一|仿佛|如同|宛如`)},
 	{"沉默节拍『沉默了/没有说话/没有回头』", regexp.MustCompile(`沉默了|没有说话|没有回头`)},
@@ -88,7 +88,7 @@ var patternDefs = []struct {
 var (
 	sentenceSplit = regexp.MustCompile(`[。！？\n]+`)
 	openingTimeRe = regexp.MustCompile(`夜|清晨|黎明|天亮|醒来|晨光|一整夜`)
-	titlePrefixRe = regexp.MustCompile(`^#{0,2}\s*第[零〇一二三四五六七八九十百千万\d]+章`)
+	titlePrefixRe = regexp.MustCompile(`^#{0,2}\s*(?:第[零〇一二三四五六七八九十百千万\d]+章|(?i:chương|chuong)\s*\d+)`)
 )
 
 // shortEndingRunes 末行不超过此字数计为"短结尾"。

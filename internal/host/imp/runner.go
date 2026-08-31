@@ -15,16 +15,16 @@ import (
 	"github.com/voocel/ainovel-cli/internal/store"
 )
 
-// prompt/schema 版本纳入各阶段 InputDigest；升级 prompt 契约时递增以自然失效下游工件。
+// Đưa phiên bản prompt/schema vào InputDigest của từng giai đoạn; khi nâng cấp hợp đồng prompt thì tăng lên để các artefact hạ nguồn tự nhiên hết hiệu lực.
 const (
-	segmentPromptVersion = "seg-v2" // v2：边界只落真实分隔处、标题逐字复制（配合标题回显校验）
+	segmentPromptVersion = "seg-v2" // v2: ranh giới chỉ rơi đúng chỗ phân tách thật, tiêu đề được sao chép nguyên văn (kèm kiểm tra hồi chiếu tiêu đề)
 	analyzePromptVersion = "analyze-v1"
 	confirmMethodAuto    = "auto_authorized"
-	confirmMethodUser    = "user_confirmed" // TUI 预览后按 y 的显式人工确认
+	confirmMethodUser    = "user_confirmed" // xác nhận thủ công rõ ràng sau khi xem trước trên TUI và nhấn y
 )
 
-// Prompts 是各语义函数的系统提示词。综合分两阶段：Synthesize 出全书 BookSynthesis，
-// Range 出长书连续区间 RangeDigest；两者输出结构不同，须各用对应提示词。
+// Prompts là các prompt hệ thống cho từng hàm ngữ nghĩa. Phần tổng hợp chia làm hai giai đoạn: Synthesize ra BookSynthesis cho toàn sách,
+// Range ra RangeDigest cho các đoạn liên tục của sách dài; đầu ra của hai bên khác nhau, nên phải dùng prompt tương ứng.
 type Prompts struct {
 	Segment    string
 	Analyze    string
@@ -32,8 +32,8 @@ type Prompts struct {
 	Range      string
 }
 
-// RunBudgets 是各语义函数的输入/输出预算。第一版用保守常量；
-// 未来应由当前 architect 模型的 context window / completion 上限推导，使批次随能力自然放大（RFC §9.2/§21）。
+// RunBudgets là ngân sách input/output cho từng hàm ngữ nghĩa. Bản đầu dùng hằng số thận trọng;
+// về sau nên suy ra từ giới hạn context window / completion của model architect hiện tại để batch tự phình theo năng lực (RFC §9.2/§21).
 type RunBudgets struct {
 	MaxUnitBytes         int
 	SegmentChunkBytes    int
@@ -44,7 +44,7 @@ type RunBudgets struct {
 	SynthesizeMaxTokens  int
 }
 
-// DefaultRunBudgets 返回保守默认预算，用于模型能力未知（探测失败）时兜底。
+// DefaultRunBudgets trả về ngân sách mặc định thận trọng, dùng làm phương án dự phòng khi chưa biết năng lực model (probe thất bại).
 func DefaultRunBudgets() RunBudgets {
 	return RunBudgets{
 		MaxUnitBytes:         8000,
@@ -57,37 +57,37 @@ func DefaultRunBudgets() RunBudgets {
 	}
 }
 
-// ModelRuntime 承载 imp 语义调用所需的模型能力事实，由 Host 在边界探测后注入（RFC §13/§17）。
-// 让双预算随 context/completion 自然放大、thinking 随能力发送；全零值时回退保守默认，
-// 行为与接入能力前一致。结构化输出不按 provider 能力发 response_format（见 callProfile 注释）。
+// ModelRuntime chứa các факт năng lực model cần cho lời gọi imp, do Host tiêm vào sau khi probe biên (RFC §13/§17).
+// Cho hai ngân sách tự phình theo context/completion, thinking được gửi theo năng lực; khi toàn bộ giá trị bằng 0 thì rơi về mặc định bảo thủ,
+// hành vi sẽ giống như trước khi tích hợp năng lực. Output có cấu trúc không phát response_format theo năng lực provider (xem chú thích callProfile).
 type ModelRuntime struct {
-	ContextTokens   int                     // 输入上下文上限（token）
-	MaxOutputTokens int                     // 单次可见输出上限（token）
-	Thinking        agentcore.ThinkingLevel // 已按能力 resolve；ThinkingAuto("") 表示不显式发送
+	ContextTokens   int                     // giới hạn context đầu vào (token)
+	MaxOutputTokens int                     // giới hạn output nhìn thấy trong một lần (token)
+	Thinking        agentcore.ThinkingLevel // đã resolve theo năng lực; ThinkingAuto("") nghĩa là không gửi tường minh
 }
 
-// profile 派生本运行时的调用能力选项（thinking）。
+// profile suy ra các tuỳ chọn gọi của runtime này (thinking).
 func (rt ModelRuntime) profile() callProfile {
 	return callProfile{thinking: rt.Thinking}
 }
 
-// Caller 是一个语义函数的模型档位：模型 + 该模型的能力事实（RFC §13.1/§17）。
-// segment/analyze/synthesize 各自持有档位，预算与调用选项都按各自档位派生，
-// 廉价档位的小窗口只约束它自己的函数，不拖累其它阶段。
+// Caller là một tier model cho một hàm ngữ nghĩa: model + факт năng lực của model đó (RFC §13.1/§17).
+// segment/analyze/synthesize đều giữ tier riêng; ngân sách và tuỳ chọn gọi đều suy ra từ tier của chính nó,
+// tier rẻ với cửa sổ nhỏ chỉ giới hạn hàm của nó, không kéo tụt các giai đoạn khác.
 type Caller struct {
 	Model   callModel
 	Runtime ModelRuntime
 }
 
-// budgetsFromRuntime 从模型真实 context/completion 上限派生各语义函数预算（RFC §9.2/§21）。
-// 这才让「换更强模型自动扩大批次、减少调用次数」成立；能力未知时回退保守默认。
+// budgetsFromRuntime suy ra ngân sách cho từng hàm ngữ nghĩa từ giới hạn context/completion thật của model (RFC §9.2/§21).
+// Chỉ như vậy mới bảo đảm "đổi model mạnh hơn thì batch tự phình to, số lần gọi giảm"; khi năng lực chưa biết thì rơi về mặc định thận trọng.
 func budgetsFromRuntime(rt ModelRuntime) RunBudgets {
 	if rt.ContextTokens <= 0 || rt.MaxOutputTokens <= 0 {
 		return DefaultRunBudgets()
 	}
-	const bytesPerToken = 3 // 中文 UTF-8 保守换算：token→字节（偏低估容量更安全）
+	const bytesPerToken = 3 // Quy đổi bảo thủ UTF-8 tiếng Trung: token→byte (ước lượng thấp hơn thì an toàn hơn)
 	out := rt.MaxOutputTokens
-	// 输入预算：上下文扣掉可见输出与 ~10% 推理/系统预留后按字节换算。
+	// Ngân sách input: lấy context trừ output nhìn thấy và phần dự trữ ~10% cho suy luận/hệ thống, rồi quy đổi sang byte.
 	reserve := rt.ContextTokens / 10
 	inTokens := rt.ContextTokens - out - reserve
 	if inTokens < 2000 {
@@ -110,30 +110,30 @@ func budgetsFromRuntime(rt ModelRuntime) RunBudgets {
 	}
 }
 
-// Confirmation 是切分确认工件，绑定当前 segmentation（RFC §8.4）。
+// Confirmation là artefact xác nhận phân đoạn, gắn với segmentation hiện tại (RFC §8.4).
 type Confirmation struct {
 	Method   string `json:"method"`
 	Chapters int    `json:"chapters"`
 }
 
-// StoryResolution 是 uncertain 故事状态的用户裁定，绑定当前 synthesis（RFC §10.4）。
+// StoryResolution là quyết định của người dùng cho trạng thái câu chuyện uncertain, gắn với synthesis hiện tại (RFC §10.4).
 type StoryResolution struct {
 	Choice string `json:"choice"` // open / closed
 }
 
-// Deps 是 runner 的窄依赖（RFC §17）。三个语义函数各自声明模型档位；
-// Host 默认全部落 architect，配置层可把机械性更强的函数指到更便宜档位（RFC §13.1）。
+// Deps là các phụ thuộc hẹp của runner (RFC §17). Ba hàm ngữ nghĩa mỗi cái khai báo tier model riêng;
+// Host mặc định đều rơi vào architect, còn lớp cấu hình có thể trỏ hàm cơ giới hơn sang tier rẻ hơn (RFC §13.1).
 type Deps struct {
 	Store         *store.Store
 	CommitChapter ChapterCommitter
 	Segment       Caller
 	Analyze       Caller
-	Synthesize    Caller // range digest 与 book synthesis 同档位（同一综合阶段）
+	Synthesize    Caller // range digest và book synthesis dùng cùng tier (cùng một giai đoạn tổng hợp)
 	Prompts       Prompts
 	Budgets       RunBudgets
 }
 
-// budgetsFromDeps 按各语义函数自己的档位能力派生预算（RFC §9.2/§13.1）。
+// budgetsFromDeps suy ra ngân sách dựa trên năng lực tier riêng của từng hàm ngữ nghĩa (RFC §9.2/§13.1).
 func budgetsFromDeps(d Deps) RunBudgets {
 	seg := budgetsFromRuntime(d.Segment.Runtime)
 	ana := budgetsFromRuntime(d.Analyze.Runtime)
@@ -149,21 +149,21 @@ func budgetsFromDeps(d Deps) RunBudgets {
 	}
 }
 
-// Run 执行完整导入管线：LoadState → NextAction → 执行一个动作 → 重新读取事实。
-// 在自己的 goroutine 中跑；返回的事件通道由本函数关闭。
+// Run thực thi toàn bộ pipeline nhập: LoadState → NextAction → chạy một hành động → đọc lại факт.
+// Chạy trong goroutine riêng; channel sự kiện trả về sẽ do hàm này đóng.
 func Run(ctx context.Context, deps Deps, opts Options) (<-chan Event, error) {
 	if deps.Store == nil || deps.CommitChapter == nil ||
 		deps.Segment.Model == nil || deps.Analyze.Model == nil || deps.Synthesize.Model == nil {
-		return nil, fmt.Errorf("deps 不完整")
+		return nil, fmt.Errorf("deps không đầy đủ")
 	}
 	if deps.Budgets == (RunBudgets{}) {
 		deps.Budgets = budgetsFromDeps(deps)
 	}
-	// 导入流程日志独立成文件：一次导入的完整转录（事件、重试、完整错误链）不与
-	// 引擎/TUI 日志混流，排查时只看这一个文件。创建失败须回显——面板会指引用户
-	// 查看 logs/import.log，静默回退等于指向一个不存在的文件（Debug-First）。
+	// Log riêng cho quy trình nhập: bản ghi đầy đủ của một lần import (sự kiện, retry, toàn bộ chuỗi lỗi) không trộn
+	// với log của engine/TUI, để lúc điều tra chỉ cần nhìn một file này. Nếu tạo thất bại phải hiện lại rõ ràng — panel sẽ
+	// dẫn người dùng xem logs/import.log; quay về im lặng tương đương chỉ vào một file không tồn tại (Debug-First).
 	log, closeLog, logErr := logger.FileLogger(deps.Store.Dir(), "import.log")
-	log.Info("imp 导入模型运行时",
+	log.Info("imp thời gian chạy model nhập",
 		"segment_ctx", deps.Segment.Runtime.ContextTokens,
 		"analyze_ctx", deps.Analyze.Runtime.ContextTokens,
 		"synthesize_ctx", deps.Synthesize.Runtime.ContextTokens,
@@ -175,7 +175,7 @@ func Run(ctx context.Context, deps Deps, opts Options) (<-chan Event, error) {
 		defer closeLog()
 		r := &runner{deps: deps, opts: opts, events: events, ws: OpenWorkspace(deps.Store.Dir()), log: log}
 		if logErr != nil {
-			r.emit(StageIngesting, 0, 0, fmt.Sprintf("导入日志文件创建失败（%v），本次转录改走默认日志", logErr), nil)
+			r.emit(StageIngesting, 0, 0, fmt.Sprintf("Tạo file log nhập thất bại (%v), bản ghi lần này sẽ dùng log mặc định", logErr), nil)
 		}
 		r.run(ctx)
 	}()
@@ -187,8 +187,8 @@ type runner struct {
 	opts   Options
 	events chan Event
 	ws     *Workspace
-	act    Action       // 当前执行动作，供失败工件标注阶段
-	log    *slog.Logger // 导入专属日志（logs/import.log）；nil 时回退默认 logger
+	act    Action       // hành động đang chạy hiện tại, dùng để gắn giai đoạn cho artefact lỗi
+	log    *slog.Logger // log riêng cho import (logs/import.log); nil thì rơi về logger mặc định
 }
 
 func (r *runner) emit(stage Stage, current, total int, msg string, err error) {
@@ -197,8 +197,8 @@ func (r *runner) emit(stage Stage, current, total int, msg string, err error) {
 
 func (r *runner) send(ev Event) {
 	r.logEvent(ev)
-	// 终态与停点事件承载唯一的成败/须行动信号（确认预览、--story 提示丢了用户就不知道该做什么），
-	// 必须可靠送达；只有中间进度事件才可在积压时丢弃。
+	// Sự kiện ở trạng thái cuối và điểm dừng phải mang đúng tín hiệu thành/bại hoặc cần hành động (xem trước xác nhận, --story mà mất gợi ý thì người dùng sẽ không biết phải làm gì),
+	// nên phải được chuyển giao tin cậy; chỉ các sự kiện tiến độ trung gian mới có thể bị bỏ khi hàng đợi đầy.
 	if ev.Stage == StageError || ev.Stage == StageDone ||
 		ev.Stage == StageAwaitingConfirmation || ev.Stage == StageAwaitingStoryStatus {
 		r.events <- ev
@@ -206,12 +206,12 @@ func (r *runner) send(ev Event) {
 	}
 	select {
 	case r.events <- ev:
-	default: // 通道满时丢弃进度，绝不阻塞管线
+	default: // khi channel đầy thì bỏ tiến độ, tuyệt đối không chặn pipeline
 	}
 }
 
-// logEvent 把每条进度事件转录进导入专属日志（<书根>/logs/import.log）：面板的重试行原地覆盖、
-// 面板随 Esc 消失，日志是唯一可事后排查的完整流程记录（§14.1）。
+// logEvent ghi lại từng sự kiện tiến độ vào log riêng của import (<root sách>/logs/import.log): dòng retry trên panel bị ghi đè ngay tại chỗ,
+// panel biến mất khi nhấn Esc, còn log là bản ghi quy trình đầy đủ duy nhất để tra cứu về sau (§14.1).
 func (r *runner) logEvent(ev Event) {
 	log := r.log
 	if log == nil {
@@ -227,7 +227,7 @@ func (r *runner) logEvent(ev Event) {
 	level := slog.LevelInfo
 	switch {
 	case ev.Stage == StageError:
-		level = slog.LevelError // 失败终态是日志里最该被过滤出来的一条，不能落成 INFO
+		level = slog.LevelError // trạng thái lỗi cuối cùng là dòng cần được lọc nổi bật nhất trong log, không được để thành INFO
 	case ev.Level == "warn":
 		level = slog.LevelWarn
 	}
@@ -239,9 +239,9 @@ func (r *runner) fail(msg string, err error) {
 	r.emit(StageError, 0, 0, msg, err)
 }
 
-// saveFailure 统一把携带原始响应的失败落到 failures/（RFC §14.2 第三落点），
-// segment/synthesize 等所有语义函数共用此兜底；分析截断打捞路径已就地写更精细的元数据。
-// 无原始响应的失败（IO、取消、前置校验）没有可保存的模型输出，不写。
+// saveFailure thống nhất ghi các thất bại có kèm phản hồi thô vào failures/ (điểm rơi thứ ba của RFC §14.2),
+// dùng chung cho mọi hàm ngữ nghĩa như segment/synthesize; đường cứu hộ cho phân tích bị cắt đã ghi metadata chi tiết ngay tại chỗ.
+// Các thất bại không có phản hồi thô (IO, huỷ, kiểm tra tiền đề) không có output model để lưu, nên không ghi.
 func (r *runner) saveFailure(err error) {
 	var se *errSemantic
 	var tr *errTruncated
@@ -253,16 +253,16 @@ func (r *runner) saveFailure(err error) {
 	}
 }
 
-// facts 组合工作区事实与正式发布对账。
+// facts ghép факт của workspace với đối soát phát hành chính thức.
 func (r *runner) facts() (Facts, error) {
 	return CollectFacts(r.deps.Store, r.ws)
 }
 
-// profileFor 派生某档位的调用选项，并把请求退避/校验重问回显到对应阶段的事件流——
-// 重试退避可静默累计 2 分钟以上，不回显用户会误以为卡死（§14.1）。
-// Key 只给请求退避（带截止时刻）：它是同一次调用内的瞬态状态，UI 原地更新一行（"第 N 次"跳动）。
-// 校验重问是跨调用的语义事件——切分逐块调用，各块独立重问，共用 Key 会让后一块覆盖前一块、
-// 吃掉排查线索（实测面板只剩一条 unit_id 不断变化的行），因此各自成行保留历史。
+// profileFor suy ra tuỳ chọn gọi cho một tier nào đó, đồng thời phát sự kiện phản hồi lại áp dụng backoff/nhắc kiểm tra
+// vào luồng sự kiện của đúng giai đoạn đó — backoff retry có thể lặng lẽ tích luỹ hơn 2 phút, không hiện ra thì người dùng sẽ tưởng là treo (§14.1).
+// Key chỉ dành cho backoff request (có thời điểm hết hạn): đó là trạng thái tức thời của cùng một lần gọi, UI cập nhật tại chỗ một dòng ("lần N" nhấp nháy).
+// Kiểm tra lại là sự kiện ngữ nghĩa xuyên suốt nhiều lần gọi — phân đoạn gọi theo từng khối, mỗi khối tự kiểm tra riêng, dùng chung Key sẽ làm khối sau đè lên khối trước,
+// nuốt mất dấu vết điều tra (thực tế panel chỉ còn một dòng unit_id đổi liên tục), nên phải để mỗi dòng riêng nhằm giữ lịch sử.
 func (r *runner) profileFor(c Caller, stage Stage) callProfile {
 	prof := c.Runtime.profile()
 	prof.log = r.log
@@ -279,9 +279,9 @@ func (r *runner) profileFor(c Caller, stage Stage) callProfile {
 	return prof
 }
 
-// applyGuidance 把本次 --guide 显式指导持久化为工作区语义输入（RFC §18.3）。
-// 指导是 segmentation InputDigest 的输入之一：内容变化自然使旧切分及其全部下游失配并重做，
-// 不写手工失效规则。工作区未建立时先跳过，ingest 后的下一轮循环写入。
+// applyGuidance lưu bền hướng dẫn --guide hiện tại thành input ngữ nghĩa của workspace (RFC §18.3).
+// Hướng dẫn là một trong các input của segmentation InputDigest: khi nội dung đổi thì các lần chia cũ và toàn bộ hạ nguồn sẽ tự lệch và phải làm lại,
+// không cần quy tắc vô hiệu hoá thủ công. Khi workspace chưa được tạo thì bỏ qua, sẽ ghi ở vòng lặp kế tiếp sau ingest.
 func (r *runner) applyGuidance() error {
 	g := strings.TrimSpace(r.opts.Guidance)
 	if g == "" || !r.ws.Active() {
@@ -289,67 +289,67 @@ func (r *runner) applyGuidance() error {
 	}
 	existing, err := r.ws.LoadGuidance()
 	if err != nil {
-		return fmt.Errorf("读取已有切分指导: %w", err)
+		return fmt.Errorf("đọc hướng dẫn phân đoạn hiện có: %w", err)
 	}
 	if existing == g {
 		return nil
 	}
-	// 发布开始后正式工件不可覆盖（§12.2）：此时重切必然在 publish 撞「拒绝覆盖」死墙，
-	// 且撞墙前会先重付切分/分析/综合的全链模型调用——把失败提前到零成本处。
-	// book 是发布的第一笔写入，它存在即发布已开始（导入前置校验保证书原本为空）。
+	// Sau khi publish bắt đầu thì artefact chính thức không được ghi đè (¶12.2): lúc này nếu chia lại thì chắc chắn sẽ đâm vào "tường từ chối ghi đè" ở publish,
+	// mà trước khi đâm tường còn phải trả thêm toàn bộ chi phí gọi model cho chia/analyze/tổng hợp — tốt nhất là đẩy lỗi lên ngay ở chỗ không tốn gì.
+	// book là lần ghi đầu tiên của publish, nó tồn tại tức là publish đã bắt đầu (kiểm tra tiền đề của import bảo đảm book ban đầu còn trống).
 	book, err := r.deps.Store.Book.Load()
 	if err != nil {
-		return fmt.Errorf("读取正式 book: %w", err)
+		return fmt.Errorf("đọc book chính thức: %w", err)
 	}
 	if book != nil {
-		return fmt.Errorf("正式 Foundation 已开始发布，--guide 重切会与已发布内容冲突而被拒绝覆盖，不再接受切分指导")
+		return fmt.Errorf("Foundation chính thức đã bắt đầu phát hành, --guide chia lại sẽ xung đột với nội dung đã phát hành và bị từ chối ghi đè, không còn nhận hướng dẫn phân đoạn nữa")
 	}
 	return r.ws.writeAtomic(fileGuidance, []byte(g))
 }
 
-// checkSourceIdentity 拦截「工作区进行中却传入不同源文件」：ingest 只在无工作区时执行，
-// 若不比对，/import B.txt 会静默从 A 的断点继续、把 A 发布完毕而 B 一个字节都没读（RFC §12.1/§18.2）。
-// 同一文件重复传路径是常见习惯（/import 同路径恢复），按内容摘要比对而非拒绝所有路径。
+// checkSourceIdentity chặn trường hợp "workspace đang chạy nhưng lại đưa vào một file nguồn khác": ingest chỉ chạy khi chưa có workspace,
+// nếu không đối chiếu thì /import B.txt có thể âm thầm nối tiếp từ điểm dừng của A, phát hành xong A mà B chưa đọc một byte nào (RFC §12.1/§18.2).
+// Việc truyền lại cùng một đường dẫn cho cùng một file là thói quen phổ biến (/import tiếp tục với cùng path), nên so sánh theo digest nội dung thay vì cấm mọi path.
 func (r *runner) checkSourceIdentity() error {
 	if r.opts.SourcePath == "" || !r.ws.Active() {
 		return nil
 	}
 	m, err := r.ws.LoadManifest()
 	if err != nil {
-		return nil // 身份三件套不可读走 ingest 的损坏诊断，不在此重复报错
+		return nil // bộ ba nhận dạng không đọc được thì đi theo chẩn đoán hỏng của ingest, không báo lỗi trùng ở đây
 	}
 	raw, err := os.ReadFile(r.opts.SourcePath)
 	if err != nil {
-		return fmt.Errorf("读取源文件 %s：%w", r.opts.SourcePath, err)
+		return fmt.Errorf("đọc tệp nguồn %s: %w", r.opts.SourcePath, err)
 	}
 	if Digest(raw) != m.RawSHA256 {
-		return fmt.Errorf("已有 %q 的导入在进行中，本次源文件与其内容不同：请先完成或放弃旧导入（删除 meta/import/）再导入新书", m.SourceName)
+		return fmt.Errorf("đã có một lần nhập %q đang chạy, nhưng tệp nguồn lần này có nội dung khác nhau: hãy hoàn tất hoặc bỏ dở lần nhập cũ trước (xóa meta/import/) rồi nhập sách mới", m.SourceName)
 	}
 	return nil
 }
 
 func (r *runner) run(ctx context.Context) {
 	if err := r.checkSourceIdentity(); err != nil {
-		r.fail("校验源文件身份", err)
+		r.fail("kiểm tra danh tính file nguồn", err)
 		return
 	}
 	var previous *Facts
 	for {
 		if ctx.Err() != nil {
-			r.fail("用户取消", ctx.Err())
+			r.fail("người dùng đã hủy", ctx.Err())
 			return
 		}
 		if err := r.applyGuidance(); err != nil {
-			r.fail("写入切分指导", err)
+			r.fail("ghi hướng dẫn phân đoạn", err)
 			return
 		}
 		facts, err := r.facts()
 		if err != nil {
-			r.fail("读取导入状态", err)
+			r.fail("đọc trạng thái import", err)
 			return
 		}
 		if previous != nil && facts == *previous {
-			r.fail("导入停滞", fmt.Errorf("动作执行后事实没有变化，下一动作仍为 %q", NextAction(facts)))
+			r.fail("import bị đình trệ", fmt.Errorf("sau khi thực hiện hành động thì факт không đổi, hành động tiếp theo vẫn là %q", NextAction(facts)))
 			return
 		}
 		snapshot := facts
@@ -364,7 +364,7 @@ func (r *runner) run(ctx context.Context) {
 			err = r.segment(ctx)
 		case ActionAwaitConfirmation:
 			if !r.confirm() {
-				return // 交互模式：等待用户确认，停在此处
+				return // chế độ tương tác: chờ người dùng xác nhận, dừng ở đây
 			}
 		case ActionAnalyze:
 			err = r.analyze(ctx)
@@ -372,42 +372,42 @@ func (r *runner) run(ctx context.Context) {
 			err = r.synthesize(ctx)
 		case ActionAwaitStoryResolution:
 			if !r.resolveStoryStatus() {
-				return // 无显式裁定：停在此处，等待 --story=open|closed
+				return // chưa có quyết định rõ ràng: dừng ở đây, chờ --story=open|closed
 			}
 		case ActionPublish:
 			err = r.publish(ctx)
 		case ActionDone:
-			r.emit(StageDone, 0, 0, "导入完成，等待验收后续写", nil)
+			r.emit(StageDone, 0, 0, "Nhập hoàn tất, chờ nghiệm thu rồi tiếp tục viết", nil)
 			return
 		default:
-			err = fmt.Errorf("未知动作 %q", act)
+			err = fmt.Errorf("hành động không xác định %q", act)
 		}
 		if err != nil {
-			r.fail("导入失败", err)
+			r.fail("nhập thất bại", err)
 			return
 		}
 	}
 }
 
 func (r *runner) ingest(ctx context.Context) error {
-	// 走到 ingest 而目录已存在 = 身份三件套（manifest/source/intent）缺失或损坏：
-	// createWorkspace 会以「已存在（无参数 /import 可恢复）」拒绝，无参数重跑又因
-	// WorkspaceReady=false 回到这里要求源路径——两条提示互相打架，用户无路可走。
+	// Đi tới ingest mà thư mục đã tồn tại = bộ ba nhận dạng (manifest/source/intent) bị thiếu hoặc hỏng:
+	// createWorkspace sẽ từ chối vì "đã tồn tại (có thể khôi phục bằng /import không tham số)", còn chạy lại không tham số
+	// thì vì WorkspaceReady=false mà quay về đây đòi đường dẫn nguồn — hai lời nhắc này đánh nhau, người dùng không có đường đi.
 	if r.ws.Active() {
-		return fmt.Errorf("meta/import/ 已存在但工作区身份不可用（manifest/source/intent 缺失或损坏），请人工确认后删除该目录再重新导入")
+		return fmt.Errorf("meta/import/ đã tồn tại nhưng danh tính workspace không dùng được (manifest/source/intent bị thiếu hoặc hỏng), vui lòng xác nhận thủ công rồi xóa thư mục đó và nhập lại")
 	}
 	if err := checkImportPreconditions(r.deps.Store); err != nil {
 		return err
 	}
 	if r.opts.SourcePath == "" {
-		return fmt.Errorf("新导入需要源文件路径")
+		return fmt.Errorf("nhập mới cần đường dẫn tệp nguồn")
 	}
-	r.emit(StageIngesting, 0, 0, "读取、解码、归一化并快照源文件...", nil)
+	r.emit(StageIngesting, 0, 0, "Đang đọc, giải mã, chuẩn hóa và chụp nhanh tệp nguồn...", nil)
 	_, m, err := Ingest(r.deps.Store.Dir(), r.opts.SourcePath, r.opts.intent())
 	if err != nil {
 		return err
 	}
-	r.emit(StageIngesting, 0, 0, fmt.Sprintf("源快照就绪：%s（编码 %s，%d 字节）", m.SourceName, m.Encoding, m.SizeBytes), nil)
+	r.emit(StageIngesting, 0, 0, fmt.Sprintf("Ảnh chụp nguồn đã sẵn sàng: %s (mã hóa %s, %d byte)", m.SourceName, m.Encoding, m.SizeBytes), nil)
 	return nil
 }
 
@@ -419,13 +419,13 @@ func (r *runner) segment(ctx context.Context) error {
 	units := buildSourceUnits(src, r.deps.Budgets.MaxUnitBytes)
 	guidance, err := r.ws.LoadGuidance()
 	if err != nil {
-		return fmt.Errorf("读取切分指导: %w", err)
+		return fmt.Errorf("đọc hướng dẫn phân đoạn: %w", err)
 	}
-	r.emit(StageSegmenting, 0, 0, fmt.Sprintf("语义识别章节边界（%d 个坐标单元）...", len(units)), nil)
+	r.emit(StageSegmenting, 0, 0, fmt.Sprintf("Nhận diện ngữ nghĩa ranh giới chương (%d đơn vị tọa độ)...", len(units)), nil)
 	digest := segmentInputDigest(Digest(src), guidance, segmentPromptVersion)
-	// 块缓存身份额外绑定 MaxUnitBytes：unit 表由（归一化源, MaxUnitBytes）唯一确定，换模型
-	// 档位改变 MaxUnitBytes 会重塑超长行的虚拟分片——ID 序列（L1.1…）与块端点可复现但字节
-	// 范围已变，仅凭端点 ID 匹配会复用错位的旧边界（anchor 失配确定性失败或静默错切）。
+	// Identity của bộ nhớ đệm khối còn gắn thêm MaxUnitBytes: bảng unit được xác định duy nhất bởi (nguồn đã chuẩn hóa, MaxUnitBytes),
+	// khi đổi tier model, MaxUnitBytes thay đổi sẽ tái tạo cách chia ảo của các dòng quá dài — dãy ID (L1.1…) và các điểm cuối khối vẫn tái hiện được,
+	// nhưng phạm vi byte đã khác; nếu chỉ khớp theo ID điểm cuối sẽ tái sử dụng nhầm ranh giới cũ bị lệch (anchor mismatch gây lỗi xác định hoặc cắt nhầm âm thầm).
 	chunkIdentity := fmt.Sprintf("%s\x00units:%d", digest, r.deps.Budgets.MaxUnitBytes)
 	seg, err := Segment(ctx, r.deps.Segment.Model, r.deps.Prompts.Segment, src, units, guidance,
 		r.deps.Budgets.SegmentChunkBytes, r.deps.Budgets.SegmentContextMargin, r.deps.Budgets.SegmentMaxTokens,
@@ -436,32 +436,32 @@ func (r *runner) segment(ctx context.Context) error {
 	if err := writeArtifact(r.ws, fileSegmentation, digest, *seg); err != nil {
 		return err
 	}
-	// 最终切分已落盘，块级缓存完成使命；清理失败无碍正确性（digest 仍一致），但要留痕。
+	// Phân đoạn cuối cùng đã được ghi xuống đĩa, bộ nhớ đệm cấp khối đã hoàn thành nhiệm vụ; dọn thất bại thì không ảnh hưởng tính đúng (digest vẫn khớp), nhưng vẫn cần để lại dấu vết.
 	if cerr := r.ws.clearDir(dirSegmentChunks); cerr != nil {
-		r.emit(StageSegmenting, 0, 0, fmt.Sprintf("块级缓存清理失败（不影响切分结果）：%v", cerr), nil)
+		r.emit(StageSegmenting, 0, 0, fmt.Sprintf("Dọn bộ nhớ đệm cấp khối thất bại (không ảnh hưởng kết quả phân đoạn): %v", cerr), nil)
 	}
 	r.emit(StageSegmenting, len(seg.Chapters), len(seg.Chapters),
-		fmt.Sprintf("切分完成：%d 章、%d 个附属区域", len(seg.Chapters), len(seg.Matter)), nil)
+		fmt.Sprintf("Phân đoạn hoàn tất: %d chương, %d vùng phụ", len(seg.Chapters), len(seg.Matter)), nil)
 	return nil
 }
 
-// confirm 处理切分确认。--yes 自动接受并写 confirmation 工件；否则展示预览并停止。
+// confirm xử lý xác nhận phân đoạn. --yes tự động chấp nhận và ghi artefact confirmation; nếu không thì hiển thị bản xem trước và dừng.
 func (r *runner) confirm() bool {
 	seg, err := readArtifact[Segmentation](r.ws, fileSegmentation)
 	if err != nil {
-		r.fail("读取切分结果", err)
+		r.fail("đọc kết quả phân đoạn", err)
 		return false
 	}
 	in, err := r.ws.LoadIntent()
 	if err != nil {
-		r.fail("读取导入意图", err)
+		r.fail("đọc ý định nhập", err)
 		return false
 	}
 	accept := r.opts.AcceptSegmentation
 	auto := r.opts.AutoConfirm || (in != nil && in.AutoConfirm)
-	// 语义容错发生过（Notes 非空：空章吸收/起始兜底/重合去重）的切分不由 --yes 盲放行：
-	// 结构被确定性改写过，必须人工核对——否则容错说明在 --yes 下无人看见，等于静默改写。
-	// TUI 预览后按 y 走 AcceptSegmentation（看过预览的显式裁定），不受此限。
+	// Tolerances ngữ nghĩa đã từng xảy ra (Notes không rỗng: hấp thụ chương trống / dự phòng đầu vào / khử trùng lặp vùng chồng lấn) thì không được để --yes cho qua mù:
+	// cấu trúc đã bị viết lại một cách xác định, bắt buộc phải kiểm tra thủ công — nếu không thì ghi chú dung sai ở dưới --yes sẽ không ai nhìn thấy, chẳng khác gì tự ý sửa âm thầm.
+	// Sau khi xem trước trên TUI rồi nhấn y sẽ đi theo AcceptSegmentation (quyết định rõ ràng sau khi đã xem preview), không bị ràng buộc này.
 	blockedByNotes := auto && !accept && len(seg.Payload.Notes) > 0
 	if blockedByNotes {
 		auto = false
@@ -469,60 +469,60 @@ func (r *runner) confirm() bool {
 	if !auto && !accept {
 		msg := buildConfirmPreview(&seg.Payload)
 		if blockedByNotes {
-			msg += "  ! 存在切分容错说明，--yes 未自动放行，请人工核对\n"
+			msg += "  ! Có ghi chú dung sai phân đoạn, --yes chưa được tự động chấp nhận, vui lòng kiểm tra thủ công\n"
 		}
 		r.emit(StageAwaitingConfirmation, len(seg.Payload.Chapters), len(seg.Payload.Chapters), msg, nil)
 		return false
 	}
 	raw, err := r.ws.readBytes(fileSegmentation)
 	if err != nil {
-		r.fail("读取切分工件", err)
+		r.fail("đọc artefact phân đoạn", err)
 		return false
 	}
-	method, doneMsg := confirmMethodAuto, "已自动接受切分（--yes）"
+	method, doneMsg := confirmMethodAuto, "Đã tự động chấp nhận phân đoạn (--yes)"
 	if accept {
-		method, doneMsg = confirmMethodUser, "已确认切分（人工核对）"
+		method, doneMsg = confirmMethodUser, "Đã xác nhận phân đoạn (kiểm tra thủ công)"
 	}
 	conf := Confirmation{Method: method, Chapters: len(seg.Payload.Chapters)}
 	if err := writeArtifact(r.ws, fileConfirmation, Digest(raw), conf); err != nil {
-		r.fail("写确认工件", err)
+		r.fail("ghi artefact xác nhận", err)
 		return false
 	}
 	r.emit(StageAwaitingConfirmation, len(seg.Payload.Chapters), len(seg.Payload.Chapters), doneMsg, nil)
 	return true
 }
 
-// buildConfirmPreview 组装切分确认预览：章节数、附属区域、全部章节标题与 uncertain 标记（RFC §8.4）。
-// 全量列出，面板 viewport 可滚动查看；不设截断上限。
+// buildConfirmPreview ghép bản xem trước để xác nhận phân đoạn: số chương, vùng phụ, toàn bộ tiêu đề chương và cờ uncertain (RFC §8.4).
+// Liệt kê toàn bộ, panel viewport có thể cuộn để xem; không đặt giới hạn cắt ngắn.
 func buildConfirmPreview(seg *Segmentation) string {
 	var b strings.Builder
-	fmt.Fprintf(&b, "已切分 %d 章", len(seg.Chapters))
+	fmt.Fprintf(&b, "Đã chia %d chương", len(seg.Chapters))
 	if len(seg.Matter) > 0 {
-		fmt.Fprintf(&b, "、%d 个附属区域", len(seg.Matter))
+		fmt.Fprintf(&b, " và %d vùng phụ", len(seg.Matter))
 	}
 	if len(seg.Uncertain) > 0 {
-		fmt.Fprintf(&b, "（%d 章存疑）", len(seg.Uncertain))
+		fmt.Fprintf(&b, " (%d chương còn nghi vấn)", len(seg.Uncertain))
 	}
-	b.WriteString("，请核对：\n")
+	b.WriteString(", vui lòng kiểm tra:\n")
 	uncertain := make(map[int]bool, len(seg.Uncertain))
 	for _, n := range seg.Uncertain {
 		uncertain[n] = true
 	}
 	for _, c := range seg.Chapters {
-		fmt.Fprintf(&b, "  第%d章 %s", c.Number, c.Title)
+		fmt.Fprintf(&b, "  Chương %d %s", c.Number, c.Title)
 		if uncertain[c.Number] {
-			b.WriteString("  [存疑]")
+			b.WriteString("  [nghi vấn]")
 		}
 		b.WriteByte('\n')
 	}
 	for _, mt := range seg.Matter {
 		fmt.Fprintf(&b, "  [%s] %s\n", mt.Kind, mt.Title)
 	}
-	// 切分期的容错说明（如空正文占位标题并入前段）必须呈现在人工停点上，否则吸收行为变成静默改写。
+	// Ghi chú dung sai ở giai đoạn phân đoạn (như tiêu đề placeholder của phần thân rỗng được hút vào đoạn trước) phải được hiện trên điểm dừng thủ công, nếu không hành vi hấp thụ sẽ biến thành sửa đổi âm thầm.
 	for _, n := range seg.Notes {
 		fmt.Fprintf(&b, "  ! %s\n", n)
 	}
-	// 操作提示（y 确认 / --guide 重切 / Esc）由 TUI 暂停块统一渲染，此处只留事实，避免双份文案漂移。
+	// Gợi ý thao tác (y để xác nhận / --guide để chia lại / Esc) do khối tạm dừng của TUI tự vẽ thống nhất, ở đây chỉ giữ факт để tránh lệch nội dung hai nơi.
 	return b.String()
 }
 
@@ -537,9 +537,9 @@ func (r *runner) analyze(ctx context.Context) error {
 	}
 	seg := &segArt.Payload
 	total := len(seg.Chapters)
-	// 逐章 digest 只绑定本章正文，不含批次上下文与前序 ledger。若第 K 章因缺失/失配需重分析，
-	// 其后仍留着 digest 恰好匹配的旧工件会带着已失效的 ledger 被复用。开分析前清理越过新鲜前缀的尾部，
-	// 强制"重分析某章即失效其后全部分析"，之后前向分析不再产生陈旧尾部（RFC §9.6 / #4a）。
+	// Digest theo từng chương chỉ gắn với chính văn của chương đó, không gồm context batch hay ledger trước đó. Nếu chương K vì thiếu/không khớp mà phải phân tích lại,
+	// các artefact cũ phía sau có digest trùng khớp lại mang ledger đã hết hạn sẽ bị tái sử dụng. Dọn phần đuôi vượt qua tiền tố mới ngay trước khi phân tích,
+	// buộc "phân tích lại một chương tức là làm mất hiệu lực toàn bộ phân tích sau nó", sau đó phân tích xuôi sẽ không còn sinh đuôi lỗi thời (RFC §9.6 / #4a).
 	if err := discardAnalysesAfter(r.ws, analyzedChapters(r.ws, seg, src, segArt.InputDigest, analyzePromptVersion), total); err != nil {
 		return err
 	}
@@ -551,7 +551,7 @@ func (r *runner) analyze(ctx context.Context) error {
 		if start >= total {
 			break
 		}
-		r.emit(StageAnalyzing, start, total, fmt.Sprintf("分析第 %d 章起的连续批次...", start+1), nil)
+		r.emit(StageAnalyzing, start, total, fmt.Sprintf("Phân tích batch liên tiếp bắt đầu từ chương %d...", start+1), nil)
 		done, err := AnalyzeNext(ctx, r.deps.Analyze.Model, r.deps.Prompts.Analyze, r.ws, src, seg, segArt.InputDigest, analyzePromptVersion, r.deps.Budgets.Analyze, r.profileFor(r.deps.Analyze, StageAnalyzing))
 		if err != nil {
 			return err
@@ -560,7 +560,7 @@ func (r *runner) analyze(ctx context.Context) error {
 			break
 		}
 	}
-	r.emit(StageAnalyzing, total, total, "逐章事实提取完成", nil)
+	r.emit(StageAnalyzing, total, total, "Trích xuất факт theo từng chương hoàn tất", nil)
 	return nil
 }
 
@@ -572,9 +572,9 @@ func (r *runner) synthesize(ctx context.Context) error {
 	total := len(segArt.Payload.Chapters)
 	facts := loadPriorFacts(r.ws, total)
 	if len(facts) != total {
-		return fmt.Errorf("逐章分析不完整：%d/%d", len(facts), total)
+		return fmt.Errorf("phân tích theo từng chương chưa đầy đủ: %d/%d", len(facts), total)
 	}
-	r.emit(StageSynthesizing, 0, total, "分层归纳全书语义...", nil)
+	r.emit(StageSynthesizing, 0, total, "Đang tổng hợp ngữ nghĩa toàn sách theo tầng...", nil)
 	syn, err := Synthesize(ctx, r.deps.Synthesize.Model, r.deps.Prompts.Synthesize, r.deps.Prompts.Range, r.ws, facts,
 		r.deps.Budgets.SynthesizeRangeBytes, r.deps.Budgets.SynthesizeMaxTokens, r.profileFor(r.deps.Synthesize, StageSynthesizing))
 	if err != nil {
@@ -583,7 +583,7 @@ func (r *runner) synthesize(ctx context.Context) error {
 	if err := writeArtifact(r.ws, fileSynthesis, synthesisInputDigest(facts), *syn); err != nil {
 		return err
 	}
-	r.emit(StageSynthesizing, total, total, fmt.Sprintf("综合完成：%d 卷、故事状态 %s", len(syn.Structure), syn.StoryStatus), nil)
+	r.emit(StageSynthesizing, total, total, fmt.Sprintf("Tổng hợp hoàn tất: %d tập, trạng thái câu chuyện %s", len(syn.Structure), syn.StoryStatus), nil)
 	return nil
 }
 
@@ -604,7 +604,7 @@ func (r *runner) publish(ctx context.Context) error {
 	total := len(seg.Chapters)
 	facts := loadPriorFacts(r.ws, total)
 	if len(facts) != total {
-		return fmt.Errorf("发布前分析不完整：%d/%d", len(facts), total)
+		return fmt.Errorf("phân tích trước khi phát hành chưa đầy đủ: %d/%d", len(facts), total)
 	}
 	closed, err := r.resolveStory(&synArt.Payload)
 	if err != nil {
@@ -618,24 +618,25 @@ func (r *runner) publish(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	r.emit(StageValidating, 0, total, "Foundation 组装校验通过", nil)
+	r.emit(StageValidating, 0, total, "Kiểm tra lắp ghép Foundation thành công", nil)
 
-	r.emit(StagePublishing, 0, total, "发布正式 Foundation...", nil)
+	r.emit(StagePublishing, 0, total, "Đang phát hành Foundation chính thức...", nil)
 	if err := publishFoundation(r.deps.Store, f); err != nil {
 		return err
 	}
-	// 导入完成 Hold 必须早于任何章节提交即持久化：若在"最后一章提交"与"设置 Hold"之间崩溃，
-	// 重启后 isPublished=true → 导入判为完成却漏设 Hold，Engine 会误把导入书当普通停机续写。
-	// 置于 publishFoundation（已初始化 RunMeta）之后、章节提交之前，彻底关闭该窗口；重跑发布时幂等
-	// 重设（--continue 不设 Hold，交由自动接力，RFC §12.4）。
+	// Hold khi hoàn tất import phải được đặt trước mọi lần commit chapter để persisting: nếu giữa "commit chương cuối"
+	// và "đặt Hold" xảy ra crash, khi khởi động lại isPublished=true → import bị xem là xong nhưng Hold lại thiếu, Engine sẽ nhầm sách nhập
+	// thành một lần dừng bình thường và tiếp tục viết.
+	// Đặt nó sau publishFoundation (RunMeta đã được khởi tạo) nhưng trước khi commit chương, để đóng hẳn cửa sổ này; khi chạy lại publish thì sẽ idempotent
+	// đặt lại ( --continue không đặt Hold, giao cho tiếp nối tự động, RFC §12.4 ).
 	if err := r.setCompletionHold(); err != nil {
-		return fmt.Errorf("建立导入完成 Hold：%w", err)
+		return fmt.Errorf("thiết lập Hold hoàn tất nhập: %w", err)
 	}
 	for i, c := range seg.Chapters {
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}
-		r.emit(StagePublishing, c.Number, total, fmt.Sprintf("发布第 %d/%d 章：%s", c.Number, total, c.Title), nil)
+		r.emit(StagePublishing, c.Number, total, fmt.Sprintf("Phát hành chương %d/%d: %s", c.Number, total, c.Title), nil)
 		if err := publishChapter(ctx, r.deps.Store, r.deps.CommitChapter, c.Number, seg.Content(src, i), facts[i]); err != nil {
 			return err
 		}
@@ -643,54 +644,54 @@ func (r *runner) publish(ctx context.Context) error {
 	return nil
 }
 
-// storyChoice 返回 uncertain 状态的有效裁定：优先绑定当前 synthesis 的已落盘裁定，其次本次 opts，再次原始 intent。
-// 已落盘裁定必须校验 InputDigest 与当前 synthesis 一致——重新综合后旧裁定失效，不能把旧 open/closed 静默
-// 套到新结果上，否则用户不会被重新征询（RFC §10.4）。显式 --story（intent）是用户跨综合的常驻指令，可保留。
+// storyChoice trả về quyết định hợp lệ cho trạng thái uncertain: ưu tiên quyết định đã ghi đĩa của synthesis hiện tại, sau đó đến opts lần này, rồi mới đến intent gốc.
+// Quyết định đã ghi đĩa phải kiểm tra InputDigest khớp với synthesis hiện tại — nếu tổng hợp lại thì quyết định cũ hết hiệu lực, không được âm thầm áp open/closed cũ
+// lên kết quả mới, nếu không người dùng sẽ không bị hỏi lại (RFC §10.4). --story tường minh (intent) là chỉ thị thường trú của người dùng xuyên suốt các lần tổng hợp, có thể giữ.
 func (r *runner) storyChoice() (string, error) {
 	if raw, err := r.ws.readBytes(fileSynthesis); err == nil {
 		if art, aerr := readArtifact[StoryResolution](r.ws, fileStoryResolve); aerr == nil && art.InputDigest == Digest(raw) {
 			return art.Payload.Choice, nil
 		} else if aerr != nil && !os.IsNotExist(aerr) {
-			return "", fmt.Errorf("读取故事状态裁定: %w", aerr)
+			return "", fmt.Errorf("đọc quyết định trạng thái câu chuyện: %w", aerr)
 		}
 	} else {
-		return "", fmt.Errorf("读取综合工件: %w", err)
+		return "", fmt.Errorf("đọc artefact tổng hợp: %w", err)
 	}
 	if r.opts.StoryResolution != "" {
 		return r.opts.StoryResolution, nil
 	}
 	in, err := r.ws.LoadIntent()
 	if err != nil {
-		return "", fmt.Errorf("读取导入意图: %w", err)
+		return "", fmt.Errorf("đọc ý định nhập: %w", err)
 	}
 	return in.StoryResolution, nil
 }
 
-// resolveStoryStatus 在 uncertain 且已有显式裁定时落盘 story-resolution.json（绑定当前 synthesis），
-// 使下游 NextAction 自然放行；无裁定则展示等待并停止。
+// resolveStoryStatus khi uncertain và đã có quyết định tường minh thì ghi story-resolution.json xuống đĩa (gắn với synthesis hiện tại),
+// để NextAction của hạ nguồn tự nhiên được phép chạy tiếp; nếu chưa có quyết định thì hiện trạng thái chờ và dừng.
 func (r *runner) resolveStoryStatus() bool {
 	choice, err := r.storyChoice()
 	if err != nil {
-		r.fail("读取故事状态裁定", err)
+		r.fail("đọc quyết định trạng thái câu chuyện", err)
 		return false
 	}
 	if choice != storyOpen && choice != storyClosed {
-		r.emit(StageAwaitingStoryStatus, 0, 0, "综合判定故事状态为 uncertain，请用 --story=open|closed 明确后重试", nil)
+		r.emit(StageAwaitingStoryStatus, 0, 0, "Synthesis đánh giá trạng thái câu chuyện là uncertain, vui lòng dùng --story=open|closed để xác định rồi thử lại", nil)
 		return false
 	}
 	raw, err := r.ws.readBytes(fileSynthesis)
 	if err != nil {
-		r.fail("读取综合结果", err)
+		r.fail("đọc kết quả tổng hợp", err)
 		return false
 	}
 	if err := writeArtifact(r.ws, fileStoryResolve, Digest(raw), StoryResolution{Choice: choice}); err != nil {
-		r.fail("落盘故事状态裁定", err)
+		r.fail("ghi quyết định trạng thái câu chuyện xuống đĩa", err)
 		return false
 	}
 	return true
 }
 
-// resolveStory 依据综合结果与用户显式裁定给出故事收束状态（RFC §10.4）。
+// resolveStory dựa trên kết quả tổng hợp và quyết định tường minh của người dùng để xác định trạng thái khép lại của câu chuyện (RFC §10.4).
 func (r *runner) resolveStory(syn *BookSynthesis) (bool, error) {
 	switch syn.StoryStatus {
 	case storyClosed:
@@ -708,25 +709,25 @@ func (r *runner) resolveStory(syn *BookSynthesis) (bool, error) {
 		case storyOpen:
 			return false, nil
 		default:
-			return false, fmt.Errorf("故事状态 uncertain，需 --story=open|closed")
+			return false, fmt.Errorf("trạng thái câu chuyện uncertain, cần --story=open|closed")
 		}
 	default:
-		return false, fmt.Errorf("未知 story_status：%q", syn.StoryStatus)
+		return false, fmt.Errorf("story_status không xác định: %q", syn.StoryStatus)
 	}
 }
 
-// setCompletionHold 设置一次导入完成 Hold；仅 --continue 才跳过（RFC §12.4）。
-// 错误必须传播——Hold 是"导入后不误续写"的唯一保障，静默失败等于保护失效。
+// setCompletionHold đặt một Hold khi hoàn tất import; chỉ --continue mới bỏ qua (RFC §12.4).
+// Lỗi phải được truyền lên — Hold là bảo đảm duy nhất để "không tiếp tục viết nhầm sau khi nhập xong", thất bại âm thầm đồng nghĩa với mất tác dụng bảo vệ.
 func (r *runner) setCompletionHold() error {
 	in, err := r.ws.LoadIntent()
 	if err != nil {
-		return fmt.Errorf("读取导入意图: %w", err)
+		return fmt.Errorf("đọc ý định nhập: %w", err)
 	}
 	if r.opts.ContinueAfter || (in != nil && in.ContinueAfterImport) {
 		return nil
 	}
 	return r.deps.Store.RunMeta.SetAdvanceHold(domain.AdvanceHold{
 		After:  domain.AdvanceHoldAtBoundary,
-		Reason: "外部小说导入完成，等待验收后续写",
+		Reason: "Đã hoàn tất nhập tiểu thuyết bên ngoài, chờ nghiệm thu rồi tiếp tục viết",
 	})
 }

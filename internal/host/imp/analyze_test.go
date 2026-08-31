@@ -3,14 +3,15 @@ package imp
 import (
 	"context"
 	"encoding/json"
+	"strconv"
 	"strings"
 	"testing"
 
 	"github.com/voocel/agentcore"
 )
 
-// TestDiscardAnalysesAfter 守护 #4a：清理越过新鲜前缀的旧分析工件，
-// 保证"重分析某章即失效其后全部分析"，防止陈旧 ledger 随后续章节被复用。
+// TestDiscardAnalysesAfter Cảnh giới #4a: dọn sạch các tác phẩm phân tích cũ nằm vượt quá tiền tố mới,
+// bảo đảm "phân tích lại một chương sẽ làm vô hiệu toàn bộ phân tích phía sau", ngăn ledger cũ bị tái sử dụng cho các chương tiếp theo.
 func TestDiscardAnalysesAfter(t *testing.T) {
 	ws := OpenWorkspace(t.TempDir())
 	for c := 1; c <= 5; c++ {
@@ -19,70 +20,70 @@ func TestDiscardAnalysesAfter(t *testing.T) {
 		}
 	}
 	if err := discardAnalysesAfter(ws, 2, 5); err != nil {
-		t.Fatalf("清理不应失败：%v", err)
+		t.Fatalf("Dọn dẹp không được thất bại: %v", err)
 	}
 	for c := 1; c <= 2; c++ {
 		if !ws.has(analysisPath(c)) {
-			t.Fatalf("新鲜前缀章 %d 应保留", c)
+			t.Fatalf("Chương %d trong tiền tố mới phải được giữ lại", c)
 		}
 	}
 	for c := 3; c <= 5; c++ {
 		if ws.has(analysisPath(c)) {
-			t.Fatalf("越过新鲜前缀的章 %d 应被清理", c)
+			t.Fatalf("Chương %d vượt quá tiền tố mới phải được dọn sạch", c)
 		}
 	}
 }
 
-// analyzeFixture 构造一份含 n 章、正文都很短的切分，用于批次/分析测试。
+// analyzeFixture dựng một phân tách gồm n chương, với phần thân đều rất ngắn, dùng cho các test batch/phân tích.
 func analyzeFixture(t *testing.T, n int) ([]byte, *Segmentation) {
 	t.Helper()
 	var b strings.Builder
 	for c := 1; c <= n; c++ {
-		b.WriteString("第")
-		b.WriteString(strings.Repeat("一", 1))
-		b.WriteString("章\n正文\n")
+		b.WriteString("Chương ")
+		b.WriteString(strconv.Itoa(c))
+		b.WriteString("\nNội dung\n")
 	}
 	norm := []byte(b.String())
 	units := buildSourceUnits(norm, 0)
 	var ds []BoundaryDecision
-	for i := 0; i < len(units); i += 2 { // 每 2 行一章（标题行 + 正文行）
+	for i := 0; i < len(units); i += 2 { // mỗi 2 dòng là một chương (dòng tiêu đề + dòng nội dung)
 		ds = append(ds, BoundaryDecision{UnitID: units[i].ID, Kind: kindChapter, Title: units[i].Text})
 	}
 	seg, err := resolveSegmentation(norm, units, ds)
 	if err != nil {
-		t.Fatalf("fixture 切分失败：%v", err)
+		t.Fatalf("fixture phân tách thất bại: %v", err)
 	}
 	if len(seg.Chapters) != n {
-		t.Fatalf("fixture 章数 %d != %d", len(seg.Chapters), n)
+		t.Fatalf("Số chương của fixture %d != %d", len(seg.Chapters), n)
 	}
 	return norm, seg
 }
 
 func TestPlanBatchOutputBudgetCaps(t *testing.T) {
 	_, seg := analyzeFixture(t, 10)
-	// 输入宽松，但可见输出预算只够 2 章（#83 批次粒度守卫，§20.4.2）。
+	// Input rộng rãi, nhưng ngân sách output nhìn thấy chỉ đủ cho 2 chương (#83 cảnh giới độ lớn batch, §20.4.2).
 	b := AnalyzeBudget{ContextBytes: 1 << 20, MaxOutputTokens: 250, PerChapterOutput: 100, PromptOverhead: 0}
 	end := planBatch(seg.Chapters, 0, 0, b)
 	if end != 2 {
-		t.Fatalf("输出预算应把批次限到 2 章，得 end=%d", end)
+		t.Fatalf("Ngân sách output phải giới hạn batch ở 2 chương, nhận end=%d", end)
 	}
 }
 
 func TestPlanBatchInputBudgetCaps(t *testing.T) {
 	_, seg := analyzeFixture(t, 10)
-	// 输出宽松，但输入字节预算只够约 1 章。
+	// Output rộng rãi, nhưng ngân sách byte input chỉ đủ khoảng 1 chương.
 	one := chapterBytes(seg.Chapters, 0)
 	b := AnalyzeBudget{ContextBytes: one + 1, MaxOutputTokens: 1 << 20, PerChapterOutput: 1, PromptOverhead: 0}
 	end := planBatch(seg.Chapters, 0, 0, b)
 	if end != 1 {
-		t.Fatalf("输入预算应把批次限到 1 章，得 end=%d", end)
+		t.Fatalf("Ngân sách input phải giới hạn batch ở 1 chương, nhận end=%d", end)
 	}
 }
 
 func factsJSON(chapter int, title string) string {
 	f := map[string]any{
-		"chapter": chapter, "title": title, "summary": "摘要", "core_event": "核心事件",
-		"key_events": []string{"事件"}, "hook": nil, "scenes": []string{}, "characters": []string{},
+		"chapter": chapter, "title": title, "summary": "Tóm tắt", "core_event": "Sự kiện cốt lõi",
+		"key_events": []string{"Sự kiện"}, "hook": nil, "scenes": []string{}, "characters": []string{},
 		"character_evidence": []any{}, "world_evidence": []any{}, "timeline_events": []any{},
 		"foreshadow_updates": []any{}, "relationship_changes": []any{}, "state_changes": []any{},
 		"hook_type": "mystery", "dominant_strand": "quest",
@@ -93,28 +94,28 @@ func factsJSON(chapter int, title string) string {
 
 func TestValidateBatchRejections(t *testing.T) {
 	_, seg := analyzeFixture(t, 2)
-	// 数量不符
+	// Số lượng không khớp
 	bad := &AnalysisBatchResult{Chapters: []ImportedChapterFacts{{Chapter: 1}}}
 	if err := validateBatch(bad, seg, 0, 2); err == nil {
-		t.Fatal("数量不符应拒绝")
+		t.Fatal("Số lượng không khớp phải bị từ chối")
 	}
-	// hook_type 非法
+	// hook_type không hợp lệ
 	var f ImportedChapterFacts
 	_ = json.Unmarshal([]byte(factsJSON(1, seg.Chapters[0].Title)), &f)
 	f.HookType = "bogus"
 	if err := validateBatch(&AnalysisBatchResult{Chapters: []ImportedChapterFacts{f}}, seg, 0, 1); err == nil {
-		t.Fatal("非法 hook_type 应拒绝")
+		t.Fatal("hook_type không hợp lệ phải bị từ chối")
 	}
-	// 枚举大小写变体：校验通过并就地归一化为小写——commit_chapter 不复验枚举，
-	// 变体直通正式状态会被精确串消费的逻辑视为未知类型。
+	// Biến thể hoa/thường của enum: kiểm tra vẫn qua và tự chuẩn hóa tại chỗ thành chữ thường — commit_chapter không kiểm tra lại enum,
+	// nên biến thể đi thẳng vào trạng thái chính thức sẽ bị logic tiêu thụ chuỗi chính xác coi là kiểu không xác định.
 	_ = json.Unmarshal([]byte(factsJSON(1, seg.Chapters[0].Title)), &f)
 	f.HookType, f.DominantStrand = "Crisis", "QUEST"
 	got := &AnalysisBatchResult{Chapters: []ImportedChapterFacts{f}}
 	if err := validateBatch(got, seg, 0, 1); err != nil {
-		t.Fatalf("大小写变体应通过校验：%v", err)
+		t.Fatalf("Biến thể hoa/thường phải qua kiểm tra: %v", err)
 	}
 	if got.Chapters[0].HookType != "crisis" || got.Chapters[0].DominantStrand != "quest" {
-		t.Fatalf("枚举应归一化为小写落盘：%+v", got.Chapters[0])
+		t.Fatalf("Enum phải được chuẩn hóa thành chữ thường khi ghi xuống đĩa: %+v", got.Chapters[0])
 	}
 }
 
@@ -122,8 +123,8 @@ func TestAnalyzeNextPersistsWithRebatchOnTruncation(t *testing.T) {
 	norm, seg := analyzeFixture(t, 2)
 	book := t.TempDir()
 	ws := &Workspace{dir: book}
-	// 首批 2 章截断：第 1 章完整、第 2 章半截 → 打捞第 1 章连续前缀（§9.5）。
-	truncated := `{"chapters":[` + factsJSON(1, seg.Chapters[0].Title) + `,{"chapter":2,"summary":"截断`
+	// Batch đầu 2 chương bị cắt cụt: chương 1 đầy đủ, chương 2 mới nửa chừng → cứu vớt tiền tố liên tục của chương 1 (§9.5).
+	truncated := `{"chapters":[` + factsJSON(1, seg.Chapters[0].Title) + `,{"chapter":2,"summary":"Cắt cụt`
 	m := &mockModel{
 		responses: []string{truncated},
 		stops:     []agentcore.StopReason{agentcore.StopReasonLength},
@@ -134,48 +135,48 @@ func TestAnalyzeNextPersistsWithRebatchOnTruncation(t *testing.T) {
 		t.Fatalf("AnalyzeNext: %v", err)
 	}
 	if done != 1 {
-		t.Fatalf("截断应打捞第 1 章连续前缀，得 %d", done)
+		t.Fatalf("Trường hợp bị cắt cụt phải vớt được tiền tố liên tục của chương 1, nhận %d", done)
 	}
 	if !ws.has(analysisPath(1)) || ws.has(analysisPath(2)) {
-		t.Fatal("应只落盘第 1 章")
+		t.Fatal("Chỉ nên ghi xuống đĩa chương 1")
 	}
 	if analyzedChapters(ws, seg, norm, "segid", "v1") != 1 {
-		t.Fatal("已分析章数应为 1")
+		t.Fatal("Số chương đã phân tích phải là 1")
 	}
-	// failures/ 应保存原始响应与打捞状态（§14.2）。
+	// failures/ phải lưu phản hồi gốc và trạng thái vớt lại (§14.2).
 	if !ws.has("failures/last-response.txt") || !ws.has("failures/last.json") {
-		t.Fatal("应保存失败原始响应与元数据")
+		t.Fatal("Phải lưu phản hồi gốc và siêu dữ liệu của lần thất bại")
 	}
 }
 
 func TestSalvagePrefixContiguous(t *testing.T) {
 	_, seg := analyzeFixture(t, 3)
-	// 前 2 章完整，第 3 章被截断。
+	// 2 chương đầu đầy đủ, chương 3 bị cắt cụt.
 	raw := `{"chapters":[` +
 		factsJSON(1, seg.Chapters[0].Title) + `,` +
 		factsJSON(2, seg.Chapters[1].Title) + `,` +
-		`{"chapter":3,"summary":"截断`
+		`{"chapter":3,"summary":"Cắt cụt`
 	got := salvagePrefix(raw, seg, 0)
 	if len(got) != 2 {
-		t.Fatalf("应打捞前 2 章连续前缀，得 %d", len(got))
+		t.Fatalf("Phải vớt được tiền tố liên tục của 2 chương đầu, nhận %d", len(got))
 	}
 	if got[0].Chapter != 1 || got[1].Chapter != 2 {
-		t.Fatal("前缀章号不连续")
+		t.Fatal("Số chương trong tiền tố không liên tục")
 	}
 }
 
 func TestSalvagePrefixStopsAtGap(t *testing.T) {
 	_, seg := analyzeFixture(t, 3)
-	// 第 1 章后直接跳到第 3 章 → 打捞在跳号处停止，只返回第 1 章。
+	// Sau chương 1 nhảy thẳng sang chương 3 → việc vớt dừng tại chỗ nhảy số, chỉ trả về chương 1.
 	raw := `{"chapters":[` + factsJSON(1, seg.Chapters[0].Title) + `,` + factsJSON(3, seg.Chapters[2].Title) + `]}`
 	got := salvagePrefix(raw, seg, 0)
 	if len(got) != 1 {
-		t.Fatalf("跳号处应停止，得 %d", len(got))
+		t.Fatalf("Phải dừng ở chỗ nhảy số, nhận %d", len(got))
 	}
 }
 
-// TestAnalyzedChaptersInvalidatesOnUpstreamChange 验证切分身份或 prompt 版本变化使已落盘分析失效（不变量 1）。
-// 这是 InputDigest 机制真正落地的核心：改上游即失效下游，而非只看文件是否存在。
+// TestAnalyzedChaptersInvalidatesOnUpstreamChange kiểm tra rằng đổi danh tính chia tách hoặc phiên bản prompt sẽ làm phân tích đã ghi xuống đĩa mất hiệu lực (bất biến 1).
+// Đây là cốt lõi để cơ chế InputDigest thực sự hoạt động: đổi upstream thì downstream mất hiệu lực, thay vì chỉ nhìn file có tồn tại hay không.
 func TestAnalyzedChaptersInvalidatesOnUpstreamChange(t *testing.T) {
 	norm, seg := analyzeFixture(t, 2)
 	ws := &Workspace{dir: t.TempDir()}
@@ -187,12 +188,12 @@ func TestAnalyzedChaptersInvalidatesOnUpstreamChange(t *testing.T) {
 		t.Fatalf("AnalyzeNext: %v", err)
 	}
 	if got := analyzedChapters(ws, seg, norm, "segid-A", "v1"); got != 2 {
-		t.Fatalf("同身份/版本应认 2 章，得 %d", got)
+		t.Fatalf("Với cùng danh tính/phiên bản phải công nhận 2 chương, nhận %d", got)
 	}
 	if got := analyzedChapters(ws, seg, norm, "segid-B", "v1"); got != 0 {
-		t.Fatalf("切分身份变化应使分析全部失效，得 %d", got)
+		t.Fatalf("Thay đổi danh tính chia tách phải làm vô hiệu toàn bộ phân tích, nhận %d", got)
 	}
 	if got := analyzedChapters(ws, seg, norm, "segid-A", "v2"); got != 0 {
-		t.Fatalf("prompt 版本变化应使分析全部失效，得 %d", got)
+		t.Fatalf("Thay đổi phiên bản prompt phải làm vô hiệu toàn bộ phân tích, nhận %d", got)
 	}
 }

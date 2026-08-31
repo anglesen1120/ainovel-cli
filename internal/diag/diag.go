@@ -7,23 +7,23 @@ import (
 	"github.com/voocel/ainovel-cli/internal/store"
 )
 
-// ── 诊断阈值 ─────────────────────────────────────────────
+// ── Ngưỡng chẩn đoán ───────────────────────────────────────
 
 const (
-	ThresholdDimScoreLow      = 70  // ChronicLowDimension: 维度均分低于此值告警
-	ThresholdContractMissRate = 0.3 // ContractMissPattern: 合同未达成率上限
-	ThresholdRewriteRate      = 0.5 // ExcessiveRewrites: 改写率上限
-	ThresholdWordShortRatio   = 0.4 // WordCountAnomaly: 字数低于均值此比例视为异常
-	ThresholdWordLongRatio    = 2.5 // WordCountAnomaly: 字数高于均值此比例视为异常
-	ThresholdHookWeakScore    = 75  // HookWeakChain: hook 低于此分视为偏弱
-	ThresholdHookWeakChain    = 3   // HookWeakChain: 连续偏弱章数阈值
-	ThresholdPayoffMissRate   = 0.4 // PayoffMissPattern: payoff 未兑现率上限
-	ThresholdCompassDrift     = 15  // CompassDrift: 指南针未更新章数上限
-	ThresholdTimelineGapRate  = 0.3 // TimelineGaps: 缺失率容忍上限
-	ThresholdForeshadowMin    = 8   // StaleForeshadow: 伏笔停滞最小章数
+	ThresholdDimScoreLow      = 70  // ChronicLowDimension: cảnh báo khi điểm trung bình chiều thấp hơn giá trị này
+	ThresholdContractMissRate = 0.3 // ContractMissPattern: giới hạn trên của tỷ lệ contract chưa đạt
+	ThresholdRewriteRate      = 0.5 // ExcessiveRewrites: giới hạn trên của tỷ lệ viết lại
+	ThresholdWordShortRatio   = 0.4 // WordCountAnomaly: số chữ thấp hơn tỷ lệ này so với trung bình thì xem là bất thường
+	ThresholdWordLongRatio    = 2.5 // WordCountAnomaly: số chữ cao hơn tỷ lệ này so với trung bình thì xem là bất thường
+	ThresholdHookWeakScore    = 75  // HookWeakChain: hook thấp hơn điểm này thì xem là yếu
+	ThresholdHookWeakChain    = 3   // HookWeakChain: ngưỡng số chương yếu liên tiếp
+	ThresholdPayoffMissRate   = 0.4 // PayoffMissPattern: giới hạn trên tỷ lệ payoff chưa thực hiện
+	ThresholdCompassDrift     = 15  // CompassDrift: giới hạn trên số chương chưa cập nhật compass
+	ThresholdTimelineGapRate  = 0.3 // TimelineGaps: giới hạn trên cho tỷ lệ thiếu được dung nạp
+	ThresholdForeshadowMin    = 8   // StaleForeshadow: số chương tối thiểu để xem foreshadow là trì trệ
 )
 
-// allRules 按 flow → quality → planning → context 排列。
+// allRules được sắp theo flow → quality → planning → context.
 var allRules = []RuleFunc{
 	// Flow
 	InvalidPendingRewrites,
@@ -49,7 +49,7 @@ var allRules = []RuleFunc{
 	RelationshipStagnation,
 }
 
-// Analyze 是诊断系统的唯一入口。
+// Analyze là điểm vào duy nhất của hệ thống chẩn đoán.
 func Analyze(s *store.Store) Report {
 	snap := Load(s)
 
@@ -62,8 +62,8 @@ func Analyze(s *store.Store) Report {
 			Confidence: ConfHigh,
 			AutoLevel:  AutoNone,
 			Target:     "runtime.flow",
-			Title:      fmt.Sprintf("工件加载失败: %s", e),
-			Suggestion: "文件可能损坏或权限不足，相关诊断规则的结果可能不完整。",
+			Title:      fmt.Sprintf("Không tải được tài sản: %s", e),
+			Suggestion: "Có thể tệp bị hỏng hoặc thiếu quyền, kết quả của các quy tắc chẩn đoán liên quan có thể chưa đầy đủ.",
 		})
 	}
 	for _, rule := range allRules {
@@ -98,7 +98,7 @@ func buildStats(snap *Snapshot) Stats {
 		st.PlanningTier = string(snap.RunMeta.PlanningTier)
 	}
 
-	// 评审统计
+	// Thống kê đánh giá
 	st.ReviewCount = len(snap.Reviews)
 	var totalScore float64
 	var dimCount int
@@ -115,7 +115,7 @@ func buildStats(snap *Snapshot) Stats {
 		st.AvgReviewScore = totalScore / float64(dimCount)
 	}
 
-	// 伏笔统计
+	// Thống kê foreshadow
 	latest := snap.LatestCompleted()
 	for _, f := range snap.Foreshadow {
 		if f.Status == "planted" || f.Status == "advanced" {
@@ -128,7 +128,7 @@ func buildStats(snap *Snapshot) Stats {
 	return st
 }
 
-// sortFindings 按严重程度排序：critical > warning > info。
+// sortFindings sắp xếp theo mức nghiêm trọng: critical > warning > info.
 func sortFindings(findings []Finding) {
 	order := map[Severity]int{SevCritical: 0, SevWarning: 1, SevInfo: 2}
 	sort.SliceStable(findings, func(i, j int) bool {
@@ -136,7 +136,7 @@ func sortFindings(findings []Finding) {
 	})
 }
 
-// staleForeshadowThreshold 根据总章节数计算伏笔停滞阈值。
+// staleForeshadowThreshold tính ngưỡng foreshadow trì trệ dựa trên tổng số chương.
 func staleForeshadowThreshold(completedChapters int) int {
 	t := completedChapters / 3
 	if t < ThresholdForeshadowMin {

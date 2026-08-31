@@ -538,6 +538,7 @@ output/novel/meta/simulation_profile.json
 }
 ```
 
+
 关于 `api_key`：
 
 - `openrouter` / `anthropic` / `gemini` / `openai` / `deepseek` / `qwen` / `glm` / `grok` 这类托管接口通常需要填写 `api_key`

@@ -14,7 +14,7 @@ func factsN(n int) []ImportedChapterFacts {
 	out := make([]ImportedChapterFacts, n)
 	for i := 0; i < n; i++ {
 		out[i] = ImportedChapterFacts{
-			Chapter: i + 1, Title: "第" + itoa(i+1) + "章", CoreEvent: "事件", Summary: "摘要",
+			Chapter: i + 1, Title: "Chương " + itoa(i+1), CoreEvent: "Sự kiện", Summary: "Tóm tắt",
 			HookType: "mystery", DominantStrand: "quest",
 		}
 	}
@@ -34,109 +34,109 @@ func itoa(n int) string {
 }
 
 func TestValidateStructure(t *testing.T) {
-	ok := []ImportedVolumeRange{{Title: "卷一", Arcs: []ImportedArcRange{{StartChapter: 1, EndChapter: 3}}}}
+	ok := []ImportedVolumeRange{{Title: "Quyển một", Arcs: []ImportedArcRange{{StartChapter: 1, EndChapter: 3}}}}
 	if err := validateStructure(ok, 3); err != nil {
-		t.Fatalf("合法结构应通过：%v", err)
+		t.Fatalf("Cấu trúc hợp lệ phải qua: %v", err)
 	}
 	gap := []ImportedVolumeRange{{Arcs: []ImportedArcRange{{StartChapter: 1, EndChapter: 2}, {StartChapter: 4, EndChapter: 5}}}}
 	if err := validateStructure(gap, 5); err == nil {
-		t.Fatal("缺口应拒绝")
+		t.Fatal("Khoảng trống phải bị từ chối")
 	}
 	short := []ImportedVolumeRange{{Arcs: []ImportedArcRange{{StartChapter: 1, EndChapter: 2}}}}
 	if err := validateStructure(short, 3); err == nil {
-		t.Fatal("未覆盖 N 应拒绝")
+		t.Fatal("Chưa bao phủ N phải bị từ chối")
 	}
 }
 
 func TestAssembleFoundationHappyClosed(t *testing.T) {
 	facts := factsN(3)
 	s := &BookSynthesis{
-		Synopsis:     "无剧透简介",
-		Premise:      "# 故事前提\n\n前提",
-		Characters:   []domain.Character{{Name: "甲"}},
+		Synopsis:     "Giới thiệu không tiết lộ cốt truyện",
+		Premise:      "# Tiền đề câu chuyện\n\nTiền đề",
+		Characters:   []domain.Character{{Name: "A"}},
 		PlanningTier: domain.PlanningTierShort,
 		StoryStatus:  storyClosed,
-		Compass:      domain.StoryCompass{EndingDirection: "收束"},
-		Structure:    []ImportedVolumeRange{{Title: "卷一", Arcs: []ImportedArcRange{{Title: "弧一", StartChapter: 1, EndChapter: 3}}}},
+		Compass:      domain.StoryCompass{EndingDirection: "Kết thúc gọn"},
+		Structure:    []ImportedVolumeRange{{Title: "Quyển một", Arcs: []ImportedArcRange{{Title: "Cung một", StartChapter: 1, EndChapter: 3}}}},
 	}
 	f, err := AssembleFoundation(s, facts, true, "book.txt")
 	if err != nil {
-		t.Fatalf("组装应成功：%v", err)
+		t.Fatalf("Lắp ghép phải thành công: %v", err)
 	}
 	if len(domain.FlattenOutline(f.Volumes)) != 3 {
-		t.Fatal("展开章数应为 3")
+		t.Fatal("Số chương sau khi trải phẳng phải là 3")
 	}
 	if !f.Volumes[len(f.Volumes)-1].Final {
-		t.Fatal("closed 时末卷应 Final")
+		t.Fatal("Khi closed thì quyển cuối phải Final")
 	}
-	if f.Book.Title != "book" || f.Book.Synopsis != "无剧透简介" {
-		t.Fatalf("作品信息组装错误: %+v", f.Book)
+	if f.Book.Title != "book" || f.Book.Synopsis != "Giới thiệu không tiết lộ cốt truyện" {
+		t.Fatalf("Thông tin tác phẩm lắp ghép sai: %+v", f.Book)
 	}
 }
 
 func TestAssembleFoundationTitleMismatch(t *testing.T) {
 	facts := factsN(2)
-	facts[1].Title = "" // 破坏标题一致性会在 FlattenOutline 校验失败？标题空但结构取自 facts，故一致。
-	// 用结构覆盖不到的章制造真实不一致：章数不符。
+	facts[1].Title = "" // Làm hỏng tính nhất quán tiêu đề sẽ bị kiểm tra lỗi ở FlattenOutline? Tiêu đề rỗng nhưng cấu trúc lấy từ facts, nên vẫn nhất quán.
+	// Tạo bất nhất thực sự bằng cách dùng cấu trúc không bao phủ đủ chương: số chương không khớp.
 	s := &BookSynthesis{
-		Synopsis: "无剧透简介", Premise: "# 故事前提", Characters: []domain.Character{{Name: "甲"}},
+		Synopsis: "Giới thiệu không tiết lộ cốt truyện", Premise: "# Tiền đề câu chuyện", Characters: []domain.Character{{Name: "A"}},
 		PlanningTier: domain.PlanningTierShort, StoryStatus: storyOpen,
 		Compass:   domain.StoryCompass{EndingDirection: "x"},
 		Structure: []ImportedVolumeRange{{Arcs: []ImportedArcRange{{StartChapter: 1, EndChapter: 1}}}},
 	}
 	if _, err := AssembleFoundation(s, facts, false, "b.txt"); err == nil {
-		t.Fatal("结构只覆盖 1 章而事实 2 章应拒绝")
+		t.Fatal("Cấu trúc chỉ bao phủ 1 chương trong khi dữ kiện có 2 chương phải bị từ chối")
 	}
 }
 
 func TestImportedBookTitle(t *testing.T) {
-	if got := importedBookTitle("我的小说.txt"); got != "我的小说" {
-		t.Fatalf("应从文件名推断书名：%q", got)
+	if got := importedBookTitle("tiểu-thuyết-của-tôi.txt"); got != "tiểu-thuyết-của-tôi" {
+		t.Fatalf("Phải suy ra tên sách từ tên tệp: %q", got)
 	}
 }
 
 func TestPlanFactRangesSplits(t *testing.T) {
 	facts := factsN(20)
 	one := len(compactFact(facts[0]))
-	ranges := planFactRanges(facts, one*3) // 每区间约 3 章
+	ranges := planFactRanges(facts, one*3) // Mỗi khoảng khoảng 3 chương
 	if len(ranges) < 2 {
-		t.Fatalf("应分多区间，得 %d", len(ranges))
+		t.Fatalf("Phải chia thành nhiều khoảng, được %d", len(ranges))
 	}
 	if ranges[0][0] != 0 || ranges[len(ranges)-1][1] != 20 {
-		t.Fatal("区间未完整覆盖")
+		t.Fatal("Khoảng chưa bao phủ đầy đủ")
 	}
 }
 
-// TestToCompactCarriesEvidence 守护 #6：逐章反推的 character/world evidence 必须进入综合紧凑视图，
-// 否则综合器只能从摘要臆造正式角色与世界规则。
+// TestToCompactCarriesEvidence bảo vệ #6: evidence character/world suy ngược theo từng chương phải đi vào chế độ xem gọn tổng hợp,
+// nếu không bộ tổng hợp chỉ có thể bịa ra nhân vật chính thức và quy tắc thế giới từ phần tóm tắt.
 func TestToCompactCarriesEvidence(t *testing.T) {
 	f := ImportedChapterFacts{
-		Chapter: 1, Title: "第一章", CoreEvent: "e", Summary: "s",
-		CharacterEvidence: []ImportedCharacterFact{{Chapter: 1, Name: "甲", Note: "沉稳"}},
-		WorldEvidence:     []ImportedWorldFact{{Chapter: 1, Category: "magic", Fact: "灵气充盈"}},
+		Chapter: 1, Title: "Chương một", CoreEvent: "e", Summary: "s",
+		CharacterEvidence: []ImportedCharacterFact{{Chapter: 1, Name: "A", Note: "điềm tĩnh"}},
+		WorldEvidence:     []ImportedWorldFact{{Chapter: 1, Category: "magic", Fact: "linh khí dồi dào"}},
 	}
 	cv := toCompact(f)
-	if len(cv.CharacterEvidence) != 1 || cv.CharacterEvidence[0].Name != "甲" {
-		t.Fatalf("character evidence 未带入紧凑视图：%+v", cv.CharacterEvidence)
+	if len(cv.CharacterEvidence) != 1 || cv.CharacterEvidence[0].Name != "A" {
+		t.Fatalf("character evidence chưa được đưa vào chế độ xem gọn: %+v", cv.CharacterEvidence)
 	}
-	if len(cv.WorldEvidence) != 1 || cv.WorldEvidence[0].Fact != "灵气充盈" {
-		t.Fatalf("world evidence 未带入紧凑视图：%+v", cv.WorldEvidence)
+	if len(cv.WorldEvidence) != 1 || cv.WorldEvidence[0].Fact != "linh khí dồi dào" {
+		t.Fatalf("world evidence chưa được đưa vào chế độ xem gọn: %+v", cv.WorldEvidence)
 	}
 }
 
-// TestSynthesizeRejectsRangeMismatch 守护 #4：长书 Map 阶段区间摘要的起止章必须与请求一致，
-// 否则归并时会把错位区间当作本区间摘要。
+// TestSynthesizeRejectsRangeMismatch bảo vệ #4: phần tóm tắt khoảng ở giai đoạn Map của sách dài phải có chương bắt đầu/kết thúc khớp với yêu cầu,
+// nếu không khi gộp sẽ lấy nhầm khoảng lệch làm phần tóm tắt của khoảng hiện tại.
 func TestSynthesizeRejectsRangeMismatch(t *testing.T) {
-	err := validateRangeDigest(&RangeDigest{StartChapter: 1, EndChapter: 5, Plot: "错位区间"}, 1, 2, "range digest")
+	err := validateRangeDigest(&RangeDigest{StartChapter: 1, EndChapter: 5, Plot: "khoảng lệch"}, 1, 2, "range digest")
 	if err == nil {
-		t.Fatal("区间起止章与请求不符应拒绝")
+		t.Fatal("Khoảng bắt đầu/kết thúc không khớp với yêu cầu phải bị từ chối")
 	}
-	if !strings.Contains(err.Error(), "章范围") {
-		t.Fatalf("错误应指出区间范围不符，得：%v", err)
+	if !strings.Contains(err.Error(), "phạm vi chương") {
+		t.Fatalf("Lỗi phải chỉ ra phạm vi khoảng không khớp, được: %v", err)
 	}
 }
 
-// TestGroupDigestsByBudget 守护 #3 归并分组：连续区间摘要按字节预算分连续组，单摘要超预算也单独成组。
+// TestGroupDigestsByBudget bảo vệ #3 gộp nhóm: các tóm tắt khoảng liên tiếp được chia thành nhóm liên tiếp theo ngân sách byte, một tóm tắt vượt ngân sách cũng tự thành một nhóm riêng.
 func TestGroupDigestsByBudget(t *testing.T) {
 	ds := []RangeDigest{
 		{StartChapter: 1, EndChapter: 5, Plot: strings.Repeat("x", 200)},
@@ -145,17 +145,17 @@ func TestGroupDigestsByBudget(t *testing.T) {
 		{StartChapter: 16, EndChapter: 20, Plot: strings.Repeat("w", 200)},
 	}
 	per := len(mustJSON(t, ds[0]))
-	groups := groupDigestsByBudget(ds, per*2+10) // 每组约容纳 2 个
+	groups := groupDigestsByBudget(ds, per*2+10) // Mỗi nhóm khoảng chứa được 2 cái
 	if len(groups) != 2 || len(groups[0]) != 2 || len(groups[1]) != 2 {
-		t.Fatalf("应分 2 组各 2 个，得 %v", groups)
+		t.Fatalf("Phải chia thành 2 nhóm, mỗi nhóm 2 cái, được %v", groups)
 	}
 	if groups[0][0].StartChapter != 1 || groups[1][1].EndChapter != 20 {
-		t.Fatal("分组未保持连续覆盖")
+		t.Fatal("Chia nhóm không giữ được tính liên tục bao phủ")
 	}
 }
 
-// TestReduceToFitMergesUntilBudget 守护 #3：区间摘要总量超预算时逐层归并到可容纳，
-// 而非无界进入最终综合调用。
+// TestReduceToFitMergesUntilBudget bảo vệ #3: khi tổng lượng tóm tắt khoảng vượt ngân sách thì phải gộp từng tầng cho đến khi vừa sức chứa,
+// chứ không đi không giới hạn vào lời gọi tổng hợp cuối cùng.
 func TestReduceToFitMergesUntilBudget(t *testing.T) {
 	ds := []RangeDigest{
 		{StartChapter: 1, EndChapter: 5, Plot: strings.Repeat("x", 200)},
@@ -164,17 +164,17 @@ func TestReduceToFitMergesUntilBudget(t *testing.T) {
 		{StartChapter: 16, EndChapter: 20, Plot: strings.Repeat("w", 200)},
 	}
 	budget := len(mustJSON(t, ds[0]))*2 + 10
-	// 每组归并出一个小摘要：第 1-10 章、第 11-20 章。
+	// Mỗi nhóm gộp ra một tóm tắt nhỏ: chương 1-10, chương 11-20.
 	m := &mockModel{responses: []string{
-		rangeDigestJSON(1, 10, "合并一"),
-		rangeDigestJSON(11, 20, "合并二"),
+		rangeDigestJSON(1, 10, "Gộp một"),
+		rangeDigestJSON(11, 20, "Gộp hai"),
 	}}
 	out, err := reduceToFit(context.Background(), m, "range", ds, budget, 4096, callProfile{})
 	if err != nil {
 		t.Fatalf("reduceToFit: %v", err)
 	}
 	if len(out) != 2 || out[0].StartChapter != 1 || out[0].EndChapter != 10 || out[1].StartChapter != 11 || out[1].EndChapter != 20 {
-		t.Fatalf("应归并为 2 个连续区间摘要，得 %+v", out)
+		t.Fatalf("Phải gộp thành 2 tóm tắt khoảng liên tiếp, được %+v", out)
 	}
 }
 
@@ -196,10 +196,10 @@ func TestSynthesizeDirectWithMock(t *testing.T) {
 		t.Fatalf("Synthesize: %v", err)
 	}
 	if s.StoryStatus != storyOpen || len(s.Structure) != 1 {
-		t.Fatalf("综合结果不符：%+v", s)
+		t.Fatalf("Kết quả tổng hợp không khớp: %+v", s)
 	}
 	if _, err := AssembleFoundation(s, facts, false, "b.txt"); err != nil {
-		t.Fatalf("组装应成功：%v", err)
+		t.Fatalf("Lắp ghép phải thành công: %v", err)
 	}
 	_ = agentcore.StopReasonStop
 }

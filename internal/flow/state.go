@@ -7,29 +7,29 @@ import (
 	storepkg "github.com/voocel/ainovel-cli/internal/store"
 )
 
-// LoadState 从 Store 读取 Route 所需的全部事实。
-// 这是路由的"IO 边界"：所有读取集中在这里，Route 保持纯。
-// 任何读取失败都返回错误；损坏的工件与“尚未生成”是两种不同事实，Router 不得
-// 在不完整快照上继续派单。
+// LoadState đọc toàn bộ dữ kiện mà Route cần từ Store.
+// Đây là "ranh giới IO" của bộ định tuyến: mọi thao tác đọc tập trung tại đây để Route luôn thuần.
+// Bất kỳ lỗi đọc nào cũng được trả về; artifact hỏng và “chưa được tạo” là hai dữ kiện khác nhau, Router không được
+// tiếp tục phân công khi snapshot không đầy đủ.
 func LoadState(store *storepkg.Store) (State, error) {
 	var s State
 	missing, err := store.FoundationMissing()
 	if err != nil {
-		return s, fmt.Errorf("load foundation state: %w", err)
+		return s, fmt.Errorf("tải trạng thái foundation: %w", err)
 	}
 	s.FoundationMissing = missing
-	// 规划级别:save_foundation 落 scale 时写入 RunMeta,补齐分支据此推导规划师。
-	// 读失败按未知处理(tier 空 → 补齐交 LLM 裁定),与其余事实的保守默认一致。
+	// Cấp quy hoạch: save_foundation ghi scale vào RunMeta; nhánh bù dùng nó để suy ra planner.
+	// Lỗi đọc được coi là chưa biết (tier rỗng → LLM quyết định việc bù), nhất quán với mặc định thận trọng cho các dữ kiện khác.
 	meta, err := store.RunMeta.Load()
 	if err != nil {
-		return s, fmt.Errorf("load run meta: %w", err)
+		return s, fmt.Errorf("tải metadata lần chạy: %w", err)
 	}
 	if meta != nil {
 		s.PlanningTier = meta.PlanningTier
 	}
 	progress, err := store.Progress.Load()
 	if err != nil {
-		return s, fmt.Errorf("load progress: %w", err)
+		return s, fmt.Errorf("tải tiến độ: %w", err)
 	}
 	if progress == nil {
 		return s, nil
@@ -37,7 +37,7 @@ func LoadState(store *storepkg.Store) (State, error) {
 	s.Progress = progress
 	feedback, err := store.Outline.LoadPendingOutlineFeedback()
 	if err != nil {
-		return s, fmt.Errorf("load outline feedback: %w", err)
+		return s, fmt.Errorf("tải phản hồi dàn ý: %w", err)
 	}
 	for _, item := range feedback {
 		if item.RequiresImmediateReview() {
@@ -47,17 +47,17 @@ func LoadState(store *storepkg.Store) (State, error) {
 
 	s.LastCompleted = progress.LatestCompleted()
 
-	// 弧边界仅在分层模式且有已完成章节时才计算
+	// Ranh giới hồi chỉ được tính ở chế độ phân tầng khi có chương đã hoàn thành.
 	if progress.Layered && s.LastCompleted > 0 {
 		boundaries, err := store.Outline.CompletedArcBoundaries(s.LastCompleted)
 		if err != nil {
-			return s, fmt.Errorf("load completed arc boundaries: %w", err)
+			return s, fmt.Errorf("tải ranh giới hồi đã hoàn thành: %w", err)
 		}
 		for i := range boundaries {
 			boundary := &boundaries[i]
 			hasReview, err := store.World.HasArcReview(boundary.EndChapter)
 			if err != nil {
-				return s, fmt.Errorf("load arc review: %w", err)
+				return s, fmt.Errorf("tải đánh giá hồi: %w", err)
 			}
 			if !hasReview {
 				s.AggregateRefresh = aggregateRefresh(AggregateArcReview, boundary)
@@ -65,7 +65,7 @@ func LoadState(store *storepkg.Store) (State, error) {
 			}
 			hasArcSummary, err := store.Summaries.HasArcSummary(boundary.Volume, boundary.Arc)
 			if err != nil {
-				return s, fmt.Errorf("load arc summary: %w", err)
+				return s, fmt.Errorf("tải tóm tắt hồi: %w", err)
 			}
 			if !hasArcSummary {
 				s.AggregateRefresh = aggregateRefresh(AggregateArcSummary, boundary)
@@ -74,7 +74,7 @@ func LoadState(store *storepkg.Store) (State, error) {
 			if boundary.IsVolumeEnd {
 				hasVolumeSummary, err := store.Summaries.HasVolumeSummary(boundary.Volume)
 				if err != nil {
-					return s, fmt.Errorf("load volume summary: %w", err)
+					return s, fmt.Errorf("tải tóm tắt quyển: %w", err)
 				}
 				if !hasVolumeSummary {
 					s.AggregateRefresh = aggregateRefresh(AggregateVolumeSummary, boundary)
@@ -85,36 +85,36 @@ func LoadState(store *storepkg.Store) (State, error) {
 
 		boundary, err := store.Outline.CheckArcBoundary(s.LastCompleted)
 		if err != nil {
-			return s, fmt.Errorf("check arc boundary: %w", err)
+			return s, fmt.Errorf("kiểm tra ranh giới hồi: %w", err)
 		}
 		if boundary != nil {
 			s.ArcBoundary = boundary
 			if boundary.IsArcEnd {
 				s.HasArcReview, err = store.World.HasArcReview(s.LastCompleted)
 				if err != nil {
-					return s, fmt.Errorf("load arc review: %w", err)
+					return s, fmt.Errorf("tải đánh giá hồi: %w", err)
 				}
 				s.HasArcSummary, err = store.Summaries.HasArcSummary(boundary.Volume, boundary.Arc)
 				if err != nil {
-					return s, fmt.Errorf("load arc summary: %w", err)
+					return s, fmt.Errorf("tải tóm tắt hồi: %w", err)
 				}
 				if boundary.IsVolumeEnd {
 					s.HasVolumeSummary, err = store.Summaries.HasVolumeSummary(boundary.Volume)
 					if err != nil {
-						return s, fmt.Errorf("load volume summary: %w", err)
+						return s, fmt.Errorf("tải tóm tắt quyển: %w", err)
 					}
 				}
 			}
 		}
 	}
 
-	// 非分层全局审阅事实:仅在触发点读盘(其余组合 Route 不消费该字段)。
+	// Dữ kiện đánh giá toàn cục không phân tầng: chỉ đọc đĩa tại điểm kích hoạt (các tổ hợp Route khác không dùng trường này).
 	if !progress.Layered && s.LastCompleted > 0 {
 		for completed := domain.ReviewInterval; completed <= len(progress.CompletedChapters); completed += domain.ReviewInterval {
 			chapter := progress.CompletedChapters[completed-1]
 			hasReview, err := store.World.HasGlobalReview(chapter)
 			if err != nil {
-				return s, fmt.Errorf("load global review: %w", err)
+				return s, fmt.Errorf("tải đánh giá toàn cục: %w", err)
 			}
 			if !hasReview {
 				s.AggregateRefresh = &AggregateRefresh{Kind: AggregateGlobalReview, EndChapter: chapter}
@@ -124,7 +124,7 @@ func LoadState(store *storepkg.Store) (State, error) {
 		if due, _ := domain.ShouldReview(len(progress.CompletedChapters)); due {
 			s.HasGlobalReview, err = store.World.HasGlobalReview(s.LastCompleted)
 			if err != nil {
-				return s, fmt.Errorf("load global review: %w", err)
+				return s, fmt.Errorf("tải đánh giá toàn cục: %w", err)
 			}
 		}
 	}

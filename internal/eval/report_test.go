@@ -26,16 +26,16 @@ func TestAggregateRepeatSummary(t *testing.T) {
 		t.Fatalf("pass rate = %.2f want 0.33", cr.Summary.PassRate)
 	}
 	if cr.Summary.HardFailRuns != 1 || cr.Summary.WarningRuns != 1 {
-		t.Fatalf("summary runs 不正确: %+v", cr.Summary)
+		t.Fatalf("summary runs không đúng: %+v", cr.Summary)
 	}
 	if cr.Summary.CostUSD == nil || cr.Summary.CostUSD.Avg != 0.1 ||
 		cr.Summary.ToolCalls == nil || cr.Summary.ToolCalls.Avg != 10 {
-		t.Fatalf("range summary 不正确: %+v", cr.Summary)
+		t.Fatalf("range summary không đúng: %+v", cr.Summary)
 	}
 
 	s := Aggregate("run", "single", "", 3, []CaseResult{cr})
 	if s.Gate != Fail || s.Repeat != 3 || len(s.Cases) != 1 {
-		t.Fatalf("suite 聚合不正确: %+v", s)
+		t.Fatalf("suite tổng hợp không đúng: %+v", s)
 	}
 }
 
@@ -51,13 +51,13 @@ func TestAggregateABDeltaControlsGate(t *testing.T) {
 	}, []Delta{delta})
 
 	if cr.Outcome != Warn {
-		t.Fatalf("delta warning 应让 case WARN，得到 %s", cr.Outcome)
+		t.Fatalf("delta warning phải làm case WARN, nhận %s", cr.Outcome)
 	}
 	if cr.Summary.VariantPassRate != 1 || cr.Summary.DeltaPassRate != 0 {
-		t.Fatalf("AB summary 不正确: %+v", cr.Summary)
+		t.Fatalf("AB summary không đúng: %+v", cr.Summary)
 	}
 	s := Aggregate("run", "ab", "writer-x", 1, []CaseResult{cr})
 	if s.Gate != Warn {
-		t.Fatalf("suite gate = %s want WARN", s.Gate)
+		t.Fatalf("suite gate = %s nhưng cần WARN", s.Gate)
 	}
 }

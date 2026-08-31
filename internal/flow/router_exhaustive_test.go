@@ -99,16 +99,16 @@ func classify(t *testing.T, inst *Instruction) expectKind {
 	switch inst.Agent {
 	case "writer":
 		switch {
-		case contains(inst.Task, "重写") || contains(inst.Task, "打磨"):
+		case contains(inst.Task, "Viết lại") || contains(inst.Task, "Biên tập"):
 			return expectRewrite
-		case contains(inst.Task, "写第"):
+		case contains(inst.Task, "Viết Chương"):
 			return expectNextChapter
 		}
 	case "editor":
 		switch {
-		case contains(inst.Task, "弧级评审"):
+		case contains(inst.Task, "scope=arc"):
 			return expectArcReview
-		case contains(inst.Task, "全局审阅"):
+		case contains(inst.Task, "scope=global"):
 			return expectGlobalReview
 		case contains(inst.Task, "save_arc_summary"):
 			return expectArcSummary
@@ -117,7 +117,7 @@ func classify(t *testing.T, inst *Instruction) expectKind {
 		}
 	case "architect_long":
 		switch {
-		case contains(inst.Task, "补齐基础设定"):
+		case contains(inst.Task, "Bổ sung các mục thiếu"):
 			return expectFoundationFill
 		case contains(inst.Task, "writer_feedback"):
 			return expectOutlineFeedback
@@ -127,14 +127,14 @@ func classify(t *testing.T, inst *Instruction) expectKind {
 			return expectNewVolume
 		}
 	case "architect_short":
-		if contains(inst.Task, "补齐基础设定") {
+		if contains(inst.Task, "Bổ sung các mục thiếu") {
 			return expectFoundationFill
 		}
 		if contains(inst.Task, "writer_feedback") {
 			return expectOutlineFeedback
 		}
 	}
-	t.Fatalf("无法归类的指令：agent=%q task=%q", inst.Agent, inst.Task)
+	t.Fatalf("Không thể phân loại lệnh: agent=%q task=%q", inst.Agent, inst.Task)
 	return expectNil
 }
 
@@ -305,39 +305,39 @@ func assertConservation(t *testing.T, s State, inst *Instruction) {
 		if s.PlanningTier == domain.PlanningTierShort {
 			wantPlanner = "architect_short"
 		}
-		if inst.Agent != wantPlanner || !contains(inst.Task, "补齐基础设定") || inst.Chapter != 0 {
-			t.Fatalf("规划期指令必须是补齐派单且规划师匹配 tier=%q：%+v", s.PlanningTier, inst)
+		if inst.Agent != wantPlanner || !contains(inst.Task, "Bổ sung các mục thiếu") || inst.Chapter != 0 {
+			t.Fatalf("Lệnh giai đoạn lập kế hoạch phải bổ sung mục thiếu và planner khớp tier=%q: %+v", s.PlanningTier, inst)
 		}
 		return
 	}
 	switch inst.Agent {
 	case "writer":
 		if inst.Chapter <= 0 {
-			t.Fatalf("writer 指令必须带章节号：%+v", inst)
+			t.Fatalf("Lệnh writer phải có số chương: %+v", inst)
 		}
 		if len(p.PendingRewrites) > 0 {
 			if inst.Chapter != p.PendingRewrites[0] {
-				t.Fatalf("重写队列非空时必须派队列头 %d，got %d", p.PendingRewrites[0], inst.Chapter)
+				t.Fatalf("Hàng đợi viết lại phải giao chương đầu %d, nhận %d", p.PendingRewrites[0], inst.Chapter)
 			}
-			wantVerb := "重写"
+			wantVerb := "Viết lại"
 			if p.Flow == domain.FlowPolishing {
-				wantVerb = "打磨"
+				wantVerb = "Biên tập"
 			}
 			if !contains(inst.Task, wantVerb) {
-				t.Fatalf("队列任务动词应为 %q：%q", wantVerb, inst.Task)
+				t.Fatalf("Động từ nhiệm vụ hàng đợi phải là %q: %q", wantVerb, inst.Task)
 			}
 		} else if inst.Chapter != p.NextChapter() {
-			t.Fatalf("续写指令章节号应为 NextChapter=%d，got %d", p.NextChapter(), inst.Chapter)
+			t.Fatalf("Số chương viết tiếp phải là NextChapter=%d, nhận %d", p.NextChapter(), inst.Chapter)
 		}
 	case "editor", "architect_long", "architect_short":
 		if inst.Chapter != 0 {
 			t.Fatalf("%s 指令不应带章节号：%+v", inst.Agent, inst)
 		}
 	default:
-		t.Fatalf("未知路由目标 %q", inst.Agent)
+		t.Fatalf("Đích định tuyến không xác định %q", inst.Agent)
 	}
 	if inst.Task == "" || inst.Reason == "" {
-		t.Fatalf("指令的 Task 与 Reason 都不得为空：%+v", inst)
+		t.Fatalf("Task và Reason của lệnh không được rỗng: %+v", inst)
 	}
 }
 

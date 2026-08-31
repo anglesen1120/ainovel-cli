@@ -24,8 +24,8 @@ func setupArcSummaryStore(t *testing.T) *store.Store {
 	volumes := []domain.VolumeOutline{{
 		Index: 1,
 		Arcs: []domain.ArcOutline{
-			{Index: 1, Chapters: []domain.OutlineEntry{{Title: "一"}, {Title: "二"}}},
-			{Index: 2, Chapters: []domain.OutlineEntry{{Title: "三"}, {Title: "四"}}},
+			{Index: 1, Chapters: []domain.OutlineEntry{{Title: "Một"}, {Title: "Hai"}}},
+			{Index: 2, Chapters: []domain.OutlineEntry{{Title: "Ba"}, {Title: "Bốn"}}},
 		},
 	}}
 	if err := s.Outline.SaveLayeredOutline(volumes); err != nil {
@@ -42,13 +42,13 @@ func setupArcSummaryStore(t *testing.T) *store.Store {
 			t.Fatal(err)
 		}
 	}
-	if err := s.World.SaveReview(domain.ReviewEntry{Chapter: 2, Scope: "arc", Verdict: "accept", Summary: "第一弧评审"}); err != nil {
+	if err := s.World.SaveReview(domain.ReviewEntry{Chapter: 2, Scope: "arc", Verdict: "accept", Summary: "Đánh giá cung một"}); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.Summaries.SaveArcSummary(domain.ArcSummary{Volume: 1, Arc: 1, Title: "第一弧", Summary: "完成", KeyEvents: []string{"事件"}}); err != nil {
+	if err := s.Summaries.SaveArcSummary(domain.ArcSummary{Volume: 1, Arc: 1, Title: "Cung một", Summary: "完成", KeyEvents: []string{"事件"}}); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.World.SaveReview(domain.ReviewEntry{Chapter: 4, Scope: "arc", Verdict: "accept", Summary: "第二弧评审"}); err != nil {
+	if err := s.World.SaveReview(domain.ReviewEntry{Chapter: 4, Scope: "arc", Verdict: "accept", Summary: "Đánh giá cung hai"}); err != nil {
 		t.Fatal(err)
 	}
 	return s
@@ -59,18 +59,18 @@ func validArcSummaryArgs(t *testing.T) []byte {
 	args, err := json.Marshal(map[string]any{
 		"volume":     1,
 		"arc":        2,
-		"title":      "入山",
-		"summary":    "主角完成入山试炼，确认后续追索方向。",
-		"key_events": []string{"通过试炼", "发现旧案线索"},
+		"title":      "Vào núi",
+		"summary":    "Nhân vật chính hoàn thành thử thách vào núi, xác nhận hướng truy tìm phía sau.",
+		"key_events": []string{"Vượt qua thử thách", "Phát hiện manh mối vụ án cũ"},
 		"character_snapshots": []map[string]any{
-			{"name": "沈渊", "status": "存活", "motivation": "追查旧案"},
+			{"name": "Thẩm Uyên", "status": "Còn sống", "motivation": "Truy tra vụ án cũ"},
 		},
 		"style_rules": map[string]any{
-			"prose": []string{"环境描写优先触觉和嗅觉", "动作戏用短句推进", "心理描写不解释结论"},
+			"prose": []string{"Ưu tiên miêu tả môi trường bằng xúc giác và khứu giác", "Cảnh hành động dùng câu ngắn để đẩy nhịp", "Miêu tả tâm lý không giải thích kết luận"},
 			"dialogue": []map[string]any{
-				{"name": "沈渊", "rules": []string{"对话极简", "少用疑问句"}},
+				{"name": "Thẩm Uyên", "rules": []string{"Thoại cực gọn", "Hạn chế dùng câu hỏi"}},
 			},
-			"taboos": []string{"避免章末长独白"},
+			"taboos": []string{"Tránh độc thoại dài ở cuối chương"},
 		},
 	})
 	if err != nil {
@@ -94,7 +94,7 @@ func TestSaveArcSummaryPersistsStyleRulesDialogueObjects(t *testing.T) {
 	if rules == nil || len(rules.Dialogue) != 1 {
 		t.Fatalf("expected one dialogue rule, got %+v", rules)
 	}
-	if rules.Dialogue[0].Name != "沈渊" || len(rules.Dialogue[0].Rules) != 2 {
+	if rules.Dialogue[0].Name != "Thẩm Uyên" || len(rules.Dialogue[0].Rules) != 2 {
 		t.Fatalf("unexpected dialogue rule: %+v", rules.Dialogue[0])
 	}
 }
@@ -150,12 +150,12 @@ func TestSaveArcSummaryRejectsDialogueStringArray(t *testing.T) {
 	args, err := json.Marshal(map[string]any{
 		"volume":              1,
 		"arc":                 2,
-		"title":               "入山",
-		"summary":             "主角完成入山试炼，确认后续追索方向。",
-		"key_events":          []string{"通过试炼"},
+		"title":               "Vào núi",
+		"summary":             "Nhân vật chính hoàn thành thử thách vào núi, xác nhận hướng truy tìm phía sau.",
+		"key_events":          []string{"Vượt qua thử thách"},
 		"character_snapshots": []map[string]any{},
 		"style_rules": map[string]any{
-			"prose":    []string{"环境描写优先触觉和嗅觉"},
+			"prose":    []string{"Ưu tiên miêu tả môi trường bằng xúc giác và khứu giác"},
 			"dialogue": []string{"沈渊对话极简"},
 		},
 	})
@@ -177,9 +177,9 @@ func TestSaveArcSummaryRequiresStyleRules(t *testing.T) {
 	args := json.RawMessage(`{
 		"volume": 1,
 		"arc": 2,
-		"title": "入山",
+		"title": "Vào núi",
 		"summary": "主角完成入山试炼。",
-		"key_events": ["通过试炼"],
+		"key_events": ["Vượt qua thử thách"],
 		"character_snapshots": []
 	}`)
 	if _, err := NewSaveArcSummaryTool(s).Execute(context.Background(), args); err == nil || !strings.Contains(err.Error(), "style_rules is required") {

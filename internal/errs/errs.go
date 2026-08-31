@@ -1,18 +1,18 @@
-// Package errs provides application-level error sentinels for ainovel-cli.
-// Callers wrap errors with fmt.Errorf("...: %w", errs.ErrXxx) and use
-// errors.Is to detect categories.
+// Gói errs cung cấp các sentinel lỗi cấp ứng dụng cho ainovel-cli.
+// Bên gọi bọc lỗi bằng fmt.Errorf("...: %w", errs.ErrXxx) và dùng
+// errors.Is để nhận diện từng nhóm lỗi.
 //
-// Provider runtime errors (rate_limit / timeout / stream_idle / network / auth
-// / context_overflow) live in agentcore — use agentcore.ClassifyProvider,
-// agentcore.IsFailoverEligible, agentcore.FailoverReason, and
-// agentcore.IsStreamIdleMessage directly.
+// Các lỗi runtime của provider (rate_limit / timeout / stream_idle / network / auth
+// / context_overflow) nằm trong agentcore — hãy dùng trực tiếp
+// agentcore.ClassifyProvider, agentcore.IsFailoverEligible, agentcore.FailoverReason
+// và agentcore.IsStreamIdleMessage.
 package errs
 
 import "errors"
 
 var (
 	ErrConfig           = errors.New("config error")
-	ErrProvider         = errors.New("provider error") // provider initialization / wiring
+	ErrProvider         = errors.New("provider error") // khởi tạo / kết nối provider
 	ErrStoreRead        = errors.New("store read error")
 	ErrStoreWrite       = errors.New("store write error")
 	ErrToolArgs         = errors.New("tool args invalid")

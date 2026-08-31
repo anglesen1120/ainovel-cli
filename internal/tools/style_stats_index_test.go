@@ -30,13 +30,13 @@ func TestStyleStatsIndexAppendRewriteAndRemove(t *testing.T) {
 		}
 	}
 
-	titles := []string{"第一章 风起", "云涌", "第3章 雷动", "暗潮", "归途", "山门"}
-	stopwords := []string{"陆九渊"}
+	titles := []string{"Chương một Phong khởi", "Vân dâng", "Chương 3 Lôi động", "Ám triều", "Hồi trình", "Sơn môn"}
+	stopwords := []string{"Lục Cửu Uyên"}
 	index := NewStyleStatsIndex(st)
 	completed := []int{1, 2, 3, 4, 5, 6}
 	assertStyleStatsIndexMatchesCompute(t, index, chapters, completed, titles, stopwords)
 
-	chapters[7] = "# 雾散\n宛如旧梦惊醒，他没有说话。\n风停了。"
+	chapters[7] = "# Sương tan\nNhư tỉnh khỏi giấc mộng cũ, anh không nói gì.\nGió ngừng rồi."
 	if err := st.Drafts.SaveFinalChapter(7, chapters[7]); err != nil {
 		t.Fatal(err)
 	}
@@ -44,7 +44,7 @@ func TestStyleStatsIndexAppendRewriteAndRemove(t *testing.T) {
 	completed = append(completed, 7)
 	assertStyleStatsIndexMatchesCompute(t, index, chapters, completed, titles, stopwords)
 
-	chapters[2] = "# 云涌\n黎明时，她心头一沉。\n改写后的长句只在这一章出现，不应成为跨章复读。\n风停了。"
+	chapters[2] = "# Vân dâng\nKhi bình minh lên, cô thấy nặng lòng.\nCâu dài đã sửa chỉ xuất hiện trong chương này, không nên bị lặp sang chương khác.\nGió ngừng rồi."
 	if err := st.Drafts.SaveFinalChapter(2, chapters[2]); err != nil {
 		t.Fatal(err)
 	}
@@ -62,7 +62,7 @@ func TestStyleStatsIndexSurfacesMissingCompletedChapter(t *testing.T) {
 		t.Fatal(err)
 	}
 	_, err := NewStyleStatsIndex(st).Snapshot([]int{1}, nil, nil)
-	if err == nil || !strings.Contains(err.Error(), "第 1 章已标记完成但终稿不存在") {
+	if err == nil || !strings.Contains(err.Error(), "Chương 1 đã được đánh dấu hoàn thành nhưng không có bản cuối") {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }

@@ -1,66 +1,27 @@
-# 内容扩充技巧
+# Kỹ thuật mở rộng nội dung
 
-当章节内容不足时，使用以下技巧自然扩充。
+Khi chương thiếu dung lượng, mở rộng bằng chi tiết có chức năng thay vì bơm chữ.
 
-## 1. 场景细节描写
+## 1. Chi tiết cảnh
 
-不要只说"他走进房间"，描写：
-- 房间的布局、光线、气味
-- 物品的细节和质感
-- 环境对人物的影响
-- 人物在空间中的移动
+Đừng chỉ nói nhân vật bước vào phòng; hãy tả:
+- Bố cục, ánh sáng, mùi.
+- Vật dụng và chất liệu.
+- Tác động của môi trường lên nhân vật.
+- Cách nhân vật di chuyển trong không gian.
 
-## 2. 人物内心活动
+## 2. Nội tâm nhân vật
 
-展示而非讲述内心世界：
-- 角色的犹豫和纠结
-- 过去记忆的闪回（1-2段）
-- 对未来的担忧和期待
-- 道德选择的内心辩论
+Trình hiện thay vì thuyết minh:
+- Do dự và giằng co.
+- Ký ức quay về ngắn gọn.
+- Lo lắng và mong đợi.
+- Tranh luận đạo đức bên trong.
 
-## 3. 对话扩展
+## 3. Mở rộng đối thoại
 
-不要只推进剧情，让对话：
-- 展现人物性格和说话方式
-- 包含潜台词和暗示
-- 有来回交锋和试探
-- 偶尔跑题再拉回（更真实）
-
-## 4. 感官体验
-
-调动五感描写：
-- 视觉：颜色、光影、形状
-- 听觉：声音、音乐、沉默
-- 触觉：温度、质感、疼痛
-- 嗅觉：气味、香味、腐臭
-- 味觉：食物、饮料、血腥味
-
-## 5. 次要情节线
-
-在主剧情中穿插：
-- 配角的小故事
-- 暗线的发展
-- 伏笔的埋设
-- 人物关系的微妙变化
-
-## 6. 节奏放慢
-
-关键时刻慢下来描写：
-- 动作场景的分解
-- 情感转变的过程
-- 发现真相的时刻
-- 紧张对峙的延展
-
-## 7. 环境烘托
-
-用环境反映情绪：
-- 天气和氛围
-- 社会环境背景
-- 文化习俗细节
-- 时代特征展现
-
-## 扩充原则
-
-- **自然融入** - 扩充内容要服务于故事，不要注水
-- **保持张力** - 即使扩充场景也不能失去冲突
-- **推进主线** - 所有扩充最终都要指向核心剧情
+Đối thoại không chỉ đẩy plot, mà còn:
+- Cho thấy tính cách và giọng nói.
+- Chứa ẩn ý và tín hiệu.
+- Có qua lại, thăm dò, phản kích.
+- Đôi khi lệch đề rồi quay lại, tự nhiên hơn.

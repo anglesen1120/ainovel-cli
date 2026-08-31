@@ -59,10 +59,10 @@ type commitArgs struct {
 
 func (t *CommitChapterTool) Name() string { return "commit_chapter" }
 func (t *CommitChapterTool) Description() string {
-	return "提交章节终稿。加载草稿正文保存为终稿，更新时间线、伏笔、关系、角色状态和进度。" +
-		"返回结构化事实：next_chapter / review_required / arc_end / volume_end / needs_expansion / book_complete / flow 等"
+	return "Nộp bản thảo cuối của chương. Tải nội dung nháp để lưu thành bản thảo cuối, cập nhật dòng thời gian, tình tiết gieo mầm, quan hệ, trạng thái nhân vật và tiến độ." +
+		"Trả về các dữ kiện có cấu trúc: next_chapter / review_required / arc_end / volume_end / needs_expansion / book_complete / flow, v.v."
 }
-func (t *CommitChapterTool) Label() string { return "提交章节" }
+func (t *CommitChapterTool) Label() string { return "Nộp chương" }
 
 // 写工具（跨域可恢复 Saga：完整载荷→终稿/状态→进度→checkpoint），禁止并发。
 func (t *CommitChapterTool) ReadOnly(_ json.RawMessage) bool        { return false }
@@ -70,7 +70,7 @@ func (t *CommitChapterTool) ConcurrencySafe(_ json.RawMessage) bool { return fal
 func (t *CommitChapterTool) StrictSchema() bool                     { return true }
 
 func (t *CommitChapterTool) Schema() map[string]any {
-	props := []schema.Prop{schema.Property("chapter", schema.Int("章节号")).Required()}
+	props := []schema.Prop{schema.Property("chapter", schema.Int("Số chương")).Required()}
 	props = append(props, chapterfacts.Properties(true)...)
 	return schema.Object(props...)
 }
@@ -78,51 +78,51 @@ func (t *CommitChapterTool) Schema() map[string]any {
 func (t *CommitChapterTool) Execute(_ context.Context, args json.RawMessage) (json.RawMessage, error) {
 	var requested commitArgs
 	if err := json.Unmarshal(args, &requested); err != nil {
-		return nil, fmt.Errorf("invalid args: %w: %w", errs.ErrToolArgs, err)
+		return nil, fmt.Errorf("Tham số không hợp lệ: %w: %w", errs.ErrToolArgs, err)
 	}
 	if requested.Chapter <= 0 {
-		return nil, fmt.Errorf("chapter must be > 0: %w", errs.ErrToolArgs)
+		return nil, fmt.Errorf("chapter phải lớn hơn 0: %w", errs.ErrToolArgs)
 	}
 	existingPending, err := t.store.Signals.LoadPendingCommit()
 	if err != nil {
-		return nil, fmt.Errorf("load pending commit: %w: %w", errs.ErrStoreRead, err)
+		return nil, fmt.Errorf("Không thể tải lần nộp đang chờ: %w: %w", errs.ErrStoreRead, err)
 	}
 	if existingPending != nil && existingPending.Chapter != requested.Chapter {
-		return nil, fmt.Errorf("存在未恢复的章节提交：第 %d 章（阶段 %s），请先恢复或重新提交该章: %w", existingPending.Chapter, existingPending.Stage, errs.ErrToolConflict)
+		return nil, fmt.Errorf("Có lần nộp chương chưa khôi phục: chương %d (giai đoạn %s); hãy khôi phục hoặc nộp lại chương này trước: %w", existingPending.Chapter, existingPending.Stage, errs.ErrToolConflict)
 	}
 	if existingPending != nil {
 		switch existingPending.Stage {
 		case domain.CommitStageStarted, domain.CommitStageStateApplied, domain.CommitStageProgressMarked, domain.CommitStageSignalSaved:
 		default:
-			return nil, fmt.Errorf("pending commit 阶段非法: %q: %w", existingPending.Stage, errs.ErrToolConflict)
+			return nil, fmt.Errorf("Giai đoạn của lần nộp đang chờ không hợp lệ: %q: %w", existingPending.Stage, errs.ErrToolConflict)
 		}
 	}
 
 	a := requested
 	if existingPending != nil && existingPending.Stage != domain.CommitStageProgressMarked && existingPending.Stage != domain.CommitStageSignalSaved {
 		if len(existingPending.Payload) == 0 {
-			return nil, fmt.Errorf("第 %d 章存在旧版未完成提交，但缺少可重放 payload；拒绝使用新生成参数覆盖，请从最近 checkpoint 恢复或人工核对 meta/pending_commit.json: %w",
+			return nil, fmt.Errorf("Lần nộp chưa hoàn tất của phiên bản cũ ở chương %d không có payload có thể phát lại; từ chối ghi đè bằng tham số mới tạo. Hãy khôi phục từ checkpoint gần nhất hoặc kiểm tra thủ công meta/pending_commit.json: %w",
 				existingPending.Chapter, errs.ErrToolConflict)
 		}
 		if err := json.Unmarshal(existingPending.Payload, &a); err != nil {
-			return nil, fmt.Errorf("decode pending commit payload: %w: %w", errs.ErrStoreRead, err)
+			return nil, fmt.Errorf("Không thể giải mã payload lần nộp đang chờ: %w: %w", errs.ErrStoreRead, err)
 		}
 		if a.Chapter != existingPending.Chapter {
-			return nil, fmt.Errorf("pending commit payload 章节不一致：记录=%d payload=%d: %w", existingPending.Chapter, a.Chapter, errs.ErrToolConflict)
+			return nil, fmt.Errorf("Chương trong payload lần nộp đang chờ không khớp: bản ghi=%d payload=%d: %w", existingPending.Chapter, a.Chapter, errs.ErrToolConflict)
 		}
 	}
 
 	progress, err := t.store.Progress.Load()
 	if err != nil {
-		return nil, fmt.Errorf("load progress: %w: %w", errs.ErrStoreRead, err)
+		return nil, fmt.Errorf("Không thể tải tiến độ: %w: %w", errs.ErrStoreRead, err)
 	}
 	if progress == nil {
-		return nil, fmt.Errorf("progress 未初始化: %w", errs.ErrToolPrecondition)
+		return nil, fmt.Errorf("Tiến độ chưa được khởi tạo: %w", errs.ErrToolPrecondition)
 	}
 	completed := slices.Contains(progress.CompletedChapters, a.Chapter)
 	if existingPending != nil && (existingPending.Stage == domain.CommitStageProgressMarked || existingPending.Stage == domain.CommitStageSignalSaved) {
 		if !completed {
-			return nil, fmt.Errorf("pending commit 已到 %s，但 progress 未标记第 %d 章完成: %w", existingPending.Stage, a.Chapter, errs.ErrToolConflict)
+			return nil, fmt.Errorf("Lần nộp đang chờ đã ở %s nhưng tiến độ chưa đánh dấu hoàn tất chương %d: %w", existingPending.Stage, a.Chapter, errs.ErrToolConflict)
 		}
 		return t.finishPendingCommit(*existingPending, progress)
 	}
@@ -134,9 +134,9 @@ func (t *CommitChapterTool) Execute(_ context.Context, args json.RawMessage) (js
 			if existingPending != nil && existingPending.Rewrite &&
 				(errors.Is(err, errs.ErrToolArgs) || errors.Is(err, errs.ErrToolPrecondition)) {
 				if clearErr := t.store.Signals.ClearPendingCommit(); clearErr != nil {
-					return nil, fmt.Errorf("返工提交校验失败（%v），且清理冻结提交失败: %w: %w", err, errs.ErrStoreWrite, clearErr)
+					return nil, fmt.Errorf("Kiểm tra lần nộp viết lại không thành công (%v) và không thể xóa lần nộp đã đóng băng: %w: %w", err, errs.ErrStoreWrite, clearErr)
 				}
-				return nil, fmt.Errorf("旧版遗留的返工提交未通过校验，已解除冻结；请修正后重新提交: %w", err)
+				return nil, fmt.Errorf("Lần nộp viết lại từ phiên bản cũ không qua kiểm tra; đã bỏ đóng băng. Hãy sửa rồi nộp lại: %w", err)
 			}
 			return nil, err
 		}
@@ -144,7 +144,7 @@ func (t *CommitChapterTool) Execute(_ context.Context, args json.RawMessage) (js
 
 	if existingPending != nil && existingPending.Rewrite {
 		if !completed {
-			return nil, fmt.Errorf("返工提交要求第 %d 章已存在终稿: %w", a.Chapter, errs.ErrToolConflict)
+			return nil, fmt.Errorf("Lần nộp viết lại yêu cầu chương %d đã có bản thảo cuối: %w", a.Chapter, errs.ErrToolConflict)
 		}
 		return t.executeRewriteCommit(a, progress, *existingPending, true)
 	}
@@ -156,7 +156,7 @@ func (t *CommitChapterTool) Execute(_ context.Context, args json.RawMessage) (js
 			}
 			payload, err := json.Marshal(a)
 			if err != nil {
-				return nil, fmt.Errorf("marshal rewrite payload: %w", err)
+				return nil, fmt.Errorf("Không thể đóng gói payload viết lại: %w", err)
 			}
 			now := time.Now().Format(time.RFC3339)
 			mode := "rewrite"
@@ -168,7 +168,7 @@ func (t *CommitChapterTool) Execute(_ context.Context, args json.RawMessage) (js
 				Summary: a.Summary, HookType: a.HookType,
 				DominantStrand: a.DominantStrand, StartedAt: now, UpdatedAt: now}
 			if err := t.store.Signals.SavePendingCommit(pending); err != nil {
-				return nil, fmt.Errorf("save rewrite pending commit: %w: %w", errs.ErrStoreWrite, err)
+				return nil, fmt.Errorf("Không thể lưu lần nộp viết lại đang chờ: %w: %w", errs.ErrStoreWrite, err)
 			}
 			return t.executeRewriteCommit(a, progress, pending, false)
 		}
@@ -183,12 +183,12 @@ func (t *CommitChapterTool) Execute(_ context.Context, args json.RawMessage) (js
 			if errors.Is(err, errs.ErrToolConflict) {
 				return nil, err
 			}
-			return nil, fmt.Errorf("章节当前不允许提交: %w: %w", errs.ErrToolPrecondition, err)
+			return nil, fmt.Errorf("Chương hiện không thể nộp: %w: %w", errs.ErrToolPrecondition, err)
 		}
 		if progress.Flow != domain.FlowRewriting && progress.Flow != domain.FlowPolishing {
 			expected := progress.NextChapter()
 			if a.Chapter != expected {
-				return nil, fmt.Errorf("正常续写只能提交下一章 %d，收到第 %d 章: %w", expected, a.Chapter, errs.ErrToolConflict)
+				return nil, fmt.Errorf("Chỉ có thể nộp chương kế tiếp %d khi viết tiếp bình thường, nhưng nhận chương %d: %w", expected, a.Chapter, errs.ErrToolConflict)
 			}
 		}
 	}
@@ -199,11 +199,11 @@ func (t *CommitChapterTool) Execute(_ context.Context, args json.RawMessage) (js
 	if progress.Layered {
 		b, bErr := t.store.Outline.CheckArcBoundary(a.Chapter)
 		if bErr != nil {
-			return nil, fmt.Errorf("弧边界检测失败 chapter=%d: %w: %w", a.Chapter, errs.ErrStoreRead, bErr)
+			return nil, fmt.Errorf("Không thể kiểm tra ranh giới cung cho chapter=%d: %w: %w", a.Chapter, errs.ErrStoreRead, bErr)
 		}
 		if b == nil {
 			return nil, fmt.Errorf(
-				"第 %d 章不在分层大纲范围内：写作必须先 expand_arc 扩展弧或 append_volume 追加卷；若全书已完结请调 save_foundation type=complete_book: %w",
+				"Chương %d nằm ngoài phạm vi dàn ý phân tầng: phải dùng expand_arc để mở rộng cung hoặc append_volume để thêm tập trước khi viết; nếu toàn truyện đã hoàn tất, hãy gọi save_foundation với type=complete_book: %w",
 				a.Chapter, errs.ErrToolPrecondition)
 		}
 		boundary = b
@@ -215,18 +215,18 @@ func (t *CommitChapterTool) Execute(_ context.Context, args json.RawMessage) (js
 	if existingPending != nil {
 		content = existingPending.DraftContent
 		if content == "" {
-			return nil, fmt.Errorf("第 %d 章未完成提交缺少 draft_content，无法证明恢复正文与原提交一致: %w",
+			return nil, fmt.Errorf("Lần nộp chưa hoàn tất của chương %d không có draft_content; không thể chứng minh nội dung khôi phục khớp với lần nộp ban đầu: %w",
 				a.Chapter, errs.ErrToolConflict)
 		}
 	} else {
 		var loadErr error
 		content, _, loadErr = t.store.Drafts.LoadChapterContent(a.Chapter)
 		if loadErr != nil {
-			return nil, fmt.Errorf("load chapter content: %w: %w", errs.ErrStoreRead, loadErr)
+			return nil, fmt.Errorf("Không thể tải nội dung chương: %w: %w", errs.ErrStoreRead, loadErr)
 		}
 	}
 	if content == "" {
-		return nil, fmt.Errorf("no content found for chapter %d: %w", a.Chapter, errs.ErrToolPrecondition)
+		return nil, fmt.Errorf("Không tìm thấy nội dung cho chương %d: %w", a.Chapter, errs.ErrToolPrecondition)
 	}
 	wordCount := utf8.RuneCountInString(content)
 
@@ -236,7 +236,7 @@ func (t *CommitChapterTool) Execute(_ context.Context, args json.RawMessage) (js
 	} else {
 		payload, err := json.Marshal(a)
 		if err != nil {
-			return nil, fmt.Errorf("marshal commit payload: %w", err)
+			return nil, fmt.Errorf("Không thể đóng gói payload nộp chương: %w", err)
 		}
 		now := time.Now().Format(time.RFC3339)
 		pending = domain.PendingCommit{
@@ -245,7 +245,7 @@ func (t *CommitChapterTool) Execute(_ context.Context, args json.RawMessage) (js
 			StartedAt: now, UpdatedAt: now,
 		}
 		if err := t.store.Signals.SavePendingCommit(pending); err != nil {
-			return nil, fmt.Errorf("save pending commit: %w: %w", errs.ErrStoreWrite, err)
+			return nil, fmt.Errorf("Không thể lưu lần nộp đang chờ: %w: %w", errs.ErrStoreWrite, err)
 		}
 	}
 
@@ -254,14 +254,14 @@ func (t *CommitChapterTool) Execute(_ context.Context, args json.RawMessage) (js
 	if pending.Stage == domain.CommitStageStarted {
 		// 2. 保存终稿
 		if err := t.store.Drafts.SaveFinalChapter(a.Chapter, content); err != nil {
-			return nil, fmt.Errorf("save final chapter: %w: %w", errs.ErrStoreWrite, err)
+			return nil, fmt.Errorf("Không thể lưu bản thảo cuối: %w: %w", errs.ErrStoreWrite, err)
 		}
 		style, err := t.chapterStyleDelta(a.Chapter)
 		if err != nil {
-			return nil, fmt.Errorf("load chapter style: %w: %w", errs.ErrStoreRead, err)
+			return nil, fmt.Errorf("Không thể tải thống kê phong cách chương: %w: %w", errs.ErrStoreRead, err)
 		}
 		if _, err := t.store.ChapterRecords.Accept(a.Chapter, domain.ChapterOriginGenerated, content, a.ChapterFacts, style); err != nil {
-			return nil, fmt.Errorf("save chapter record: %w: %w", errs.ErrStoreWrite, err)
+			return nil, fmt.Errorf("Không thể lưu bản ghi chương: %w: %w", errs.ErrStoreWrite, err)
 		}
 
 		// 3. 保存摘要
@@ -269,7 +269,7 @@ func (t *CommitChapterTool) Execute(_ context.Context, args json.RawMessage) (js
 			Chapter: a.Chapter, Title: a.Title, Summary: a.Summary, Characters: a.Characters, KeyEvents: a.KeyEvents,
 		}
 		if err := t.store.Summaries.SaveSummary(summary); err != nil {
-			return nil, fmt.Errorf("save summary: %w: %w", errs.ErrStoreWrite, err)
+			return nil, fmt.Errorf("Không thể lưu tóm tắt chương: %w: %w", errs.ErrStoreWrite, err)
 		}
 
 		// 4. 更新状态增量
@@ -278,12 +278,12 @@ func (t *CommitChapterTool) Execute(_ context.Context, args json.RawMessage) (js
 				a.TimelineEvents[i].Chapter = a.Chapter
 			}
 			if err := t.store.World.AppendTimelineEvents(a.TimelineEvents); err != nil {
-				return nil, fmt.Errorf("append timeline: %w: %w", errs.ErrStoreWrite, err)
+				return nil, fmt.Errorf("Không thể thêm sự kiện dòng thời gian: %w: %w", errs.ErrStoreWrite, err)
 			}
 		}
 		if len(a.ForeshadowUpdates) > 0 {
 			if err := t.store.World.UpdateForeshadow(a.Chapter, a.ForeshadowUpdates); err != nil {
-				return nil, fmt.Errorf("update foreshadow: %w: %w", errs.ErrStoreWrite, err)
+				return nil, fmt.Errorf("Không thể cập nhật tình tiết gieo mầm: %w: %w", errs.ErrStoreWrite, err)
 			}
 		}
 		if len(a.RelationshipChanges) > 0 {
@@ -291,7 +291,7 @@ func (t *CommitChapterTool) Execute(_ context.Context, args json.RawMessage) (js
 				a.RelationshipChanges[i].Chapter = a.Chapter
 			}
 			if err := t.store.World.UpdateRelationships(a.RelationshipChanges); err != nil {
-				return nil, fmt.Errorf("update relationships: %w: %w", errs.ErrStoreWrite, err)
+				return nil, fmt.Errorf("Không thể cập nhật quan hệ: %w: %w", errs.ErrStoreWrite, err)
 			}
 		}
 		if len(a.StateChanges) > 0 {
@@ -299,7 +299,7 @@ func (t *CommitChapterTool) Execute(_ context.Context, args json.RawMessage) (js
 				a.StateChanges[i].Chapter = a.Chapter
 			}
 			if err := t.store.World.AppendStateChanges(a.StateChanges); err != nil {
-				return nil, fmt.Errorf("append state changes: %w: %w", errs.ErrStoreWrite, err)
+				return nil, fmt.Errorf("Không thể thêm thay đổi trạng thái: %w: %w", errs.ErrStoreWrite, err)
 			}
 		}
 
@@ -308,31 +308,31 @@ func (t *CommitChapterTool) Execute(_ context.Context, args json.RawMessage) (js
 		if len(a.Characters) > 0 {
 			coreNames, err := loadCoreCharacterNameSet(t.store)
 			if err != nil {
-				return nil, fmt.Errorf("load core characters for cast ledger: %w: %w", errs.ErrStoreRead, err)
+				return nil, fmt.Errorf("Không thể tải các nhân vật chính cho sổ nhân vật phụ: %w: %w", errs.ErrStoreRead, err)
 			}
 			if err := t.store.Cast.MergeAppearances(a.Chapter, a.Characters, a.CastIntros, coreNames); err != nil {
-				slog.Warn("配角名册累加失败，跳过", "module", "commit", "chapter", a.Chapter, "err", err)
+				slog.Warn("Không thể bổ sung sổ nhân vật phụ; sẽ bỏ qua", "module", "commit", "chapter", a.Chapter, "err", err)
 			}
 		}
 
 		pending.Stage = domain.CommitStageStateApplied
 		pending.UpdatedAt = time.Now().Format(time.RFC3339)
 		if err := t.store.Signals.SavePendingCommit(pending); err != nil {
-			return nil, fmt.Errorf("update pending commit stage: %w: %w", errs.ErrStoreWrite, err)
+			return nil, fmt.Errorf("Không thể cập nhật giai đoạn lần nộp đang chờ: %w: %w", errs.ErrStoreWrite, err)
 		}
 	}
 
 	// 5. 更新进度
 	if !completed {
 		if err := t.store.Progress.MarkChapterComplete(a.Chapter, wordCount, a.HookType, a.DominantStrand); err != nil {
-			return nil, fmt.Errorf("mark chapter complete: %w: %w", errs.ErrStoreWrite, err)
+			return nil, fmt.Errorf("Không thể đánh dấu chương đã hoàn tất: %w: %w", errs.ErrStoreWrite, err)
 		}
 	}
 
 	// 6. 判断是否需要审阅
 	progress, err = t.store.Progress.Load()
 	if err != nil {
-		return nil, fmt.Errorf("load progress: %w: %w", errs.ErrStoreRead, err)
+		return nil, fmt.Errorf("Không thể tải tiến độ: %w: %w", errs.ErrStoreRead, err)
 	}
 	completedCount := 0
 	if progress != nil {
@@ -352,7 +352,7 @@ func (t *CommitChapterTool) Execute(_ context.Context, args json.RawMessage) (js
 		nextVol = boundary.NextVolume
 		nextArc = boundary.NextArc
 		if err := t.store.Progress.UpdateVolumeArc(vol, arc); err != nil {
-			return nil, fmt.Errorf("update volume/arc: %w: %w", errs.ErrStoreWrite, err)
+			return nil, fmt.Errorf("Không thể cập nhật tập/cung: %w: %w", errs.ErrStoreWrite, err)
 		}
 	}
 
@@ -397,7 +397,7 @@ func (t *CommitChapterTool) Execute(_ context.Context, args json.RawMessage) (js
 	}
 	latestProgress, err := t.store.Progress.Load()
 	if err != nil {
-		return nil, fmt.Errorf("load progress after completion: %w: %w", errs.ErrStoreRead, err)
+		return nil, fmt.Errorf("Không thể tải tiến độ sau khi hoàn tất: %w: %w", errs.ErrStoreRead, err)
 	}
 	if latestProgress != nil {
 		result.Flow = string(latestProgress.Flow)
@@ -408,7 +408,7 @@ func (t *CommitChapterTool) Execute(_ context.Context, args json.RawMessage) (js
 		if err := t.store.Outline.AppendOutlineFeedback(store.ChapterFeedback{
 			Chapter: a.Chapter, Deviation: a.Feedback.Deviation, Suggestion: a.Feedback.Suggestion,
 		}); err != nil {
-			return nil, fmt.Errorf("persist outline feedback: %w: %w", errs.ErrStoreWrite, err)
+			return nil, fmt.Errorf("Không thể lưu phản hồi dàn ý: %w: %w", errs.ErrStoreWrite, err)
 		}
 	}
 
@@ -416,7 +416,7 @@ func (t *CommitChapterTool) Execute(_ context.Context, args json.RawMessage) (js
 	violations := t.checkRules(content)
 	output, err := json.Marshal(commitOutput{CommitResult: result, RuleViolations: violations})
 	if err != nil {
-		return nil, fmt.Errorf("marshal commit output: %w", err)
+		return nil, fmt.Errorf("Không thể đóng gói kết quả nộp chương: %w", err)
 	}
 
 	pending.Stage = domain.CommitStageProgressMarked
@@ -424,32 +424,32 @@ func (t *CommitChapterTool) Execute(_ context.Context, args json.RawMessage) (js
 	pending.Output = output
 	pending.UpdatedAt = time.Now().Format(time.RFC3339)
 	if err := t.store.Signals.SavePendingCommit(pending); err != nil {
-		return nil, fmt.Errorf("update pending commit result: %w: %w", errs.ErrStoreWrite, err)
+		return nil, fmt.Errorf("Không thể cập nhật kết quả lần nộp đang chờ: %w: %w", errs.ErrStoreWrite, err)
 	}
 
 	// 9. 追加 checkpoint。必须先于清除 pending_commit，确保重启后可见的
 	// pending_commit 总能驱动重跑补齐缺失 checkpoint。
 	if err := t.appendCommitCheckpoint(a.Chapter); err != nil {
-		return nil, fmt.Errorf("checkpoint commit: %w: %w", errs.ErrStoreWrite, err)
+		return nil, fmt.Errorf("Không thể ghi checkpoint nộp chương: %w: %w", errs.ErrStoreWrite, err)
 	}
 	pending.Stage = domain.CommitStageSignalSaved
 	pending.UpdatedAt = time.Now().Format(time.RFC3339)
 	if err := t.store.Signals.SavePendingCommit(pending); err != nil {
-		return nil, fmt.Errorf("update pending commit checkpoint stage: %w: %w", errs.ErrStoreWrite, err)
+		return nil, fmt.Errorf("Không thể cập nhật giai đoạn checkpoint của lần nộp đang chờ: %w: %w", errs.ErrStoreWrite, err)
 	}
 
 	// 10. 清除进度中间状态
 	if err := t.store.Progress.ClearInProgress(); err != nil {
-		return nil, fmt.Errorf("clear in-progress: %w: %w", errs.ErrStoreWrite, err)
+		return nil, fmt.Errorf("Không thể xóa trạng thái đang xử lý: %w: %w", errs.ErrStoreWrite, err)
 	}
 	if err := t.store.Signals.ClearPendingCommit(); err != nil {
-		return nil, fmt.Errorf("clear pending commit: %w: %w", errs.ErrStoreWrite, err)
+		return nil, fmt.Errorf("Không thể xóa lần nộp đang chờ: %w: %w", errs.ErrStoreWrite, err)
 	}
 
 	// 持久化违规事实:editor 评审经 novel_context 消费(返回值只是镜像——
 	// writer 在 commit 后立即硬停,返回值无人可读)。best-effort。
 	if err := t.store.World.SaveRuleViolations(a.Chapter, violations); err != nil {
-		slog.Warn("机械违规落盘失败", "module", "tools", "chapter", a.Chapter, "err", err)
+		slog.Warn("Không thể lưu các vi phạm quy tắc cơ học", "module", "tools", "chapter", a.Chapter, "err", err)
 	}
 	t.refreshStyleStats(a.Chapter, content)
 	return output, nil
@@ -460,19 +460,19 @@ func (t *CommitChapterTool) Execute(_ context.Context, args json.RawMessage) (js
 func (t *CommitChapterTool) finishPendingCommit(pending domain.PendingCommit, progress *domain.Progress) (json.RawMessage, error) {
 	if pending.Stage == domain.CommitStageProgressMarked {
 		if err := t.appendCommitCheckpoint(pending.Chapter); err != nil {
-			return nil, fmt.Errorf("checkpoint commit: %w: %w", errs.ErrStoreWrite, err)
+			return nil, fmt.Errorf("Không thể ghi checkpoint nộp chương: %w: %w", errs.ErrStoreWrite, err)
 		}
 		pending.Stage = domain.CommitStageSignalSaved
 		pending.UpdatedAt = time.Now().Format(time.RFC3339)
 		if err := t.store.Signals.SavePendingCommit(pending); err != nil {
-			return nil, fmt.Errorf("update pending commit checkpoint stage: %w: %w", errs.ErrStoreWrite, err)
+			return nil, fmt.Errorf("Không thể cập nhật giai đoạn checkpoint của lần nộp đang chờ: %w: %w", errs.ErrStoreWrite, err)
 		}
 	}
 	if err := t.store.Progress.ClearInProgress(); err != nil {
-		return nil, fmt.Errorf("clear in-progress: %w: %w", errs.ErrStoreWrite, err)
+		return nil, fmt.Errorf("Không thể xóa trạng thái đang xử lý: %w: %w", errs.ErrStoreWrite, err)
 	}
 	if err := t.store.Signals.ClearPendingCommit(); err != nil {
-		return nil, fmt.Errorf("clear pending commit: %w: %w", errs.ErrStoreWrite, err)
+		return nil, fmt.Errorf("Không thể xóa lần nộp đang chờ: %w: %w", errs.ErrStoreWrite, err)
 	}
 	t.refreshStyleStats(pending.Chapter, pending.DraftContent)
 	if len(pending.Output) > 0 {
@@ -487,10 +487,10 @@ func (t *CommitChapterTool) finishPendingCommit(pending domain.PendingCommit, pr
 func (t *CommitChapterTool) validateRewriteDraft(chapter int, title string, progress *domain.Progress) (string, error) {
 	content, _, err := t.store.Drafts.LoadChapterContent(chapter)
 	if err != nil {
-		return "", fmt.Errorf("rewrite: load chapter content: %w: %w", errs.ErrStoreRead, err)
+		return "", fmt.Errorf("Viết lại: không thể tải nội dung chương: %w: %w", errs.ErrStoreRead, err)
 	}
 	if content == "" {
-		return "", fmt.Errorf("no content found for chapter %d: %w", chapter, errs.ErrToolPrecondition)
+		return "", fmt.Errorf("Không tìm thấy nội dung cho chương %d: %w", chapter, errs.ErrToolPrecondition)
 	}
 	changed, err := t.rewriteChanged(chapter, content, title)
 	if err != nil {
@@ -499,25 +499,25 @@ func (t *CommitChapterTool) validateRewriteDraft(chapter int, title string, prog
 	if changed {
 		return content, nil
 	}
-	mode := "重写"
+	mode := "viết lại"
 	if progress != nil && progress.Flow == domain.FlowPolishing {
-		mode = "打磨"
+		mode = "trau chuốt"
 	}
-	return "", fmt.Errorf("第 %d 章正文和标题均未发生变化，未检测到%s改动: %w",
+	return "", fmt.Errorf("Nội dung và tiêu đề của chương %d đều không thay đổi, không phát hiện thay đổi %s: %w",
 		chapter, mode, errs.ErrToolPrecondition)
 }
 
 func (t *CommitChapterTool) rewriteChanged(chapter int, content, title string) (bool, error) {
 	existingFinal, err := t.store.Drafts.LoadChapterText(chapter)
 	if err != nil {
-		return false, fmt.Errorf("rewrite: load final chapter: %w: %w", errs.ErrStoreRead, err)
+		return false, fmt.Errorf("Viết lại: không thể tải bản thảo cuối: %w: %w", errs.ErrStoreRead, err)
 	}
 	if existingFinal != content {
 		return true, nil
 	}
 	summary, err := t.store.Summaries.LoadSummary(chapter)
 	if err != nil {
-		return false, fmt.Errorf("rewrite: load chapter summary: %w: %w", errs.ErrStoreRead, err)
+		return false, fmt.Errorf("Viết lại: không thể tải tóm tắt chương: %w: %w", errs.ErrStoreRead, err)
 	}
 	return summary == nil || strings.TrimSpace(summary.Title) != strings.TrimSpace(title), nil
 }
@@ -551,7 +551,7 @@ func (t *CommitChapterTool) executeRewriteCommit(a commitArgs, progress *domain.
 	// 1. 只使用首次提交时冻结的返工正文，崩溃恢复不得采用随后被覆盖的 draft。
 	content := pending.DraftContent
 	if content == "" {
-		return nil, fmt.Errorf("第 %d 章返工提交缺少 draft_content，无法安全恢复: %w", chapter, errs.ErrToolConflict)
+		return nil, fmt.Errorf("Lần nộp viết lại của chương %d không có draft_content, không thể khôi phục an toàn: %w", chapter, errs.ErrToolConflict)
 	}
 	wordCount := utf8.RuneCountInString(content)
 
@@ -562,11 +562,11 @@ func (t *CommitChapterTool) executeRewriteCommit(a commitArgs, progress *domain.
 			return nil, err
 		}
 		if !changed {
-			mode := "重写"
+			mode := "viết lại"
 			if progress != nil && progress.Flow == domain.FlowPolishing {
-				mode = "打磨"
+				mode = "trau chuốt"
 			}
-			return nil, fmt.Errorf("第 %d 章正文和标题均未发生变化，未检测到%s改动: %w",
+			return nil, fmt.Errorf("Nội dung và tiêu đề của chương %d đều không thay đổi, không phát hiện thay đổi %s: %w",
 				chapter, mode, errs.ErrToolPrecondition)
 		}
 	}
@@ -576,7 +576,7 @@ func (t *CommitChapterTool) executeRewriteCommit(a commitArgs, progress *domain.
 		// 一旦事实链不闭合就会把失败载荷留在磁盘上，后续重试永远读到坏基线。
 		existing, err := t.store.ChapterRecords.Load(chapter)
 		if err != nil {
-			return nil, fmt.Errorf("rewrite: load chapter record: %w: %w", errs.ErrStoreRead, err)
+			return nil, fmt.Errorf("Viết lại: không thể tải bản ghi chương: %w: %w", errs.ErrStoreRead, err)
 		}
 		var existingUpdates []domain.ForeshadowUpdate
 		var style domain.StyleDelta
@@ -592,7 +592,7 @@ func (t *CommitChapterTool) executeRewriteCommit(a commitArgs, progress *domain.
 			chapter, domain.ChapterOriginGenerated, content, a.ChapterFacts, style,
 		)
 		if err != nil {
-			return nil, fmt.Errorf("rewrite: prepare chapter record: %w: %w", errs.ErrStoreRead, err)
+			return nil, fmt.Errorf("Viết lại: không thể chuẩn bị bản ghi chương: %w: %w", errs.ErrStoreRead, err)
 		}
 		chapters := slices.Clone(progress.CompletedChapters)
 		slices.Sort(chapters)
@@ -604,54 +604,54 @@ func (t *CommitChapterTool) executeRewriteCommit(a commitArgs, progress *domain.
 			}
 			record, err := t.store.ChapterRecords.Load(completedChapter)
 			if err != nil {
-				return nil, fmt.Errorf("rewrite: load chapter record %d: %w: %w", completedChapter, errs.ErrStoreRead, err)
+				return nil, fmt.Errorf("Viết lại: không thể tải bản ghi chương %d: %w: %w", completedChapter, errs.ErrStoreRead, err)
 			}
 			if record == nil {
-				return nil, fmt.Errorf("rewrite: 第 %d 章缺少接纳记录: %w", completedChapter, errs.ErrToolConflict)
+				return nil, fmt.Errorf("Viết lại: chương %d thiếu bản ghi đã chấp nhận: %w", completedChapter, errs.ErrToolConflict)
 			}
 			records = append(records, *record)
 		}
 		if err := revision.ValidateRecords(records); err != nil {
 			if clearErr := t.store.Signals.ClearPendingCommit(); clearErr != nil {
-				return nil, fmt.Errorf("rewrite: 章节事实链校验失败（%v），且清理冻结提交失败: %w: %w", err, errs.ErrStoreWrite, clearErr)
+				return nil, fmt.Errorf("Viết lại: kiểm tra chuỗi dữ kiện chương không thành công (%v) và không thể xóa lần nộp đã đóng băng: %w: %w", err, errs.ErrStoreWrite, clearErr)
 			}
-			return nil, fmt.Errorf("rewrite: 章节事实链校验失败，已解除冻结且未写入返工结果: %w: %w", errs.ErrToolPrecondition, err)
+			return nil, fmt.Errorf("Viết lại: kiểm tra chuỗi dữ kiện chương không thành công; đã bỏ đóng băng và chưa ghi kết quả viết lại: %w: %w", errs.ErrToolPrecondition, err)
 		}
 
 		// 4. 校验通过后再覆盖权威记录与终稿；同一冻结载荷可安全重放。
 		if err := t.store.Drafts.SaveFinalChapter(chapter, content); err != nil {
-			return nil, fmt.Errorf("rewrite: save final chapter: %w: %w", errs.ErrStoreWrite, err)
+			return nil, fmt.Errorf("Viết lại: không thể lưu bản thảo cuối: %w: %w", errs.ErrStoreWrite, err)
 		}
 		if err := t.store.ChapterRecords.Save(*candidate); err != nil {
-			return nil, fmt.Errorf("rewrite: save chapter record: %w: %w", errs.ErrStoreWrite, err)
+			return nil, fmt.Errorf("Viết lại: không thể lưu bản ghi chương: %w: %w", errs.ErrStoreWrite, err)
 		}
 		if len(recovered) > 0 {
-			slog.Warn("已从伏笔账本恢复旧版本丢失的种植事实", "module", "commit", "chapter", chapter, "foreshadows", recovered)
+			slog.Warn("Đã khôi phục các tình tiết gieo mầm bị mất trong phiên bản cũ từ sổ theo dõi tình tiết", "module", "commit", "chapter", chapter, "foreshadows", recovered)
 		}
 		if err := revision.NewProjector(t.store).Apply(records); err != nil {
-			return nil, fmt.Errorf("rewrite: rebuild chapter projections: %w: %w", errs.ErrStoreWrite, err)
+			return nil, fmt.Errorf("Viết lại: không thể dựng lại các phép chiếu chương: %w: %w", errs.ErrStoreWrite, err)
 		}
 		if err := t.store.Summaries.SaveSummary(domain.ChapterSummary{
 			Chapter: chapter, Title: a.Title, Summary: a.Summary, Characters: a.Characters, KeyEvents: a.KeyEvents,
 		}); err != nil {
-			return nil, fmt.Errorf("rewrite: save summary: %w: %w", errs.ErrStoreWrite, err)
+			return nil, fmt.Errorf("Viết lại: không thể lưu tóm tắt: %w: %w", errs.ErrStoreWrite, err)
 		}
 		pending.Stage = domain.CommitStageStateApplied
 		pending.UpdatedAt = time.Now().Format(time.RFC3339)
 		if err := t.store.Signals.SavePendingCommit(pending); err != nil {
-			return nil, fmt.Errorf("rewrite: update pending state stage: %w: %w", errs.ErrStoreWrite, err)
+			return nil, fmt.Errorf("Viết lại: không thể cập nhật giai đoạn trạng thái đang chờ: %w: %w", errs.ErrStoreWrite, err)
 		}
 	}
 
 	// 5. 更新字数（MarkChapterComplete 对已完成章节是幂等的：replaces word count, slice.Contains 防止重复入队）
 	if progress.Phase != domain.PhaseComplete {
 		if err := t.store.Progress.MarkChapterComplete(chapter, wordCount, a.HookType, a.DominantStrand); err != nil {
-			return nil, fmt.Errorf("rewrite: update word count: %w: %w", errs.ErrStoreWrite, err)
+			return nil, fmt.Errorf("Viết lại: không thể cập nhật số từ: %w: %w", errs.ErrStoreWrite, err)
 		}
 
 		// 6. Drain 待处理队列；队列空时 CompleteRewrite 会自动把 flow 切回 writing
 		if err := t.store.Progress.CompleteRewrite(chapter); err != nil {
-			return nil, fmt.Errorf("rewrite: complete rewrite: %w: %w", errs.ErrStoreWrite, err)
+			return nil, fmt.Errorf("Viết lại: không thể hoàn tất viết lại: %w: %w", errs.ErrStoreWrite, err)
 		}
 	}
 
@@ -662,7 +662,7 @@ func (t *CommitChapterTool) executeRewriteCommit(a commitArgs, progress *domain.
 	}
 	latest, err := t.store.Progress.Load()
 	if err != nil {
-		return nil, fmt.Errorf("rewrite: load progress after drain: %w: %w", errs.ErrStoreRead, err)
+		return nil, fmt.Errorf("Viết lại: không thể tải tiến độ sau khi xử lý hàng đợi: %w: %w", errs.ErrStoreRead, err)
 	}
 	remaining := []int{}
 	nextChapter := chapter + 1
@@ -691,16 +691,16 @@ func (t *CommitChapterTool) executeRewriteCommit(a commitArgs, progress *domain.
 			reComplete = latest.TotalChapters > 0 && len(latest.CompletedChapters) >= latest.TotalChapters
 		}
 		if err != nil {
-			return nil, fmt.Errorf("rewrite: evaluate completion: %w: %w", errs.ErrStoreRead, err)
+			return nil, fmt.Errorf("Viết lại: không thể đánh giá trạng thái hoàn tất: %w: %w", errs.ErrStoreRead, err)
 		}
 		if reComplete {
 			if err := t.store.Progress.MarkComplete(); err != nil {
-				return nil, fmt.Errorf("rewrite: mark complete: %w: %w", errs.ErrStoreWrite, err)
+				return nil, fmt.Errorf("Viết lại: không thể đánh dấu toàn truyện đã hoàn tất: %w: %w", errs.ErrStoreWrite, err)
 			}
 			bookComplete = true
 			p, err := t.store.Progress.Load()
 			if err != nil {
-				return nil, fmt.Errorf("rewrite: reload completed progress: %w: %w", errs.ErrStoreRead, err)
+				return nil, fmt.Errorf("Viết lại: không thể tải lại tiến độ đã hoàn tất: %w: %w", errs.ErrStoreRead, err)
 			}
 			if p != nil {
 				flow = string(p.Flow)
@@ -716,33 +716,33 @@ func (t *CommitChapterTool) executeRewriteCommit(a commitArgs, progress *domain.
 		"flow": flow, "book_complete": bookComplete, "rule_violations": violations,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("rewrite: marshal output: %w", err)
+		return nil, fmt.Errorf("Viết lại: không thể đóng gói kết quả: %w", err)
 	}
 	pending.Stage = domain.CommitStageProgressMarked
 	pending.Output = output
 	pending.UpdatedAt = time.Now().Format(time.RFC3339)
 	if err := t.store.Signals.SavePendingCommit(pending); err != nil {
-		return nil, fmt.Errorf("rewrite: update pending progress stage: %w: %w", errs.ErrStoreWrite, err)
+		return nil, fmt.Errorf("Viết lại: không thể cập nhật giai đoạn tiến độ đang chờ: %w: %w", errs.ErrStoreWrite, err)
 	}
 
 	// 8. Checkpoint 后再标 signal_saved，最后清理 PendingCommit。
 	if err := t.appendCommitCheckpoint(chapter); err != nil {
-		return nil, fmt.Errorf("rewrite: checkpoint commit: %w: %w", errs.ErrStoreWrite, err)
+		return nil, fmt.Errorf("Viết lại: không thể ghi checkpoint nộp chương: %w: %w", errs.ErrStoreWrite, err)
 	}
 	pending.Stage = domain.CommitStageSignalSaved
 	pending.UpdatedAt = time.Now().Format(time.RFC3339)
 	if err := t.store.Signals.SavePendingCommit(pending); err != nil {
-		return nil, fmt.Errorf("rewrite: update pending checkpoint stage: %w: %w", errs.ErrStoreWrite, err)
+		return nil, fmt.Errorf("Viết lại: không thể cập nhật giai đoạn checkpoint đang chờ: %w: %w", errs.ErrStoreWrite, err)
 	}
 	if err := t.store.Progress.ClearInProgress(); err != nil {
-		return nil, fmt.Errorf("rewrite: clear in-progress: %w: %w", errs.ErrStoreWrite, err)
+		return nil, fmt.Errorf("Viết lại: không thể xóa trạng thái đang xử lý: %w: %w", errs.ErrStoreWrite, err)
 	}
 	if err := t.store.Signals.ClearPendingCommit(); err != nil {
-		return nil, fmt.Errorf("rewrite: clear pending commit: %w: %w", errs.ErrStoreWrite, err)
+		return nil, fmt.Errorf("Viết lại: không thể xóa lần nộp đang chờ: %w: %w", errs.ErrStoreWrite, err)
 	}
 
 	if err := t.store.World.SaveRuleViolations(chapter, violations); err != nil {
-		slog.Warn("机械违规落盘失败", "module", "tools", "chapter", chapter, "err", err)
+		slog.Warn("Không thể lưu các vi phạm quy tắc cơ học", "module", "tools", "chapter", chapter, "err", err)
 	}
 	t.refreshStyleStats(chapter, content)
 	return output, nil
@@ -766,7 +766,7 @@ func (t *CommitChapterTool) restoreRewritePlants(chapter int, existing []domain.
 
 	ledger, err := t.store.World.LoadForeshadowLedger()
 	if err != nil {
-		return nil, fmt.Errorf("rewrite: load foreshadow ledger for recovery: %w: %w", errs.ErrStoreRead, err)
+		return nil, fmt.Errorf("Viết lại: không thể tải sổ tình tiết gieo mầm để khôi phục: %w: %w", errs.ErrStoreRead, err)
 	}
 	var restored []domain.ForeshadowUpdate
 	var ids []string
@@ -778,7 +778,7 @@ func (t *CommitChapterTool) restoreRewritePlants(chapter int, existing []domain.
 			continue
 		}
 		if strings.TrimSpace(entry.ID) == "" || strings.TrimSpace(entry.Description) == "" {
-			return nil, fmt.Errorf("rewrite: 第 %d 章伏笔账本缺少可恢复的 id 或 description: %w", chapter, errs.ErrToolConflict)
+			return nil, fmt.Errorf("Viết lại: sổ tình tiết gieo mầm của chương %d thiếu id hoặc description có thể khôi phục: %w", chapter, errs.ErrToolConflict)
 		}
 		planted[entry.ID] = struct{}{}
 		restored = append(restored, domain.ForeshadowUpdate{
@@ -797,11 +797,11 @@ func (t *CommitChapterTool) refreshStyleStats(chapter int, content string) {
 		var err error
 		content, err = t.store.Drafts.LoadChapterText(chapter)
 		if err != nil {
-			slog.Error("风格统计索引更新失败", "module", "tools", "chapter", chapter, "err", err)
+			slog.Error("Không thể cập nhật chỉ mục thống kê phong cách", "module", "tools", "chapter", chapter, "err", err)
 			return
 		}
 		if content == "" {
-			slog.Error("风格统计索引更新失败", "module", "tools", "chapter", chapter, "err", errors.New("终稿不存在"))
+			slog.Error("Không thể cập nhật chỉ mục thống kê phong cách", "module", "tools", "chapter", chapter, "err", errors.New("không có bản thảo cuối"))
 			return
 		}
 	}
@@ -813,7 +813,7 @@ func (t *CommitChapterTool) refreshStyleStats(chapter int, content string) {
 func (t *CommitChapterTool) buildSkipResult(chapter int, progress *domain.Progress) (json.RawMessage, error) {
 	_, wordCount, err := t.store.Drafts.LoadChapterContent(chapter)
 	if err != nil {
-		return nil, fmt.Errorf("load completed chapter: %w: %w", errs.ErrStoreRead, err)
+		return nil, fmt.Errorf("Không thể tải chương đã hoàn tất: %w: %w", errs.ErrStoreRead, err)
 	}
 
 	result := domain.CommitResult{
@@ -826,7 +826,7 @@ func (t *CommitChapterTool) buildSkipResult(chapter int, progress *domain.Progre
 	if progress != nil && progress.Layered {
 		boundary, err := t.store.Outline.CheckArcBoundary(chapter)
 		if err != nil {
-			return nil, fmt.Errorf("check completed chapter boundary: %w: %w", errs.ErrStoreRead, err)
+			return nil, fmt.Errorf("Không thể kiểm tra ranh giới của chương đã hoàn tất: %w: %w", errs.ErrStoreRead, err)
 		}
 		if boundary != nil {
 			result.ArcEnd = boundary.IsArcEnd
@@ -894,11 +894,11 @@ func (t *CommitChapterTool) applyCompletion(result *domain.CommitResult, progres
 	if progress.Layered {
 		complete, err := layeredComplete(t.store, progress)
 		if err != nil {
-			return false, fmt.Errorf("evaluate layered completion: %w: %w", errs.ErrStoreRead, err)
+			return false, fmt.Errorf("Không thể đánh giá trạng thái hoàn tất phân tầng: %w: %w", errs.ErrStoreRead, err)
 		}
 		if complete {
 			if err := t.store.Progress.MarkComplete(); err != nil {
-				return false, fmt.Errorf("mark book complete: %w: %w", errs.ErrStoreWrite, err)
+				return false, fmt.Errorf("Không thể đánh dấu toàn truyện đã hoàn tất: %w: %w", errs.ErrStoreWrite, err)
 			}
 			return true, nil
 		}
@@ -906,7 +906,7 @@ func (t *CommitChapterTool) applyCompletion(result *domain.CommitResult, progres
 	}
 	if progress.TotalChapters > 0 && result.NextChapter > progress.TotalChapters {
 		if err := t.store.Progress.MarkComplete(); err != nil {
-			return false, fmt.Errorf("mark book complete: %w: %w", errs.ErrStoreWrite, err)
+			return false, fmt.Errorf("Không thể đánh dấu toàn truyện đã hoàn tất: %w: %w", errs.ErrStoreWrite, err)
 		}
 		return true, nil
 	}
@@ -930,7 +930,7 @@ func layeredStructurallyComplete(st *store.Store, progress *domain.Progress) (bo
 	}
 	volumes, err := st.Outline.LoadLayeredOutline()
 	if err != nil {
-		return false, fmt.Errorf("load layered outline: %w", err)
+		return false, fmt.Errorf("Không thể tải dàn ý phân tầng: %w", err)
 	}
 	if len(volumes) == 0 {
 		return false, nil
@@ -958,22 +958,22 @@ func finaleWrapped(st *store.Store, progress *domain.Progress) (bool, error) {
 	}
 	b, err := st.Outline.CheckArcBoundary(last)
 	if err != nil {
-		return false, fmt.Errorf("check finale boundary: %w", err)
+		return false, fmt.Errorf("Không thể kiểm tra ranh giới phần kết: %w", err)
 	}
 	if b == nil || !b.IsArcEnd {
 		return false, nil
 	}
 	hasReview, err := st.World.HasArcReview(last)
 	if err != nil {
-		return false, fmt.Errorf("load finale review: %w", err)
+		return false, fmt.Errorf("Không thể tải đánh giá phần kết: %w", err)
 	}
 	hasArcSummary, err := st.Summaries.HasArcSummary(b.Volume, b.Arc)
 	if err != nil {
-		return false, fmt.Errorf("load finale arc summary: %w", err)
+		return false, fmt.Errorf("Không thể tải tóm tắt cung phần kết: %w", err)
 	}
 	hasVolumeSummary, err := st.Summaries.HasVolumeSummary(b.Volume)
 	if err != nil {
-		return false, fmt.Errorf("load finale volume summary: %w", err)
+		return false, fmt.Errorf("Không thể tải tóm tắt tập phần kết: %w", err)
 	}
 	return hasReview && hasArcSummary && hasVolumeSummary, nil
 }
@@ -988,7 +988,7 @@ func finaleWrapped(st *store.Store, progress *domain.Progress) (bool, error) {
 func layeredComplete(st *store.Store, progress *domain.Progress) (bool, error) {
 	volumes, err := st.Outline.LoadLayeredOutline()
 	if err != nil {
-		return false, fmt.Errorf("load layered outline: %w", err)
+		return false, fmt.Errorf("Không thể tải dàn ý phân tầng: %w", err)
 	}
 	if domain.FinaleVolume(volumes) > 0 {
 		structurallyComplete, err := layeredStructurallyComplete(st, progress)
@@ -1006,7 +1006,7 @@ func layeredComplete(st *store.Store, progress *domain.Progress) (bool, error) {
 func ReconcileLayeredCompletion(st *store.Store) (bool, error) {
 	progress, err := st.Progress.Load()
 	if err != nil {
-		return false, fmt.Errorf("load progress: %w", err)
+		return false, fmt.Errorf("Không thể tải tiến độ: %w", err)
 	}
 	if progress == nil || !progress.Layered {
 		return false, nil
@@ -1022,7 +1022,7 @@ func ReconcileLayeredCompletion(st *store.Store) (bool, error) {
 		return complete, err
 	}
 	if err := st.Progress.MarkComplete(); err != nil {
-		return false, fmt.Errorf("mark complete: %w", err)
+		return false, fmt.Errorf("Không thể đánh dấu hoàn tất: %w", err)
 	}
 	return true, nil
 }
@@ -1039,7 +1039,7 @@ func layeredBookComplete(st *store.Store, progress *domain.Progress) (bool, erro
 	// 4. 活跃伏笔必须归零（承诺已兑现）
 	active, err := st.World.LoadActiveForeshadow()
 	if err != nil {
-		return false, fmt.Errorf("load active foreshadow: %w", err)
+		return false, fmt.Errorf("Không thể tải các tình tiết gieo mầm đang hoạt động: %w", err)
 	}
 	if len(active) > 0 {
 		return false, nil
@@ -1047,7 +1047,7 @@ func layeredBookComplete(st *store.Store, progress *domain.Progress) (bool, erro
 	// 5. 指南针活跃长线必须收束（无 compass / 长线未清都交回架构师裁定）
 	compass, err := st.Outline.LoadCompass()
 	if err != nil {
-		return false, fmt.Errorf("load compass: %w", err)
+		return false, fmt.Errorf("Không thể tải la bàn cốt truyện: %w", err)
 	}
 	if compass == nil || len(compass.OpenThreads) > 0 {
 		return false, nil

@@ -1,25 +1,25 @@
-# 奇幻风格补充参考
+# Tham khảo bổ sung phong cách kỳ ảo
 
-## 世界构建
+## Xây dựng thế giới
 
-- 魔法体系必须有明确代价，不能出现"无限能量"
-- 种族特征要在行动中自然展示，禁止百科式灌输
-- 新设定首次出现时通过角色互动引出，不用旁白解释
+- Hệ thống ma thuật phải có giá rõ, không có năng lượng vô hạn.
+- Đặc điểm chủng tộc nên hiện qua hành động, tránh giảng giải như bách khoa.
+- Thiết lập mới lần đầu xuất hiện nên đi qua tương tác nhân vật, không chỉ bằng lời kể.
 
-## 常见陷阱
+## Cạm bẫy thường gặp
 
-- 龙傲天：主角能力攀升要有合理代价和挫折
-- 设定膨胀：每章最多引入一个新设定概念
-- 语言穿越：避免现代网络用语出现在古典背景中
+- Nhân vật chính quá thuận lợi: tăng năng lực phải có giá và vấp ngã.
+- Phình thiết lập: mỗi chương tối đa đưa một khái niệm mới quan trọng.
+- Lệch ngôn ngữ: tránh slang hiện đại trong bối cảnh cổ điển nếu không có lý do.
 
-## 战斗与能力描写
+## Chiến đấu và năng lực
 
-- 战斗重点是策略和代价，不是招式名称堆砌
-- 能力上限在 world_rules 中已约定，严禁突破
-- 受伤要有持续影响，不能"下一场景就好了"
+- Trọng tâm trận đánh là chiến thuật và cái giá, không phải tên chiêu dồn đống.
+- Giới hạn năng lực đã định trong world_rules phải được tôn trọng.
+- Vết thương cần có hệ quả kéo dài, không biến mất ngay cảnh sau.
 
-## 氛围营造
+## Không khí
 
-- 通过五感描写建立异世界沉浸感
-- 日常生活细节（货币、食物、交通）体现世界观
-- 避免所有角色都说现代普通话，适当使用世界观内的表达方式
+- Dùng năm giác quan để tạo nhập tâm thế giới khác.
+- Chi tiết đời sống như tiền, đồ ăn, di chuyển phản ánh worldbuilding.
+- Tránh để mọi nhân vật nói cùng một kiểu hiện đại; dùng cách diễn đạt hợp thế giới.

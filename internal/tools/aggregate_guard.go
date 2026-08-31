@@ -8,17 +8,17 @@ import (
 	"github.com/voocel/ainovel-cli/internal/store"
 )
 
-// requireAggregateTarget 将 Editor 的新聚合写入绑定到 Router 当前唯一待补的工件。
-// 目标完全由已落盘事实推导，不依赖任务文案，也不信任模型自填的章节/卷弧号；
-// 已落盘同内容的幂等收尾由各工具在调用本函数前识别。
+// requireAggregateTarget ràng buộc bản ghi tổng hợp mới của Editor vào hạng mục duy nhất Router đang chờ.
+// Mục tiêu được suy ra hoàn toàn từ dữ kiện đã lưu, không phụ thuộc mô tả nhiệm vụ và không tin số chương/tập/cung do mô hình tự điền;
+// việc hoàn tất idempotent với cùng nội dung đã lưu được mỗi công cụ nhận diện trước khi gọi hàm này.
 func requireAggregateTarget(st *store.Store, kind flow.AggregateKind, volume, arc, endChapter int) error {
 	state, err := flow.LoadState(st)
 	if err != nil {
-		return fmt.Errorf("load aggregate state: %w: %w", errs.ErrStoreRead, err)
+		return fmt.Errorf("Không thể tải trạng thái tổng hợp: %w: %w", errs.ErrStoreRead, err)
 	}
 	due := state.AggregateRefresh
 	if due == nil {
-		return fmt.Errorf("当前没有待处理的 %s 工件: %w", kind, errs.ErrToolPrecondition)
+		return fmt.Errorf("Hiện không có hạng mục %s đang chờ xử lý: %w", kind, errs.ErrToolPrecondition)
 	}
 	targetMismatch := due.Kind != kind
 	switch kind {
@@ -27,12 +27,12 @@ func requireAggregateTarget(st *store.Store, kind flow.AggregateKind, volume, ar
 	case flow.AggregateVolumeSummary:
 		targetMismatch = targetMismatch || due.Volume != volume
 	case flow.AggregateGlobalReview:
-		// 全局评审没有卷弧坐标，只由 kind 和截止章节定位。
+		// Đánh giá toàn cục không có tọa độ tập/cung, chỉ được định vị bằng kind và chương kết thúc.
 	}
 	endMismatch := endChapter > 0 && due.EndChapter != endChapter
 	if targetMismatch || endMismatch {
 		return fmt.Errorf(
-			"聚合写入目标不匹配：当前应处理 kind=%s volume=%d arc=%d end_chapter=%d，收到 kind=%s volume=%d arc=%d end_chapter=%d: %w",
+			"Mục tiêu ghi tổng hợp không khớp: hiện phải xử lý kind=%s volume=%d arc=%d end_chapter=%d, nhưng nhận kind=%s volume=%d arc=%d end_chapter=%d: %w",
 			due.Kind, due.Volume, due.Arc, due.EndChapter,
 			kind, volume, arc, endChapter, errs.ErrToolConflict,
 		)

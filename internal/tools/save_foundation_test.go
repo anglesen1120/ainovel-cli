@@ -172,8 +172,8 @@ func TestSaveFoundationRejectsFullOutlineAfterComplete(t *testing.T) {
 			}
 
 			args, _ := json.Marshal(map[string]any{"type": tt.typeArg, "content": tt.content})
-			if _, err := NewSaveFoundationTool(s).Execute(context.Background(), args); err == nil || !strings.Contains(err.Error(), "已完结") {
-				t.Fatalf("完结后全量覆盖必须被拒绝，err=%v", err)
+			if _, err := NewSaveFoundationTool(s).Execute(context.Background(), args); err == nil || !strings.Contains(err.Error(), "đã hoàn tất") {
+				t.Fatalf("toàn bộ dàn ý phải bị từ chối sau khi hoàn tất, lỗi=%v", err)
 			}
 			outline, err := s.Outline.LoadOutline()
 			if err != nil {

@@ -15,11 +15,11 @@ func TestPlanActionsOnlyHighConfSafe(t *testing.T) {
 	actions := PlanActions(findings)
 	for _, a := range actions {
 		if a.SourceRule != "PhaseFlowMismatch" {
-			t.Fatalf("unexpected action from rule %q, only PhaseFlowMismatch should produce actions", a.SourceRule)
+			t.Fatalf("quy tắc %q tạo ra thao tác ngoài dự kiến; chỉ PhaseFlowMismatch được tạo thao tác", a.SourceRule)
 		}
 	}
 	if len(actions) == 0 {
-		t.Fatal("expected at least one action from PhaseFlowMismatch")
+		t.Fatal("PhaseFlowMismatch phải tạo ít nhất một thao tác")
 	}
 }
 
@@ -36,7 +36,7 @@ func TestPlanActionsDedup(t *testing.T) {
 		}
 	}
 	if count != 1 {
-		t.Fatalf("expected 1 action from OrphanedSteer (dedup), got %d", count)
+		t.Fatalf("OrphanedSteer phải tạo 1 thao tác (loại trùng), nhận %d", count)
 	}
 }
 
@@ -49,15 +49,15 @@ func TestPhaseFlowMismatchMeta(t *testing.T) {
 	}
 	findings := PhaseFlowMismatch(snap)
 	if len(findings) != 1 {
-		t.Fatalf("expected 1 finding, got %d", len(findings))
+		t.Fatalf("phải có 1 phát hiện, nhận %d", len(findings))
 	}
 	f := findings[0]
 	if f.Confidence != ConfHigh || f.AutoLevel != AutoSafe {
-		t.Fatalf("expected high/safe, got %s/%s", f.Confidence, f.AutoLevel)
+		t.Fatalf("phải là high/safe, nhận %s/%s", f.Confidence, f.AutoLevel)
 	}
 	actions := PlanActions(findings)
 	if len(actions) == 0 {
-		t.Fatal("expected actions from PhaseFlowMismatch")
+		t.Fatal("PhaseFlowMismatch phải tạo thao tác")
 	}
 	hasFollowUp := false
 	for _, a := range actions {
@@ -66,7 +66,7 @@ func TestPhaseFlowMismatchMeta(t *testing.T) {
 		}
 	}
 	if !hasFollowUp {
-		t.Fatal("expected enqueue_follow_up action")
+		t.Fatal("phải có thao tác enqueue_follow_up")
 	}
 }
 
@@ -81,17 +81,17 @@ func TestInvalidPendingRewritesMeta(t *testing.T) {
 	}
 	findings := InvalidPendingRewrites(snap)
 	if len(findings) != 1 {
-		t.Fatalf("expected 1 finding, got %d", len(findings))
+		t.Fatalf("phải có 1 phát hiện, nhận %d", len(findings))
 	}
 	f := findings[0]
 	if f.Severity != SevCritical || f.Confidence != ConfHigh || f.AutoLevel != AutoSuggest {
-		t.Fatalf("expected critical/high/suggest, got %s/%s/%s", f.Severity, f.Confidence, f.AutoLevel)
+		t.Fatalf("phải là critical/high/suggest, nhận %s/%s/%s", f.Severity, f.Confidence, f.AutoLevel)
 	}
 	if f.Rule != "InvalidPendingRewrites" {
-		t.Fatalf("unexpected rule: %s", f.Rule)
+		t.Fatalf("quy tắc ngoài dự kiến: %s", f.Rule)
 	}
 	if actions := PlanActions(findings); len(actions) != 0 {
-		t.Fatalf("invalid pending rewrites should not auto-plan actions yet, got %+v", actions)
+		t.Fatalf("pending rewrites không hợp lệ chưa được tự động lập thao tác, nhận %+v", actions)
 	}
 }
 
@@ -105,22 +105,22 @@ func TestOutlineExhaustedMeta(t *testing.T) {
 	}
 	findings := OutlineExhausted(snap)
 	if len(findings) != 1 {
-		t.Fatalf("expected 1 finding, got %d", len(findings))
+		t.Fatalf("phải có 1 phát hiện, nhận %d", len(findings))
 	}
 	f := findings[0]
 	if f.Confidence != ConfHigh || f.AutoLevel != AutoSafe {
-		t.Fatalf("expected high/safe, got %s/%s", f.Confidence, f.AutoLevel)
+		t.Fatalf("phải là high/safe, nhận %s/%s", f.Confidence, f.AutoLevel)
 	}
 	actions := PlanActions(findings)
 	if len(actions) != 1 || actions[0].Kind != ActionEnqueueFollowUp {
-		t.Fatalf("expected 1 enqueue_follow_up action, got %+v", actions)
+		t.Fatalf("phải có 1 thao tác enqueue_follow_up, nhận %+v", actions)
 	}
 }
 
 func TestOrphanedSteerMeta(t *testing.T) {
 	snap := &Snapshot{
 		RunMeta: &domain.RunMeta{
-			PendingSteer: "把主角的性格改一下",
+			PendingSteer: "Hãy chỉnh lại tính cách nhân vật chính",
 		},
 		Progress: &domain.Progress{
 			Flow: domain.FlowWriting,
@@ -128,14 +128,14 @@ func TestOrphanedSteerMeta(t *testing.T) {
 	}
 	findings := OrphanedSteer(snap)
 	if len(findings) != 1 {
-		t.Fatalf("expected 1 finding, got %d", len(findings))
+		t.Fatalf("phải có 1 phát hiện, nhận %d", len(findings))
 	}
 	f := findings[0]
 	if f.Confidence != ConfHigh || f.AutoLevel != AutoSafe {
-		t.Fatalf("expected high/safe, got %s/%s", f.Confidence, f.AutoLevel)
+		t.Fatalf("phải là high/safe, nhận %s/%s", f.Confidence, f.AutoLevel)
 	}
 	actions := PlanActions(findings)
 	if len(actions) != 1 || actions[0].Kind != ActionEnqueueFollowUp {
-		t.Fatalf("expected 1 enqueue_follow_up action, got %+v", actions)
+		t.Fatalf("phải có 1 thao tác enqueue_follow_up, nhận %+v", actions)
 	}
 }

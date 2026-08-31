@@ -43,34 +43,34 @@ func (m *nativeSimulationModel) Generate(_ context.Context, messages []agentcore
 }
 
 func TestAnalyzeSourceUsesNativeSchema(t *testing.T) {
-	model := &nativeSimulationModel{response: validSourceReportJSON("清晰摘要")}
-	report, err := AnalyzeSource(t.Context(), model, "只分析写作方法。", scannedSource{})
+	model := &nativeSimulationModel{response: validSourceReportJSON("Tóm tắt rõ ràng")}
+	report, err := AnalyzeSource(t.Context(), model, "Chỉ phân tích phương pháp viết.", scannedSource{})
 	if err != nil {
 		t.Fatalf("AnalyzeSource: %v", err)
 	}
 	if report.Summary == "" {
-		t.Fatal("summary 为空")
+		t.Fatal("summary trống")
 	}
 	format := model.config.ResponseFormat
 	if format == nil || format.JSONSchema == nil || format.JSONSchema.Name != sourceReportContract.Name {
 		t.Fatalf("response format = %#v", format)
 	}
 	if strings.Contains(model.messages[0].TextContent(), "<output-json-schema>") {
-		t.Fatalf("native prompt 不应注入 schema: %s", model.messages[0].TextContent())
+		t.Fatalf("native prompt không nên chèn schema: %s", model.messages[0].TextContent())
 	}
 }
 
 func TestAnalyzeSourcePromptModeRepairsMissingRequiredFields(t *testing.T) {
 	model := &scriptedLLM{responses: []string{
 		`{}`,
-		validSourceReportJSON("修正后的摘要"),
+		validSourceReportJSON("Tóm tắt sau khi sửa"),
 	}}
-	report, err := AnalyzeSource(t.Context(), model, "只分析写作方法。", scannedSource{})
+	report, err := AnalyzeSource(t.Context(), model, "Chỉ phân tích phương pháp viết.", scannedSource{})
 	if err != nil {
 		t.Fatalf("AnalyzeSource: %v", err)
 	}
-	if report.Summary != "修正后的摘要" || model.calls.Load() != 2 {
-		t.Fatalf("缺字段后应反馈自愈: report=%+v calls=%d", report, model.calls.Load())
+	if report.Summary != "Tóm tắt sau khi sửa" || model.calls.Load() != 2 {
+		t.Fatalf("Sau khi thiếu trường, cần phản hồi để tự khắc phục: report=%+v calls=%d", report, model.calls.Load())
 	}
 }
 

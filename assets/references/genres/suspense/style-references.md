@@ -1,25 +1,25 @@
-# 悬疑风格补充参考
+# Tham khảo bổ sung phong cách suspense
 
-## 线索布局
+## Bố trí manh mối
 
-- 每章至少埋设一条线索（实线索或红鲱鱼）
-- 关键线索必须在揭晓前至少出现两次
-- 线索首次出现要自然融入场景，不能刻意强调
+- Mỗi chương ít nhất có một manh mối thật hoặc red herring.
+- Manh mối then chốt nên xuất hiện trước khi hé lộ, tốt nhất hơn một lần.
+- Lần xuất hiện đầu phải hòa vào cảnh, không nhấn quá lộ.
 
-## 误导技法
+## Kỹ thuật đánh lạc hướng
 
-- 红鲱鱼要有独立的合理性，不能事后看完全无意义
-- 叙述性诡计需要严格遵守"不说谎但可以省略"原则
-- 嫌疑人转移要有动机支撑，不能为了误导而误导
+- Red herring có lý riêng, không vô nghĩa khi nhìn lại.
+- Thủ pháp kể chuyện có thể lược bỏ nhưng không nói dối.
+- Chuyển nghi phạm cần động cơ chống đỡ, không đánh lạc hướng tùy tiện.
 
-## 节奏控制
+## Kiểm soát nhịp
 
-- 紧张→舒缓→更紧张的波浪式节奏
-- 信息释放要节制，每次只给读者"刚好不够"的信息量
-- 章末必须有悬念钩子，禁止"平静收尾"
+- Dùng nhịp sóng: căng → dịu → căng hơn.
+- Nhả thông tin tiết chế, mỗi lần chỉ đủ để người đọc thiếu thêm một chút.
+- Cuối chương cần móc, tránh khép quá yên.
 
-## 逻辑严密性
+## Logic chặt
 
-- 时间线必须可回溯验证
-- 不在场证明、动机、手法三要素缺一不可
-- 揭晓时读者应该能用已知线索自行推导出结论
+- Timeline phải truy ngược kiểm chứng được.
+- Alibi, động cơ và phương thức cần đủ ba chân.
+- Khi hé lộ, người đọc có thể dùng manh mối đã biết để tự suy ra kết luận.

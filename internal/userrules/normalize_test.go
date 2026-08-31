@@ -17,93 +17,94 @@ func TestExtractJSON_StripsCodeFences(t *testing.T) {
 	cases := []struct{ in, wantHas string }{
 		{"```json\n{\"a\":1}\n```", `"a":1`},
 		{"```\n{\"a\":1}\n```", `"a":1`},
-		{"前缀解释\n{\"a\":1}\n后缀", `"a":1`},
+		{"Giải thích tiền tố\n{\"a\":1}\nhậu tố", `"a":1`},
 		{"{\"a\":1}", `"a":1`},
 	}
 	for _, c := range cases {
 		got := llmcontract.ExtractJSONObject(c.in)
 		if got == "" {
-			t.Fatalf("extractJSON(%q) 返回空", c.in)
+			t.Fatalf("extractJSON(%q) trả về rỗng", c.in)
 		}
 		var m map[string]any
 		if err := json.Unmarshal([]byte(got), &m); err != nil {
-			t.Fatalf("extractJSON(%q)=%q 不是合法 JSON: %v", c.in, got, err)
+			t.Fatalf("extractJSON(%q)=%q không phải JSON hợp lệ: %v", c.in, got, err)
 		}
 	}
-	if llmcontract.ExtractJSONObject("没有任何 JSON") != "" {
-		t.Fatal("无 JSON 时应返回空串")
+	if llmcontract.ExtractJSONObject("Không có JSON nào") != "" {
+		t.Fatal("khi không có JSON phải trả về chuỗi rỗng")
 	}
 }
 
 func TestParseNormalizerJSON_FullOutput(t *testing.T) {
 	raw := "```json\n" + `{
   "structured": {
-    "genre": "都市",
+    "genre": "Đô thị",
     "forbidden_chars": [],
-    "forbidden_phrases": ["某种程度上"],
-    "fatigue_words": [{"word": "竟然", "max_per_chapter": 2}]
+    "forbidden_phrases": ["ở một mức độ nào đó"],
+    "fatigue_words": [{"word": "thật ra", "max_per_chapter": 2}]
   },
-  "preferences": "主角冷静克制",
-  "uncertain": ["少用比喻：无阈值"]
+  "preferences": "Nhân vật chính điềm tĩnh, kiềm chế",
+  "uncertain": ["Hạn chế dùng ẩn dụ: không có ngưỡng"]
 }` + "\n```"
 	body := llmcontract.ExtractJSONObject(raw)
 	if err := llmcontract.ValidateJSON(normalizeContract.Schema, []byte(body)); err != nil {
-		t.Fatalf("应解析成功: %v", err)
+		t.Fatalf("phải phân tích thành công: %v", err)
 	}
 	var out normalizerOutput
 	if err := json.Unmarshal([]byte(body), &out); err != nil {
-		t.Fatalf("应解码成功: %v", err)
+		t.Fatalf("phải giải mã thành công: %v", err)
 	}
 	cand, err := out.toCandidate("startup_prompt")
 	if err != nil {
 		t.Fatalf("toCandidate: %v", err)
 	}
-	if cand.Structured.Genre != "都市" {
-		t.Fatalf("genre 解析错误：%+v", cand.Structured)
+	if cand.Structured.Genre != "Đô thị" {
+		t.Fatalf("phân tích genre lỗi: %+v", cand.Structured)
 	}
-	if len(cand.Structured.ForbiddenPhrases) != 1 || cand.Structured.ForbiddenPhrases[0] != "某种程度上" {
-		t.Fatalf("forbidden_phrases 解析错误：%v", cand.Structured.ForbiddenPhrases)
+	if len(cand.Structured.ForbiddenPhrases) != 1 || cand.Structured.ForbiddenPhrases[0] != "ở một mức độ nào đó" {
+		t.Fatalf("phân tích forbidden_phrases lỗi: %v", cand.Structured.ForbiddenPhrases)
 	}
-	if cand.Structured.FatigueWords["竟然"] != 2 {
-		t.Fatalf("fatigue_words 数组应转成 map：%v", cand.Structured.FatigueWords)
+	if cand.Structured.FatigueWords["thật ra"] != 2 {
+		t.Fatalf("mảng fatigue_words phải chuyển thành map: %v", cand.Structured.FatigueWords)
 	}
-	if cand.Preferences != "主角冷静克制" {
-		t.Fatalf("preferences 解析错误：%q", cand.Preferences)
+	if cand.Preferences != "Nhân vật chính điềm tĩnh, kiềm chế" {
+		t.Fatalf("phân tích preferences lỗi: %q", cand.Preferences)
 	}
 	if len(cand.Uncertain) != 1 {
-		t.Fatalf("uncertain 应有 1 条，得到 %v", cand.Uncertain)
+		t.Fatalf("uncertain phải có 1 mục, nhận được %v", cand.Uncertain)
 	}
 }
 
-// fatigue 条目校验：空词与非正整数阈值都是可反馈修正的业务错误。
+// Kiểm tra mục fatigue: từ trống và ngưỡng không dương đều là lỗi nghiệp vụ có thể phản hồi để sửa.
 func TestToCandidateRejectsInvalidFatigueEntries(t *testing.T) {
 	bad := normalizerOutput{Structured: normalizerStructured{
 		FatigueWords: []fatigueWordEntry{{Word: " ", MaxPerChapter: 2}},
 	}}
 	if _, err := bad.toCandidate("x"); err == nil {
-		t.Fatal("空词条目应报错")
+		t.Fatal("mục có từ trống phải báo lỗi")
 	}
 	bad = normalizerOutput{Structured: normalizerStructured{
-		FatigueWords: []fatigueWordEntry{{Word: "竟然", MaxPerChapter: 0}},
+		FatigueWords: []fatigueWordEntry{{Word: "thật ra", MaxPerChapter: 0}},
 	}}
 	if _, err := bad.toCandidate("x"); err == nil {
-		t.Fatal("非正整数阈值应报错")
+		t.Fatal("ngưỡng không phải số nguyên dương phải báo lỗi")
 	}
 }
 
 func TestParseNormalizerJSON_GarbageFails(t *testing.T) {
-	if body := llmcontract.ExtractJSONObject("模型只回了一句话，没有 JSON"); body != "" {
-		t.Fatal("无 JSON 应解析失败（触发降级）")
+	if body := llmcontract.ExtractJSONObject("Mô hình chỉ trả về một câu, không có JSON"); body != "" {
+		t.Fatal("không có JSON phải phân tích thất bại (kích hoạt hạ cấp)")
 	}
-	if body := llmcontract.ExtractJSONObject("{ 不完整"); body != "" {
-		t.Fatal("残缺 JSON 应解析失败")
+	if body := llmcontract.ExtractJSONObject("{ không hoàn chỉnh"); body != "" {
+		t.Fatal("JSON không hoàn chỉnh phải phân tích thất bại")
 	}
 }
 
-// 契约测试(RFC §11.1):根为 object、全属性(含嵌套 structured/fatigue_words 条目)required。
+// Kiểm tra hợp đồng (RFC §11.1): gốc là object; mọi thuộc tính, kể cả structured lồng nhau
+// và các mục fatigue_words, đều bắt buộc.
 func TestNormalizeContractIsStrictReady(t *testing.T) {
 	if normalizeContract.Schema["type"] != "object" {
-		t.Fatal("根必须是 object")
+		t.Fatal("gốc phải là object")
 	}
 	if err := llmcontract.ValidateStrictReady(normalizeContract.Schema); err != nil {
 		t.Fatal(err)
@@ -111,21 +112,22 @@ func TestNormalizeContractIsStrictReady(t *testing.T) {
 }
 
 func TestNormalize_NilModelErrors(t *testing.T) {
-	// 无模型可用：返回明确错误，由 Service 层降级为 raw preferences。
+	// Không có mô hình: trả về lỗi rõ ràng để tầng Service hạ cấp thành raw preferences.
 	var n *Normalizer = NewNormalizer(nil)
-	if _, err := n.Normalize(t.Context(), "startup_prompt", "每章1200字，主角冷静"); err == nil {
-		t.Fatal("无模型应返回错误")
+	if _, err := n.Normalize(t.Context(), "startup_prompt", "Mỗi chương 1.200 từ, nhân vật chính điềm tĩnh"); err == nil {
+		t.Fatal("không có mô hình phải trả về lỗi")
 	}
 }
 
-// scriptedModel 是最小 fake ChatModel：按调用次序吐预设回复，并记录最后一轮收到的
-// messages，供断言反馈式重试是否把纠正提示并入了下一轮对话。回复用尽后重复最后一条。
+// scriptedModel là ChatModel giả tối thiểu: trả các hồi đáp định sẵn theo thứ tự gọi và ghi lại
+// messages của lượt cuối để kiểm tra lần thử lại có đưa gợi ý sửa vào hội thoại kế tiếp hay không.
+// Sau khi hết hồi đáp, nó lặp lại hồi đáp cuối.
 type scriptedModel struct {
 	replies  []string
 	calls    int
 	lastMsgs []agentcore.Message
 	lastCfg  agentcore.CallConfig
-	err      error // 非 nil 时 Generate 恒返回该错误
+	err      error // Khi khác nil, Generate luôn trả lỗi này.
 	cancel   context.CancelFunc
 	cancelAt int
 }
@@ -160,73 +162,73 @@ func (m *scriptedModel) GenerateStream(context.Context, []agentcore.Message, []a
 
 func (m *scriptedModel) SupportsTools() bool { return false }
 
-// 反馈式重试：首轮吐坏 JSON、次轮才合法。Normalize 应成功，且次轮对话里带上了上一轮的
-// 坏输出与纠正提示（反馈式，而非原样盲重试）。
+// Thử lại có phản hồi: lượt đầu trả JSON hỏng, lượt hai mới hợp lệ. Normalize phải thành công,
+// đồng thời hội thoại lượt hai phải có đầu ra hỏng trước đó và gợi ý sửa, không phải thử lại mù.
 func TestNormalize_FeedbackRetryRecovers(t *testing.T) {
 	model := &scriptedModel{replies: []string{
-		"这不是 JSON",
-		`{"structured":{"genre":"","forbidden_chars":[],"forbidden_phrases":["某种程度上"],"fatigue_words":[]},"preferences":"","uncertain":[]}`,
+		"Đây không phải JSON",
+		`{"structured":{"genre":"","forbidden_chars":[],"forbidden_phrases":["ở một mức độ nào đó"],"fatigue_words":[]},"preferences":"","uncertain":[]}`,
 	}}
 	n := NewNormalizer(model)
 
-	cand, err := n.Normalize(t.Context(), "startup_prompt", "不要出现某种程度上")
+	cand, err := n.Normalize(t.Context(), "startup_prompt", "Không được xuất hiện cụm ở một mức độ nào đó")
 	if err != nil {
-		t.Fatalf("次轮已返回合法 JSON，不应失败: %v", err)
+		t.Fatalf("lượt hai đã trả JSON hợp lệ, không được thất bại: %v", err)
 	}
 	if len(cand.Structured.ForbiddenPhrases) != 1 {
-		t.Fatalf("应解析出 forbidden_phrases，got %+v", cand.Structured)
+		t.Fatalf("phải phân tích được forbidden_phrases, nhận %+v", cand.Structured)
 	}
 	if model.calls != 2 {
-		t.Fatalf("应在第 2 次成功，实际调用 %d 次", model.calls)
+		t.Fatalf("phải thành công ở lần gọi thứ 2, thực tế gọi %d lần", model.calls)
 	}
 
 	var sawBad, sawHint bool
 	for _, msg := range model.lastMsgs {
 		text := msg.TextContent()
-		if text == "这不是 JSON" {
+		if text == "Đây không phải JSON" {
 			sawBad = true
 		}
-		if strings.Contains(text, "JSON Schema") && strings.Contains(text, "错误：") {
+		if strings.Contains(text, "JSON Schema") && strings.Contains(text, "Lỗi:") {
 			sawHint = true
 		}
 	}
 	if !sawBad || !sawHint {
-		t.Errorf("次轮应并入上一轮坏输出与纠正提示，sawBad=%v sawHint=%v", sawBad, sawHint)
+		t.Errorf("lượt hai phải có đầu ra hỏng và gợi ý sửa, sawBad=%v sawHint=%v", sawBad, sawHint)
 	}
 	system := model.lastMsgs[0].TextContent()
 	if !strings.Contains(system, "<output-json-schema>") || !strings.Contains(system, `"fatigue_words"`) {
-		t.Fatalf("prompt contract 应从 Contract 自动附加 schema:\n%s", system)
+		t.Fatalf("prompt contract phải tự động thêm schema từ Contract:\n%s", system)
 	}
 }
 
-// 归一化不覆盖模型的 thinking 默认；普通 chat 模型会拒绝显式 off。
+// Chuẩn hóa không ghi đè mặc định thinking của mô hình; mô hình chat thông thường sẽ từ chối off tường minh.
 func TestNormalize_LeavesThinkingUnspecifiedAndReservesTokens(t *testing.T) {
 	model := &scriptedModel{replies: []string{`{"structured":{"genre":"","forbidden_chars":[],"forbidden_phrases":[],"fatigue_words":[]},"preferences":"x","uncertain":[]}`}}
 	n := NewNormalizer(model)
 
-	if _, err := n.Normalize(t.Context(), "startup_prompt", "随便一条规则"); err != nil {
+	if _, err := n.Normalize(t.Context(), "startup_prompt", "một quy tắc bất kỳ"); err != nil {
 		t.Fatalf("normalize: %v", err)
 	}
 	if model.lastCfg.ThinkingLevel != agentcore.ThinkingAuto {
-		t.Errorf("不应发送 thinking 参数，got %q", model.lastCfg.ThinkingLevel)
+		t.Errorf("không được gửi tham số thinking, nhận %q", model.lastCfg.ThinkingLevel)
 	}
 	if model.lastCfg.MaxTokens != normalizeMaxTokens {
-		t.Errorf("max_tokens 应为 %d，got %d", normalizeMaxTokens, model.lastCfg.MaxTokens)
+		t.Errorf("max_tokens phải là %d, nhận %d", normalizeMaxTokens, model.lastCfg.MaxTokens)
 	}
 }
 
-// 全程坏 JSON：没有固定次数上限，持续反馈重问，直到 context 取消。
+// JSON hỏng xuyên suốt: không giới hạn số lần cố định; tiếp tục phản hồi hỏi lại đến khi context bị hủy.
 func TestNormalize_FeedbackRetryContinuesUntilContextCanceled(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
-	model := &scriptedModel{replies: []string{"坏"}, cancel: cancel, cancelAt: 4}
+	model := &scriptedModel{replies: []string{"hỏng"}, cancel: cancel, cancelAt: 4}
 	n := NewNormalizer(model)
 
-	_, err := n.Normalize(ctx, "startup_prompt", "每章1200字")
+	_, err := n.Normalize(ctx, "startup_prompt", "Mỗi chương 1.200 từ")
 	if !errors.Is(err, context.Canceled) {
-		t.Fatalf("应由 context 结束自愈循环，得 %v", err)
+		t.Fatalf("context phải kết thúc vòng tự sửa, nhận %v", err)
 	}
 	if model.calls != 4 {
-		t.Fatalf("context 取消前应持续调用，实际 %d", model.calls)
+		t.Fatalf("phải tiếp tục gọi đến trước khi context bị hủy, thực tế %d", model.calls)
 	}
 }
 
@@ -241,21 +243,21 @@ func (retryableTestError) Error() string             { return "provider unavaila
 func (retryableTestError) Retryable() bool           { return true }
 func (retryableTestError) RetryAfter() time.Duration { return time.Millisecond }
 
-// 终止错误（401 等）不得盲重试：恰好 1 次调用即返回错误。
+// Lỗi dừng (như 401) không được thử lại mù: chỉ đúng một lần gọi rồi trả về lỗi.
 func TestNormalize_TerminalErrorStopsImmediately(t *testing.T) {
 	model := &scriptedModel{err: terminalTestError{}}
 	n := NewNormalizer(model)
 
-	_, err := n.Normalize(t.Context(), "startup_prompt", "规则")
+	_, err := n.Normalize(t.Context(), "startup_prompt", "quy tắc")
 	if err == nil || !errors.As(err, &terminalTestError{}) {
-		t.Fatalf("应透出终止错误: %v", err)
+		t.Fatalf("phải trả lỗi dừng: %v", err)
 	}
 	if model.calls != 1 {
-		t.Fatalf("终止错误不应重试，实际调用 %d 次", model.calls)
+		t.Fatalf("lỗi dừng không được thử lại, thực tế gọi %d lần", model.calls)
 	}
 }
 
-// retryable 请求错误由 llmretry 退避重试。
+// Lỗi yêu cầu có thể thử lại được llmretry thử lại với cơ chế lùi thời gian.
 type flakyModel struct {
 	scriptedModel
 	failures int
@@ -275,13 +277,13 @@ func TestNormalize_RetryableErrorRecovers(t *testing.T) {
 		failures:      2,
 	}
 	n := NewNormalizer(model)
-	cand, err := n.Normalize(t.Context(), "startup_prompt", "规则")
+	cand, err := n.Normalize(t.Context(), "startup_prompt", "quy tắc")
 	if err != nil || cand.Preferences != "x" {
-		t.Fatalf("退避后应成功: %+v %v", cand, err)
+		t.Fatalf("phải thành công sau khi lùi thời gian: %+v %v", cand, err)
 	}
 }
 
-// nativeRulesModel 声明支持原生 JSON Schema。
+// nativeRulesModel khai báo hỗ trợ JSON Schema gốc.
 type nativeRulesModel struct {
 	*scriptedModel
 }
@@ -295,33 +297,33 @@ func (m *nativeRulesModel) Capabilities() llm.Capabilities {
 }
 
 func TestNormalize_NativeSendsSchemaAndRejectsFences(t *testing.T) {
-	// 原生模式：schema 进请求；裸 JSON 成功。
+	// Chế độ native: gửi schema theo yêu cầu; JSON trần thành công.
 	model := &nativeRulesModel{&scriptedModel{replies: []string{
 		`{"structured":{"genre":"","forbidden_chars":[],"forbidden_phrases":[],"fatigue_words":[]},"preferences":"x","uncertain":[]}`,
 	}}}
 	n := NewNormalizer(model)
-	cand, err := n.Normalize(t.Context(), "startup_prompt", "规则")
+	cand, err := n.Normalize(t.Context(), "startup_prompt", "quy tắc")
 	if err != nil || cand.Preferences != "x" {
-		t.Fatalf("native 归一化失败: %+v %v", cand, err)
+		t.Fatalf("chuẩn hóa native thất bại: %+v %v", cand, err)
 	}
 	rf := model.lastCfg.ResponseFormat
 	if rf == nil || rf.JSONSchema == nil || rf.JSONSchema.Name != "userrules_normalize" {
-		t.Fatalf("native 模式应发送 schema: %+v", rf)
+		t.Fatalf("chế độ native phải gửi schema: %+v", rf)
 	}
 	if got := model.lastMsgs[0].TextContent(); got != normalizerSystemPrompt {
-		t.Fatalf("native 模式不应向提示词重复注入 schema:\n%s", got)
+		t.Fatalf("chế độ native không được chèn lại schema vào prompt:\n%s", got)
 	}
 
-	// 围栏输出=契约违约：立即报错，不走 extractJSON、不重问。
+	// Đầu ra có hàng rào là vi phạm hợp đồng: báo lỗi ngay, không extractJSON hoặc hỏi lại.
 	fenced := &nativeRulesModel{&scriptedModel{replies: []string{
 		"```json\n{\"structured\":{},\"preferences\":\"x\",\"uncertain\":[]}\n```",
 	}}}
 	n = NewNormalizer(fenced)
-	_, err = n.Normalize(t.Context(), "startup_prompt", "规则")
-	if err == nil || !strings.Contains(err.Error(), "契约违约") {
-		t.Fatalf("期望契约违约错误, got %v", err)
+	_, err = n.Normalize(t.Context(), "startup_prompt", "quy tắc")
+	if err == nil || !strings.Contains(err.Error(), "Vi phạm hợp đồng Schema gốc") {
+		t.Fatalf("mong đợi lỗi vi phạm hợp đồng Schema gốc, nhận %v", err)
 	}
 	if fenced.calls != 1 {
-		t.Fatalf("契约违约不应重问，实际 %d 次", fenced.calls)
+		t.Fatalf("vi phạm hợp đồng không được hỏi lại, thực tế gọi %d lần", fenced.calls)
 	}
 }

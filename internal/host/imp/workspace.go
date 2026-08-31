@@ -9,27 +9,27 @@ import (
 	"path/filepath"
 )
 
-// workspaceSchemaVersion 是导入工作区整体 schema 版本。
-// 不匹配时显式要求用匹配版本继续或重新导入，不猜测迁移（RFC §6.1）。
+// workspaceSchemaVersion là phiên bản schema tổng thể của workspace nhập.
+// Khi không khớp, yêu cầu rõ ràng tiếp tục bằng phiên bản khớp hoặc nhập lại, không đoán cách migration (RFC §6.1).
 const workspaceSchemaVersion = 1
 
-// Digest 计算内容摘要，沿用仓库既有约定 "sha256:"+hex（见 store/checkpoints.go）。
+// Digest tính digest nội dung, dùng tiếp quy ước sẵn có của repo "sha256:"+hex (xem store/checkpoints.go).
 func Digest(data []byte) string {
 	sum := sha256.Sum256(data)
 	return "sha256:" + hex.EncodeToString(sum[:])
 }
 
-// Artifact 是工作区中每份语义工件的统一身份：schema 版本 + 输入摘要 + 载荷。
-// 只有能从当前真实语义输入重建出相同 InputDigest 才可复用（RFC §6.3 / 不变量 1）。
-// 不实现依赖图：LoadState 沿固定线性管线逐步比对 InputDigest 判定复用与失效，NextAction 据此推导下一步。
+// Artifact là danh tính thống nhất của mỗi hiện vật ngữ nghĩa trong workspace: phiên bản schema + digest đầu vào + payload.
+// Chỉ được tái sử dụng khi có thể tái tạo cùng InputDigest từ đầu vào ngữ nghĩa thực hiện tại (RFC §6.3 / bất biến 1).
+// Không triển khai đồ thị phụ thuộc: LoadState so sánh InputDigest từng bước theo pipeline tuyến tính cố định để quyết định tái sử dụng và vô hiệu hóa, NextAction từ đó suy ra bước tiếp theo.
 type Artifact[T any] struct {
 	SchemaVersion int    `json:"schema_version"`
 	InputDigest   string `json:"input_digest"`
 	Payload       T      `json:"payload"`
 }
 
-// Manifest 对应唯一归一化源快照，是工作区身份而非派生工件（RFC §6.1）。
-// 不保存绝对源路径，避免泄露机器目录并消除移动文件带来的恢复问题。
+// Manifest tương ứng với snapshot nguồn đã chuẩn hóa duy nhất, là danh tính workspace chứ không phải hiện vật phái sinh (RFC §6.1).
+// Không lưu đường dẫn nguồn tuyệt đối, tránh rò rỉ thư mục máy và loại bỏ vấn đề khôi phục do di chuyển file.
 type Manifest struct {
 	Version          int    `json:"version"`
 	SourceName       string `json:"source_name"`
@@ -40,7 +40,7 @@ type Manifest struct {
 	CreatedAt        string `json:"created_at"`
 }
 
-// Intent 保存启动导入时的显式用户授权，恢复后仍必须遵守，不由工件猜出，Runner 不静默改写（RFC §6.1）。
+// Intent lưu ủy quyền rõ ràng của người dùng khi bắt đầu nhập; sau khi khôi phục vẫn phải tuân thủ, không suy ra từ hiện vật, Runner không âm thầm viết lại (RFC §6.1).
 type Intent struct {
 	Version             int    `json:"version"`
 	AutoConfirm         bool   `json:"auto_confirm,omitempty"`
@@ -48,7 +48,7 @@ type Intent struct {
 	ContinueAfterImport bool   `json:"continue_after_import,omitempty"`
 }
 
-// 工作区标准工件相对路径。
+// Đường dẫn tương đối của các hiện vật chuẩn trong workspace.
 const (
 	fileManifest     = "manifest.json"
 	fileIntent       = "intent.json"
@@ -64,23 +64,23 @@ const (
 	dirFailures      = "failures"
 )
 
-// Workspace 是 <书根>/meta/import/ 目录的原子工件读写句柄。
+// Workspace là handle đọc/ghi hiện vật nguyên tử cho thư mục <thu_muc_sach>/meta/import/.
 type Workspace struct {
 	dir string
 }
 
-// OpenWorkspace 返回指向书根下 meta/import/ 的句柄；不保证目录已存在，用 Active() 判断。
+// OpenWorkspace trả về handle trỏ tới meta/import/ dưới thư mục gốc sách; không đảm bảo thư mục đã tồn tại, dùng Active() để kiểm tra.
 func OpenWorkspace(bookDir string) *Workspace {
 	return &Workspace{dir: filepath.Join(bookDir, "meta", "import")}
 }
 
-// Dir 返回工作区绝对路径（诊断与失败工件落点用）。
+// Dir trả về đường dẫn tuyệt đối của workspace (dùng cho chẩn đoán và vị trí ghi hiện vật lỗi).
 func (w *Workspace) Dir() string { return w.dir }
 
 func (w *Workspace) path(rel string) string { return filepath.Join(w.dir, rel) }
 
-// Active 判断是否存在已发布的活动工作区。meta/import/ 不存在就不算活动，
-// 半初始化目录以 meta/import.init-* 形态存在，不会被误判为活动（RFC §6.1）。
+// Active kiểm tra có workspace hoạt động đã được publish hay không. Nếu meta/import/ không tồn tại thì không tính là hoạt động,
+// thư mục khởi tạo dở tồn tại dưới dạng meta/import.init-* sẽ không bị nhận nhầm là hoạt động (RFC §6.1).
 func (w *Workspace) Active() bool {
 	fi, err := os.Stat(w.dir)
 	return err == nil && fi.IsDir()
@@ -91,7 +91,7 @@ func (w *Workspace) has(rel string) bool {
 	return err == nil
 }
 
-// writeAtomic 以「临时文件 + fsync + rename」原子写入 rel（相对工作区）。
+// writeAtomic ghi nguyên tử rel (tương đối với workspace) bằng "file tạm + fsync + rename".
 func (w *Workspace) writeAtomic(rel string, data []byte) error {
 	full := w.path(rel)
 	if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
@@ -121,8 +121,8 @@ func (w *Workspace) writeAtomic(rel string, data []byte) error {
 	return nil
 }
 
-// syncDir best-effort fsync 目录项，使刚完成的 rename 在掉电后仍持久。
-// Windows 等平台可能不支持目录 Sync，其错误忽略——进程崩溃安全不依赖它，仅补掉电场景（RFC §12.3）。
+// syncDir fsync mục thư mục theo best-effort, để rename vừa hoàn tất vẫn bền vững sau khi mất điện.
+// Các nền tảng như Windows có thể không hỗ trợ Sync trên thư mục; bỏ qua lỗi đó — an toàn khi tiến trình crash không phụ thuộc vào nó, chỉ bổ sung cho tình huống mất điện (RFC §12.3).
 func syncDir(dir string) {
 	d, err := os.Open(dir)
 	if err != nil {
@@ -148,19 +148,19 @@ func (w *Workspace) readJSON(rel string, v any) error {
 	return json.Unmarshal(data, v)
 }
 
-// LoadManifest 读取工作区源快照身份。
+// LoadManifest đọc danh tính snapshot nguồn của workspace.
 func (w *Workspace) LoadManifest() (*Manifest, error) {
 	var m Manifest
 	if err := w.readJSON(fileManifest, &m); err != nil {
 		return nil, err
 	}
 	if m.Version != workspaceSchemaVersion {
-		return nil, fmt.Errorf("manifest schema 版本 %d != %d，请用匹配版本继续或重新导入", m.Version, workspaceSchemaVersion)
+		return nil, fmt.Errorf("phiên bản schema manifest %d != %d, vui lòng dùng phiên bản khớp để tiếp tục hoặc nhập lại", m.Version, workspaceSchemaVersion)
 	}
 	return &m, nil
 }
 
-// LoadIntent 读取用户启动授权。
+// LoadIntent đọc ủy quyền khởi động của người dùng.
 func (w *Workspace) LoadIntent() (*Intent, error) {
 	var in Intent
 	if err := w.readJSON(fileIntent, &in); err != nil {
@@ -169,14 +169,14 @@ func (w *Workspace) LoadIntent() (*Intent, error) {
 	return &in, nil
 }
 
-// LoadSource 读取归一化源快照文本。
+// LoadSource đọc văn bản snapshot nguồn đã chuẩn hóa.
 func (w *Workspace) LoadSource() ([]byte, error) {
 	return os.ReadFile(w.path(fileSource))
 }
 
-// LoadGuidance 读取用户切分指导（RFC §18.3）；缺失即无指导。
-// 指导与 source.txt 同为切分的语义输入而非派生工件，由显式 --guide 更新，
-// 内容变化使 segmentation 及其下游 InputDigest 自然失配。
+// LoadGuidance đọc hướng dẫn chia đoạn của người dùng (RFC §18.3); thiếu nghĩa là không có hướng dẫn.
+// Hướng dẫn và source.txt đều là đầu vào ngữ nghĩa của việc chia đoạn chứ không phải hiện vật phái sinh, được cập nhật rõ ràng bằng --guide,
+// thay đổi nội dung sẽ tự nhiên làm segmentation và InputDigest downstream của nó không khớp.
 func (w *Workspace) LoadGuidance() (string, error) {
 	data, err := os.ReadFile(w.path(fileGuidance))
 	if os.IsNotExist(err) {
@@ -188,12 +188,12 @@ func (w *Workspace) LoadGuidance() (string, error) {
 	return string(data), nil
 }
 
-// readBytes 读取工件原始字节，用于下游 InputDigest 绑定。
+// readBytes đọc byte gốc của hiện vật, dùng để ràng buộc InputDigest downstream.
 func (w *Workspace) readBytes(rel string) ([]byte, error) {
 	return os.ReadFile(w.path(rel))
 }
 
-// writeArtifact 写入带统一身份的语义工件。
+// writeArtifact ghi hiện vật ngữ nghĩa có danh tính thống nhất.
 func writeArtifact[T any](w *Workspace, rel, inputDigest string, payload T) error {
 	return w.writeJSON(rel, Artifact[T]{
 		SchemaVersion: workspaceSchemaVersion,
@@ -202,25 +202,25 @@ func writeArtifact[T any](w *Workspace, rel, inputDigest string, payload T) erro
 	})
 }
 
-// readArtifact 读取语义工件并校验 schema 版本；InputDigest 是否匹配由调用方按当前输入判定。
+// readArtifact đọc hiện vật ngữ nghĩa và kiểm tra phiên bản schema; việc InputDigest có khớp hay không do caller quyết định theo đầu vào hiện tại.
 func readArtifact[T any](w *Workspace, rel string) (*Artifact[T], error) {
 	var a Artifact[T]
 	if err := w.readJSON(rel, &a); err != nil {
 		return nil, err
 	}
 	if a.SchemaVersion != workspaceSchemaVersion {
-		return nil, fmt.Errorf("%s schema 版本 %d != %d，请用匹配版本继续或重新导入", rel, a.SchemaVersion, workspaceSchemaVersion)
+		return nil, fmt.Errorf("phiên bản schema %s %d != %d, vui lòng dùng phiên bản khớp để tiếp tục hoặc nhập lại", rel, a.SchemaVersion, workspaceSchemaVersion)
 	}
 	return &a, nil
 }
 
-// clearDir 删除工作区内某个中间缓存目录。错误必须交调用方处置：吞掉会让「已清除」的
-// 文案撒谎——下次重跑照样复用坏缓存（Windows 反病毒/句柄占用是真实场景，Debug-First）。
+// clearDir xóa một thư mục cache trung gian trong workspace. Lỗi phải giao cho caller xử lý: nuốt lỗi sẽ khiến
+// thông báo "đã xóa" nói dối — lần chạy lại sau vẫn tái sử dụng cache hỏng (trình chống virus/handle bị chiếm dụng trên Windows là tình huống thực tế, Debug-First).
 func (w *Workspace) clearDir(rel string) error {
 	return os.RemoveAll(w.path(rel))
 }
 
-// FailureMeta 是最近一次失败的诊断元数据（RFC §14.2）。
+// FailureMeta là metadata chẩn đoán của lần thất bại gần nhất (RFC §14.2).
 type FailureMeta struct {
 	Stage         string `json:"stage"`
 	Detail        string `json:"detail"`
@@ -228,20 +228,20 @@ type FailureMeta struct {
 	PrefixSalvage string `json:"prefix_salvage,omitempty"` // available:N / unavailable
 }
 
-// writeFailure best-effort 保存最近失败的元数据与未裁剪的原始模型响应到 failures/（RFC §14.2）。
-// 原始响应可能含正文，仅落在用户自己的书目录，不进普通日志或脱敏诊断导出。
+// writeFailure lưu metadata thất bại gần nhất và phản hồi model gốc chưa cắt vào failures/ theo best-effort (RFC §14.2).
+// Phản hồi gốc có thể chứa nội dung chính văn, chỉ nằm trong thư mục sách của chính người dùng, không đi vào log thông thường hoặc bản xuất chẩn đoán đã khử định danh.
 func (w *Workspace) writeFailure(meta FailureMeta, rawResponse string) {
 	_ = w.writeJSON(filepath.Join(dirFailures, "last.json"), meta)
 	_ = w.writeAtomic(filepath.Join(dirFailures, "last-response.txt"), []byte(rawResponse))
 }
 
-// createWorkspace 在临时目录写齐 manifest/intent/source 并校验后，以目录 rename 原子发布为 meta/import/。
-// 这样初始三件套不会以半初始化形态进入 NextAction，也无需 stage=initializing（RFC §6.1）。
+// createWorkspace ghi đủ manifest/intent/source vào thư mục tạm và kiểm tra, rồi publish nguyên tử thành meta/import/ bằng rename thư mục.
+// Nhờ vậy bộ ba ban đầu sẽ không đi vào NextAction ở trạng thái khởi tạo dở, và cũng không cần stage=initializing (RFC §6.1).
 func createWorkspace(bookDir string, m Manifest, in Intent, normalized []byte) (*Workspace, error) {
 	base := filepath.Join(bookDir, "meta")
 	final := filepath.Join(base, "import")
 	if fi, err := os.Stat(final); err == nil && fi.IsDir() {
-		return nil, fmt.Errorf("导入工作区已存在：%s（无参数 /import 可从中恢复）", final)
+		return nil, fmt.Errorf("workspace nhập đã tồn tại: %s (/import không tham số có thể khôi phục từ đó)", final)
 	}
 	if err := os.MkdirAll(base, 0o755); err != nil {
 		return nil, err
@@ -267,20 +267,20 @@ func createWorkspace(bookDir string, m Manifest, in Intent, normalized []byte) (
 	if err := tw.writeJSON(fileIntent, in); err != nil {
 		return nil, err
 	}
-	// 发布前校验三件套可读且源快照与 manifest 一致，杜绝半写工作区。
+	// Trước khi publish, kiểm tra bộ ba có thể đọc được và snapshot nguồn khớp với manifest, ngăn chặn workspace ghi dở.
 	got, err := tw.LoadManifest()
 	if err != nil {
-		return nil, fmt.Errorf("校验初始 manifest：%w", err)
+		return nil, fmt.Errorf("kiểm tra manifest ban đầu: %w", err)
 	}
 	src, err := tw.LoadSource()
 	if err != nil {
-		return nil, fmt.Errorf("校验初始源快照：%w", err)
+		return nil, fmt.Errorf("kiểm tra snapshot nguồn ban đầu: %w", err)
 	}
 	if d := Digest(src); d != got.NormalizedSHA256 {
-		return nil, fmt.Errorf("初始源快照摘要不一致：%s != %s", d, got.NormalizedSHA256)
+		return nil, fmt.Errorf("digest snapshot nguồn ban đầu không nhất quán: %s != %s", d, got.NormalizedSHA256)
 	}
 	if _, err := tw.LoadIntent(); err != nil {
-		return nil, fmt.Errorf("校验初始 intent：%w", err)
+		return nil, fmt.Errorf("kiểm tra intent ban đầu: %w", err)
 	}
 
 	if err := os.Rename(tmp, final); err != nil {

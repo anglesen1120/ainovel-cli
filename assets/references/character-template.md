@@ -1,31 +1,28 @@
-# 人物档案
+# Hồ sơ nhân vật
 
-## 主角
+## Nhân vật chính
 
-### [角色一姓名]
-- **别名/称号**：（如"废物少年"、"炎哥"、"不灭战神"等，正文中可能用到的各种称呼）
-- **年龄/职业**：
-- **外貌特征**：
-- **性格核心**：
-- **核心价值观**：
-- **最大恐惧**：
-- **致命缺陷**：
-- **内心渴望**：
-- **背景故事**：
+### [Tên nhân vật một]
+- **Alias / danh xưng**: [các cách gọi có thể xuất hiện trong chính văn]
+- **Tuổi / nghề nghiệp**:
+- **Đặc điểm ngoại hình**:
+- **Cốt lõi tính cách**:
+- **Giá trị cốt lõi**:
+- **Nỗi sợ lớn nhất**:
+- **Khuyết điểm chí mạng**:
+- **Khao khát bên trong**:
+- **Câu chuyện nền**:
 - **MBTI:**
 
-### [角色二姓名]
+### [Tên nhân vật hai]
+- [Cùng format với trên]
 
-......
+## Phản diện
 
+### [Tên nhân vật]
+- [Cùng format nhân vật chính]
 
+## Nhân vật phụ
 
-## 反派
-
-### [角色姓名]
-- [同主角格式]
-
-## 配角
-
-### [角色姓名]
-- [简化格式]
+### [Tên nhân vật]
+- [Format rút gọn]

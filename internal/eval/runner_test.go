@@ -9,9 +9,9 @@ import (
 	"github.com/voocel/ainovel-cli/internal/host"
 )
 
-// fakeEngine 模拟 host：Abort 后像 waitDone 那样向 done 发送一次。done 带 1 缓冲，
-// 测试据此断言 drive 是否 drain 了 Done（len(done)==0 即已消费）——这是防 send-on-closed-channel
-// panic 的关键不变量。
+// fakeEngine mô phỏng host: sau Abort sẽ gửi một lần vào done như waitDone. done có buffer 1,
+// kiểm thử dựa vào đó để khẳng định drive đã drain Done chưa (len(done)==0 tức là đã tiêu thụ) — đây là bất biến chống send-on-closed-channel
+// panic là bất biến then chốt.
 type fakeEngine struct {
 	events chan host.Event
 	stream chan string
@@ -44,7 +44,7 @@ func (f *fakeEngine) Abort() bool {
 	f.mu.Lock()
 	f.aborted = true
 	f.mu.Unlock()
-	select { // 模拟 waitDone：abort 触发后向 done 发送一次
+	select { // Mô phỏng waitDone: sau khi abort sẽ gửi một lần vào done
 	case f.done <- struct{}{}:
 	default:
 	}
@@ -57,52 +57,52 @@ func (f *fakeEngine) wasAborted() bool {
 	return f.aborted
 }
 
-// 超时路径必须 Abort 后 drain 到 Done 再返回超时错误——否则 RunCase 的 Close 会与
-// waitDone 竞争关闭 done 通道而 panic（Codex review #1）。
+// Nhánh quá giờ phải Abort rồi drain tới Done mới trả lỗi quá thời gian — nếu không Close của RunCase sẽ
+// cạnh tranh đóng kênh done với waitDone rồi panic (Codex review #1).
 func TestDriveTimeoutDrainsToDone(t *testing.T) {
 	f := newFakeEngine()
 	err := drive(f, 1, RunOptions{Timeout: 30 * time.Millisecond})
-	if err == nil || !strings.Contains(err.Error(), "超时") {
-		t.Fatalf("超时应返回超时错误，得到 %v", err)
+	if err == nil || !strings.Contains(err.Error(), "quá thời gian") {
+		t.Fatalf("Quá thời gian phải trả về lỗi quá thời gian, nhận %v", err)
 	}
 	if !f.wasAborted() {
-		t.Fatal("超时应触发 Abort")
+		t.Fatal("Quá thời gian phải kích hoạt Abort")
 	}
 	if len(f.done) != 0 {
-		t.Fatal("drive 必须 drain Done 后才返回（否则与 Close 竞争关闭通道 panic）")
+		t.Fatal("drive phải drain Done rồi mới được trả về (nếu không sẽ cạnh tranh đóng kênh với Close và panic)")
 	}
 }
 
-// 达到章数上限：Abort 后 drain 到 Done，返回 nil（正常截停，不是超时）。
+// Đạt giới hạn số chương: Abort rồi drain tới Done, trả nil (dừng bình thường, không phải quá thời gian).
 func TestDriveCapStopsAndDrains(t *testing.T) {
 	f := newFakeEngine()
 	f.mu.Lock()
 	f.snap = host.UISnapshot{CompletedCount: 1}
 	f.mu.Unlock()
-	f.events <- host.Event{Category: "SYSTEM", Summary: "committed"} // 触发 cap 检查
+	f.events <- host.Event{Category: "SYSTEM", Summary: "committed"} // kích hoạt kiểm tra cap
 
 	err := drive(f, 1, RunOptions{Timeout: time.Second})
 	if err != nil {
-		t.Fatalf("正常截停应返回 nil，得到 %v", err)
+		t.Fatalf("Dừng bình thường phải trả nil, nhận %v", err)
 	}
 	if !f.wasAborted() {
-		t.Fatal("达到章数上限应 Abort")
+		t.Fatal("Đạt giới hạn số chương phải Abort")
 	}
 	if len(f.done) != 0 {
-		t.Fatal("应 drain Done 后返回")
+		t.Fatal("Phải drain Done rồi mới trả về")
 	}
 }
 
-// 引擎自然 Done（书写完）：无需 Abort，返回 nil。
+// Engine tự Done (viết xong): không cần Abort, trả nil.
 func TestDriveNaturalDoneReturnsNil(t *testing.T) {
 	f := newFakeEngine()
 	f.done <- struct{}{}
 
 	err := drive(f, 1, RunOptions{Timeout: time.Second})
 	if err != nil {
-		t.Fatalf("自然完成应返回 nil，得到 %v", err)
+		t.Fatalf("Hoàn thành tự nhiên phải trả nil, nhận %v", err)
 	}
 	if f.wasAborted() {
-		t.Fatal("自然完成不应 Abort")
+		t.Fatal("Hoàn thành tự nhiên không được Abort")
 	}
 }

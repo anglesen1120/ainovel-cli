@@ -1,10 +1,10 @@
-## 言情风格
+## Phong cách tình cảm
 
-- **情感递进**：遵循接触→好感→冲突→和解→深入的自然节奏，不急于推进
-- **关系张力**：每个阶段都需要合理的阻碍，阻碍来源要多样（性格、立场、误解、外部压力）
-- **内心描写**：深入角色内心，展现矛盾和挣扎，但避免大段独白式心理分析
-- **互动细节**：用微表情、小动作、不经意的习惯传递情感，比直接告白更有张力
-- **对话节奏**：暧昧期对话留白多，甜蜜期对话轻松自然，冲突期对话尖锐但克制
-- **场景氛围**：环境描写与情感状态呼应，但不过度使用"下雨=悲伤"类刻板隐喻
-- **配角功能**：闺蜜/兄弟角色推动情节发展，不沦为恋爱咨询工具
-- **冲突设计**：误会不能靠"一句话就能解释清楚"维持，矛盾要触及核心价值观差异
+- **Tiến triển cảm xúc**: tiếp xúc → thiện cảm → xung đột → hòa giải → đào sâu, không vội.
+- **Sức căng quan hệ**: mỗi giai đoạn có trở lực hợp lý từ tính cách, lập trường, hiểu lầm hoặc áp lực ngoài.
+- **Nội tâm**: đi sâu giằng co nhưng tránh độc thoại phân tích dài.
+- **Chi tiết tương tác**: dùng biểu cảm nhỏ, động tác và thói quen để truyền tình cảm.
+- **Nhịp đối thoại**: giai đoạn mập mờ nhiều khoảng trống; ngọt ngào thì nhẹ; xung đột thì sắc nhưng kiềm.
+- **Không khí cảnh**: môi trường cộng hưởng cảm xúc nhưng tránh ẩn dụ khuôn.
+- **Nhân vật phụ**: giúp đẩy plot, không thành công cụ tư vấn tình yêu.
+- **Thiết kế xung đột**: hiểu lầm không được duy trì bằng một câu có thể giải thích xong.

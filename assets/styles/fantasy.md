@@ -1,10 +1,10 @@
-## 奇幻冒险风格
+## Phong cách kỳ ảo phiêu lưu
 
-- **世界观展开**：不集中灌输设定，通过角色互动和行动自然展示世界规则
-- **魔法/能力体系**：有明确代价和限制，避免万能型能力，冲突中展示体系边界
-- **史诗感营造**：宏大叙事与个人命运交织，小人物视角折射大格局
-- **种族与文化**：不同种族/文化有独特语言习惯、价值观和行为模式
-- **战斗场景**：注重策略和代价，避免单纯的力量碾压，利用环境和智谋取胜
-- **旅途叙事**：每个新场景都有独特的视觉/感官特征，避免"又一个村庄"
-- **成长弧线**：主角的能力成长与心智成长同步，代价与收获并存
-- **命名体系**：保持风格统一，避免突兀的现代词汇打破沉浸感
+- **Mở thế giới**: không đổ thiết lập tập trung; cho quy tắc hiện qua tương tác và hành động.
+- **Hệ thống ma thuật / năng lực**: có giá và giới hạn rõ, thể hiện biên giới trong xung đột.
+- **Cảm giác sử thi**: số phận cá nhân đan với cục diện lớn.
+- **Chủng tộc và văn hóa**: mỗi nhóm có thói quen ngôn ngữ, giá trị và hành vi riêng.
+- **Chiến đấu**: trọng chiến lược và cái giá, không chỉ nghiền bằng sức mạnh.
+- **Hành trình**: mỗi cảnh mới có đặc điểm giác quan riêng.
+- **Trưởng thành**: năng lực và tâm trí cùng đổi, có mất có được.
+- **Đặt tên**: giữ thống nhất phong vị, tránh từ hiện đại phá nhập tâm.

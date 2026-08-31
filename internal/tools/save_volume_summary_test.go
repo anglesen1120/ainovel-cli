@@ -22,10 +22,10 @@ func setupVolumeSummaryStore(t *testing.T) *store.Store {
 		t.Fatal(err)
 	}
 	volumes := []domain.VolumeOutline{{
-		Index: 1, Title: "终卷", Final: true,
+		Index: 1, Title: "Tập kết", Final: true,
 		Arcs: []domain.ArcOutline{{
-			Index: 1, Title: "收官弧",
-			Chapters: []domain.OutlineEntry{{Title: "终章"}},
+			Index: 1, Title: "Cung khép lại",
+			Chapters: []domain.OutlineEntry{{Title: "Chương kết"}},
 		}},
 	}}
 	if err := s.Outline.SaveLayeredOutline(volumes); err != nil {
@@ -40,10 +40,10 @@ func setupVolumeSummaryStore(t *testing.T) *store.Store {
 	if err := s.Progress.MarkChapterComplete(1, 100, "", ""); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.World.SaveReview(domain.ReviewEntry{Chapter: 1, Scope: "arc", Verdict: "accept", Summary: "评审通过"}); err != nil {
+	if err := s.World.SaveReview(domain.ReviewEntry{Chapter: 1, Scope: "arc", Verdict: "accept", Summary: "Đánh giá đạt"}); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.Summaries.SaveArcSummary(domain.ArcSummary{Volume: 1, Arc: 1, Title: "收官弧", Summary: "完成", KeyEvents: []string{"终局"}}); err != nil {
+	if err := s.Summaries.SaveArcSummary(domain.ArcSummary{Volume: 1, Arc: 1, Title: "Cung khép lại", Summary: "Hoàn tất", KeyEvents: []string{"Kết cục"}}); err != nil {
 		t.Fatal(err)
 	}
 	return s
@@ -52,24 +52,24 @@ func setupVolumeSummaryStore(t *testing.T) *store.Store {
 func TestSaveVolumeSummaryRejectsNonDueVolume(t *testing.T) {
 	s := setupVolumeSummaryStore(t)
 	args, err := json.Marshal(map[string]any{
-		"volume": 2, "title": "未来卷", "summary": "尚未发生", "key_events": []string{"事件"},
+		"volume": 2, "title": "Tập tương lai", "summary": "Chưa xảy ra", "key_events": []string{"Sự kiện"},
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if _, err := NewSaveVolumeSummaryTool(s).Execute(context.Background(), args); err == nil || !strings.Contains(err.Error(), "聚合写入目标不匹配") {
-		t.Fatalf("expected non-due volume rejection, got %v", err)
+	if _, err := NewSaveVolumeSummaryTool(s).Execute(context.Background(), args); err == nil || !strings.Contains(err.Error(), "Mục tiêu ghi tổng hợp không khớp") {
+		t.Fatalf("phải từ chối quyển chưa đến hạn, nhận được %v", err)
 	}
 	if summary, err := s.Summaries.LoadVolumeSummary(2); err != nil || summary != nil {
-		t.Fatalf("future volume summary must not be persisted, summary=%+v err=%v", summary, err)
+		t.Fatalf("không được lưu tóm tắt quyển tương lai, summary=%+v err=%v", summary, err)
 	}
 }
 
 func TestReconcileLayeredCompletionRepairsInterruptedVolumeSummary(t *testing.T) {
 	s := setupVolumeSummaryStore(t)
-	// 模拟进程在卷摘要已经落盘、Progress.MarkComplete 尚未执行时退出。
-	if err := s.Summaries.SaveVolumeSummary(domain.VolumeSummary{Volume: 1, Title: "终卷", Summary: "全书收束", KeyEvents: []string{"终局"}}); err != nil {
+	// Mô phỏng tiến trình thoát ra khi tóm tắt tập đã được ghi xuống nhưng Progress.MarkComplete هنوز chưa chạy.
+	if err := s.Summaries.SaveVolumeSummary(domain.VolumeSummary{Volume: 1, Title: "Tập kết", Summary: "Toàn bộ truyện khép lại", KeyEvents: []string{"Kết cục"}}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -96,7 +96,7 @@ func TestSaveVolumeSummaryRetriesCheckpointThenCompletes(t *testing.T) {
 		t.Fatal(err)
 	}
 	args, err := json.Marshal(map[string]any{
-		"volume": 1, "title": "终卷", "summary": "全书收束", "key_events": []string{"终局"},
+		"volume": 1, "title": "Tập kết", "summary": "Toàn bộ truyện khép lại", "key_events": []string{"Kết cục"},
 	})
 	if err != nil {
 		t.Fatal(err)

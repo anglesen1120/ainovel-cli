@@ -14,7 +14,7 @@ const (
 	ArmVariant  = "variant"
 )
 
-// Suite 是一次评测运行的聚合结果。
+// Suite là kết quả tổng hợp của một lần chạy đánh giá.
 type Suite struct {
 	RunID   string       `json:"run_id"`
 	Mode    string       `json:"mode"` // single / ab
@@ -56,7 +56,7 @@ type RangeSummary struct {
 	Max float64 `json:"max"`
 }
 
-// Aggregate 把单 case 结果汇总成 suite，并计算整体门禁：任一 FAIL→FAIL，否则任一 WARN→WARN。
+// Aggregate gộp kết quả từng case thành suite và tính cổng chặn tổng: chỉ cần một FAIL là FAIL, ngược lại chỉ cần một WARN là WARN.
 func Aggregate(runID, mode, variant string, repeat int, cases []CaseResult) Suite {
 	gate := Pass
 	for _, c := range cases {
@@ -187,7 +187,7 @@ func worstOutcome(a, b Outcome) Outcome {
 	return Pass
 }
 
-// WriteReport 在 outDir 下写 report.json（机读）与 report.md（人读）。
+// WriteReport ghi report.json (máy đọc) và report.md (người đọc) dưới outDir.
 func WriteReport(s Suite, outDir string) error {
 	if err := os.MkdirAll(outDir, 0o755); err != nil {
 		return err
@@ -202,7 +202,7 @@ func WriteReport(s Suite, outDir string) error {
 	return os.WriteFile(filepath.Join(outDir, "report.md"), []byte(renderMarkdown(s)), 0o644)
 }
 
-// Summary 是给 stdout 的精简结论。
+// Summary là kết luận rút gọn dành cho stdout.
 func Summary(s Suite) string {
 	var hardFails, warnings int
 	for _, c := range s.Cases {
@@ -215,16 +215,16 @@ func Summary(s Suite) string {
 			warnings += len(d.Warnings)
 		}
 	}
-	return fmt.Sprintf("Gate: %s  (%d cases, %d hard fails, %d warnings)",
+	return fmt.Sprintf("Gate: %s  (%d case, %d hard fails, %d warnings)",
 		s.Gate, len(s.Cases), hardFails, warnings)
 }
 
 func renderMarkdown(s Suite) string {
 	var b strings.Builder
-	fmt.Fprintf(&b, "# Eval Report\n\n")
+	fmt.Fprintf(&b, "# Báo cáo Eval\n\n")
 	fmt.Fprintf(&b, "Gate: **%s**\n\n", s.Gate)
 
-	fmt.Fprintf(&b, "## Summary\n\n")
+	fmt.Fprintf(&b, "## Tóm tắt\n\n")
 	fmt.Fprintf(&b, "- run_id: %s\n", s.RunID)
 	fmt.Fprintf(&b, "- mode: %s\n", s.Mode)
 	if s.Variant != "" {
@@ -233,7 +233,7 @@ func renderMarkdown(s Suite) string {
 	fmt.Fprintf(&b, "- repeat: %d\n", s.Repeat)
 	fmt.Fprintf(&b, "- cases: %d\n\n", len(s.Cases))
 
-	fmt.Fprintf(&b, "## Cases\n\n")
+	fmt.Fprintf(&b, "## Các case\n\n")
 	for _, c := range s.Cases {
 		fmt.Fprintf(&b, "### %s  [%s]\n\n", c.CaseID, c.Outcome)
 		if c.Role != "" {

@@ -148,13 +148,13 @@ func TestRun_ExistingFile_NoOverwrite(t *testing.T) {
 	}
 	_, err := Run(context.Background(), Deps{Store: s}, Options{OutPath: target})
 	if err == nil {
-		t.Fatal("expect error when target exists and !Overwrite")
+		t.Fatal("mong đợi lỗi khi tệp đích đã tồn tại và !Overwrite")
 	}
-	if !strings.Contains(err.Error(), "已存在") {
-		t.Errorf("unexpected error: %v", err)
+	if !strings.Contains(err.Error(), "tệp đã tồn tại") {
+		t.Errorf("lỗi không mong đợi: %v", err)
 	}
 
-	// 加 Overwrite 应成功
+	// Có Overwrite thì phải thành công.
 	res, err := Run(context.Background(), Deps{Store: s}, Options{OutPath: target, Overwrite: true})
 	if err != nil {
 		t.Fatalf("Overwrite Run: %v", err)
@@ -282,10 +282,10 @@ func TestRun_UnknownExtension(t *testing.T) {
 	s, _ := newTestStore(t, "X", []int{1})
 	_, err := Run(context.Background(), Deps{Store: s}, Options{OutPath: "/tmp/foo.dat"})
 	if err == nil {
-		t.Fatal("expect error for unknown extension")
+		t.Fatal("mong đợi lỗi với phần mở rộng không xác định")
 	}
-	if !strings.Contains(err.Error(), "扩展名") {
-		t.Errorf("error should mention extension: %v", err)
+	if !strings.Contains(err.Error(), "phần mở rộng") {
+		t.Errorf("lỗi phải nêu phần mở rộng: %v", err)
 	}
 }
 

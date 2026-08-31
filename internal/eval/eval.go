@@ -13,54 +13,54 @@ import (
 	"github.com/voocel/ainovel-cli/internal/bootstrap"
 )
 
-// Command 是 `ainovel-cli eval` 子命令入口，返回进程退出码：
-// 0=PASS/WARN，1=有 case FAIL，2=用法/配置错误。
+// Command là điểm vào của lệnh con `ainovel-cli eval`, trả về mã thoát của tiến trình:
+// 0=PASS/WARN, 1=có case FAIL, 2=lỗi cú pháp/cấu hình.
 //
-// 清晰流程：加载配置 → 加载 case → 按 single/A-B 编排运行 → 采集 → 评分 → 聚合 → 报告。
+// Luồng rõ ràng: tải cấu hình → tải case → chạy theo single/A-B → thu thập → chấm điểm → tổng hợp → báo cáo.
 func Command(argv []string) int {
 	fs := flag.NewFlagSet("eval", flag.ContinueOnError)
-	casesPath := fs.String("cases", "", "case 目录或单个 .json 文件（必填）")
-	variantDir := fs.String("variant", "", "variant prompt 覆盖目录（含 writer.md 等核心提示词）")
-	configPath := fs.String("config", "", "配置文件路径（缺省用默认路径）")
-	outDir := fs.String("out", "", "报告输出目录（缺省 workspace/evals/<run_id>）")
-	maxChapters := fs.Int("max-chapters", -1, "覆盖所有 case 的章数上限（-1=不覆盖）")
-	timeout := fs.Duration("timeout", 30*time.Minute, "单 case 墙钟上限（0=不限）")
-	repeat := fs.Int("repeat", 1, "每个 case 重复运行次数（降低模型随机性影响）")
-	ci := fs.Bool("ci", false, "CI 模式：抑制逐事件进度输出，仅打印最终结论（退出码已反映门禁，无需此 flag 也生效）")
+	casesPath := fs.String("cases", "", "thư mục case hoặc một tệp .json (bắt buộc)")
+	variantDir := fs.String("variant", "", "thư mục ghi đè prompt variant (gồm writer.md và các prompt cốt lõi)")
+	configPath := fs.String("config", "", "đường dẫn tệp cấu hình (mặc định dùng đường dẫn mặc định)")
+	outDir := fs.String("out", "", "thư mục xuất báo cáo (mặc định workspace/evals/<run_id>)")
+	maxChapters := fs.Int("max-chapters", -1, "ghi đè giới hạn số chương cho mọi case (-1=không ghi đè)")
+	timeout := fs.Duration("timeout", 30*time.Minute, "giới hạn thời gian thực cho một case (0=không giới hạn)")
+	repeat := fs.Int("repeat", 1, "số lần chạy lặp cho mỗi case (giảm ảnh hưởng của tính ngẫu nhiên mô hình)")
+	ci := fs.Bool("ci", false, "Chế độ CI: ẩn đầu ra tiến độ theo từng sự kiện, chỉ in kết luận cuối cùng (mã thoát đã phản ánh cổng chặn, nên không cần flag này vẫn có hiệu lực)")
 	if err := fs.Parse(argv); err != nil {
 		return 2
 	}
 	if strings.TrimSpace(*casesPath) == "" {
-		fmt.Fprintln(os.Stderr, "eval: 缺少 --cases")
+		fmt.Fprintln(os.Stderr, "eval: thiếu --cases")
 		fs.Usage()
 		return 2
 	}
 	if *repeat <= 0 {
-		fmt.Fprintln(os.Stderr, "eval: --repeat 必须大于 0")
+		fmt.Fprintln(os.Stderr, "eval: --repeat phải lớn hơn 0")
 		return 2
 	}
 
-	// eval 的 -config 指向独立文件时按单文件加载（可复现、不被本机全局/项目污染）；
-	// 缺省则走默认的全局+项目两层合并。
+	// Khi -config của eval trỏ tới một tệp riêng thì tải theo chế độ đơn tệp (có thể tái lập, không bị cấu hình toàn cục/dự án trên máy làm nhiễm);
+	// nếu bỏ trống thì dùng hợp nhất hai lớp toàn cục + dự án mặc định.
 	loadConfig := bootstrap.LoadConfig
 	if strings.TrimSpace(*configPath) != "" {
 		loadConfig = func() (bootstrap.Config, error) { return bootstrap.LoadConfigFile(*configPath) }
 	}
 	cfg, err := loadConfig()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "eval: 加载配置失败: %v\n", err)
+		fmt.Fprintf(os.Stderr, "eval: tải cấu hình thất bại: %v\n", err)
 		return 2
 	}
 
 	cases, err := LoadCases(*casesPath)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "eval: 加载 case 失败: %v\n", err)
+		fmt.Fprintf(os.Stderr, "eval: tải case thất bại: %v\n", err)
 		return 2
 	}
 
 	variantPrompts, err := loadVariant(*variantDir)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "eval: 加载 variant 失败: %v\n", err)
+		fmt.Fprintf(os.Stderr, "eval: tải variant thất bại: %v\n", err)
 		return 2
 	}
 
@@ -93,13 +93,13 @@ func Command(argv []string) int {
 		}
 		var progressW io.Writer
 		if !*ci {
-			progressW = os.Stderr // CI 模式静默逐事件输出，保持日志干净
+			progressW = os.Stderr // Chế độ CI im lặng đầu ra theo từng sự kiện, giữ log gọn sạch
 		}
 
 		if variantName == "" {
 			runs := make([]RunResult, 0, *repeat)
 			for i := 1; i <= *repeat; i++ {
-				bundle := assets.Load(style, assets.LoadOptions{}) // 纯内置,确定性 baseline,不受本机覆盖污染
+				bundle := assets.Load(style, assets.LoadOptions{}) // Chỉ dùng nội bộ, baseline xác định, không bị nhiễm từ ghi đè trên máy
 				dir := runDir(*outDir, c.ID, ArmSingle, i, *repeat)
 				res := runOne(cfg, bundle, c, dir, *timeout, progressW)
 				res.Arm, res.Repeat = ArmSingle, i
@@ -122,7 +122,7 @@ func Command(argv []string) int {
 
 			varBundle := assets.Load(style, assets.LoadOptions{})
 			if err := applyVariant(&varBundle, variantPrompts); err != nil {
-				fmt.Fprintf(os.Stderr, "eval: variant 覆盖失败: %v\n", err)
+				fmt.Fprintf(os.Stderr, "eval: ghi đè variant thất bại: %v\n", err)
 				return 2
 			}
 			varDir := runDir(*outDir, c.ID, ArmVariant, i, *repeat)
@@ -138,11 +138,11 @@ func Command(argv []string) int {
 
 	suite := Aggregate(runID, mode, variantName, *repeat, caseResults)
 	if err := WriteReport(suite, *outDir); err != nil {
-		fmt.Fprintf(os.Stderr, "eval: 写报告失败: %v\n", err)
+		fmt.Fprintf(os.Stderr, "eval: ghi báo cáo thất bại: %v\n", err)
 		return 2
 	}
 
-	fmt.Fprintf(os.Stderr, "\n%s\n报告: %s\n", Summary(suite), filepath.Join(*outDir, "report.md"))
+	fmt.Fprintf(os.Stderr, "\n%s\nBáo cáo: %s\n", Summary(suite), filepath.Join(*outDir, "report.md"))
 	if suite.Gate == Fail {
 		return 1
 	}
@@ -172,7 +172,7 @@ func runDir(outDir, caseID, arm string, repeat, totalRepeats int) string {
 	return filepath.Join(outDir, "artifacts", caseID, fmt.Sprintf("r%d", repeat), arm)
 }
 
-// loadVariant 读取 variant 目录下所有 *.md（文件名→内容）。空目录返回空 map。
+// loadVariant đọc toàn bộ *.md trong thư mục variant (tên tệp→nội dung). Thư mục trống trả về map rỗng.
 func loadVariant(dir string) (map[string]string, error) {
 	if strings.TrimSpace(dir) == "" {
 		return nil, nil
@@ -193,15 +193,15 @@ func loadVariant(dir string) (map[string]string, error) {
 		out[e.Name()] = string(data)
 	}
 	if len(out) == 0 {
-		return nil, fmt.Errorf("variant 目录无 *.md 文件: %s", dir)
+		return nil, fmt.Errorf("Thư mục variant không có tệp *.md: %s", dir)
 	}
 	return out, nil
 }
 
 func applyVariant(b *assets.Bundle, prompts map[string]string) error {
 	for file, raw := range prompts {
-		// voice.md 是文风层独立 variant 入口:只替换文风段,协议模板不动,
-		// 组装仍走 BuildWriterPrompt 同一路径(docs/voice-layer.md §3.6)。
+		// voice.md là điểm vào variant độc lập của lớp văn phong: chỉ thay đoạn văn phong, không đụng mẫu giao thức,
+		// việc ghép vẫn đi theo cùng đường dẫn BuildWriterPrompt (docs/voice-layer.md §3.6).
 		if file == "voice.md" {
 			b.OverrideVoice(raw)
 			continue

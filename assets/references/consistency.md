@@ -1,40 +1,29 @@
-# 连贯性保证机制
+# Cơ chế bảo đảm liên tục
 
-为确保长时间创作的故事连贯性：
+Để câu chuyện dài không đứt mạch:
 
-## 写前必读
+## Đọc trước khi viết
 
-每次开始写新章节前：
-1. 阅读 `00-大纲.md` 中所有已完成章节的摘要
-2. 读取上一章文件，了解当前悬念
-3. 检查人物状态（位置、情绪、关系）
+Mỗi khi bắt đầu chương mới:
+1. Đọc outline và summary chương đã hoàn thành.
+2. Đọc file chương trước để nắm móc hiện tại.
+3. Kiểm tra trạng thái nhân vật: vị trí, cảm xúc, quan hệ.
 
-## 穿针引线
+## Luồn chỉ nối mạch
 
-在新章节中：
-- 呼应前文埋下的伏笔和线索
-- 提及之前发生的事件（自然融入）
-- 让人物行为与之前保持一致
+Trong chương mới:
+- Hồi đáp mồi nhử và manh mối trước đó.
+- Nhắc sự kiện cũ một cách tự nhiên khi cốt truyện cần.
+- Giữ hành vi nhân vật nhất quán với lựa chọn đã có.
 
-## 人物状态跟踪
+## Theo dõi trạng thái nhân vật
 
-注意人物在各章节中的变化和成长：
-- 位置变化（人在哪里）
-- 情绪状态（当前心情）
-- 关系变化（与其他角色关系）
-- 能力变化（获得新技能/信息）
+Chú ý thay đổi theo chương:
+- Vị trí.
+- Cảm xúc.
+- Quan hệ.
+- Năng lực hoặc thông tin mới.
 
-## 悬念线延续
+## Tiếp diễn tuyến suspense
 
-确保主线悬念逐步推进：
-- 每章至少回应一个旧悬念
-- 提出新悬念或升级现有悬念
-- 不要遗忘任何未解的悬念
-
-## 一致性检查清单
-
-- [ ] 人物行为符合其性格设定
-- [ ] 前后伏笔有呼应，逻辑闭环
-- [ ] 高潮低谷分布合理，节奏恰当
-- [ ] 时间线连贯（没有时间跳跃错误）
-- [ ] 场景转换自然（没有凭空出现）
+Móc chính cần được đẩy từng bước; mỗi lần nhả thông tin nên mở thêm câu hỏi hoặc buộc nhân vật chọn.

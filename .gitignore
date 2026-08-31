@@ -45,3 +45,4 @@ tasks
 refer/
 output*
 workspace/
+.worktrees/

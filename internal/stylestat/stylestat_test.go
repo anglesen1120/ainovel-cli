@@ -49,6 +49,27 @@ func TestComputePatterns(t *testing.T) {
 	}
 }
 
+func TestComputePatternsDetectsVietnameseContrastAlongsideChinese(t *testing.T) {
+	chapters := make([]string, minChapters)
+	for i := range chapters {
+		chapters[i] = chapterWith("Anh ấy Không phải đang lùi bước, mà là đang chờ đợi. 他不是愤怒，而是恐惧。")
+	}
+
+	stats := Compute(Input{Chapters: chapters})
+	if stats == nil {
+		t.Fatal("expected stats")
+	}
+	for _, pattern := range stats.Patterns {
+		if strings.HasPrefix(pattern.Name, "Câu chỉnh hướng") {
+			if pattern.Total != minChapters*2 {
+				t.Errorf("contrast pattern total: got %d want %d", pattern.Total, minChapters*2)
+			}
+			return
+		}
+	}
+	t.Fatalf("contrast pattern missing: %+v", stats.Patterns)
+}
+
 func TestComputeTopPhrasesWithStopwords(t *testing.T) {
 	// 「青云山巅」高频出现；「陆九渊」是角色名应被过滤
 	line := "众人望向青云山巅，陆九渊负手而立。\n"
@@ -128,6 +149,11 @@ func TestComputeTitleFormats(t *testing.T) {
 	s := Compute(Input{Chapters: chapters, Titles: []string{"第一章 风起", "云涌", "第3章 雷动"}})
 	if s.TitleFormats == nil || s.TitleFormats.WithPrefix != 2 || s.TitleFormats.WithoutPrefix != 1 {
 		t.Errorf("title formats: %+v", s.TitleFormats)
+	}
+	// Vietnamese numeric prefixes participate in the same mixed-format detection.
+	s = Compute(Input{Chapters: chapters, Titles: []string{"Chương 1: Khởi đầu", "Chuong 2: Tiếp nối", "Không tiền tố"}})
+	if s.TitleFormats == nil || s.TitleFormats.WithPrefix != 2 || s.TitleFormats.WithoutPrefix != 1 {
+		t.Errorf("Vietnamese title formats: %+v", s.TitleFormats)
 	}
 	// 统一 → 不上报
 	s = Compute(Input{Chapters: chapters, Titles: []string{"风起", "云涌"}})

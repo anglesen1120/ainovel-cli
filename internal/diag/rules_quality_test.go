@@ -32,9 +32,9 @@ func TestHookWeakChain(t *testing.T) {
 func TestPayoffMissPattern(t *testing.T) {
 	snap := &Snapshot{
 		Plans: map[int]*domain.ChapterPlan{
-			1: {Chapter: 1, Contract: domain.ChapterContract{PayoffPoints: []string{"首战取胜"}}},
-			2: {Chapter: 2, Contract: domain.ChapterContract{PayoffPoints: []string{"确认搭档关系"}}},
-			3: {Chapter: 3, Contract: domain.ChapterContract{PayoffPoints: []string{"揭开真相一角"}}},
+			1: {Chapter: 1, Contract: domain.ChapterContract{PayoffPoints: []string{"Thắng trận đầu"}}},
+			2: {Chapter: 2, Contract: domain.ChapterContract{PayoffPoints: []string{"Xác nhận quan hệ đồng đội"}}},
+			3: {Chapter: 3, Contract: domain.ChapterContract{PayoffPoints: []string{"Hé lộ một góc sự thật"}}},
 		},
 		Reviews: map[int]*domain.ReviewEntry{
 			1: {Chapter: 1, Scope: "chapter", ContractStatus: "partial"},
@@ -50,7 +50,7 @@ func TestPayoffMissPattern(t *testing.T) {
 	if findings[0].Rule != "PayoffMissPattern" {
 		t.Fatalf("unexpected rule: %+v", findings[0])
 	}
-	if !strings.Contains(findings[0].Evidence, "ch1(1项 payoff)") || !strings.Contains(findings[0].Evidence, "2/3") {
+	if !strings.Contains(findings[0].Evidence, "ch1(1 payoff)") || !strings.Contains(findings[0].Evidence, "2/3") {
 		t.Fatalf("unexpected evidence: %s", findings[0].Evidence)
 	}
 }

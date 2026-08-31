@@ -25,19 +25,19 @@ func TestCollectReadsStyleUsageAndToolCalls(t *testing.T) {
 		t.Fatalf("save progress: %v", err)
 	}
 	if err := s.Outline.SaveOutline([]domain.OutlineEntry{
-		{Chapter: 1, Title: "第一章 起风"},
-		{Chapter: 2, Title: "破局"},
-		{Chapter: 3, Title: "第三章 入局"},
-		{Chapter: 4, Title: "追问"},
-		{Chapter: 5, Title: "第五章 回声"},
+		{Chapter: 1, Title: "Chương 1: Gió nổi"},
+		{Chapter: 2, Title: "Phá cục"},
+		{Chapter: 3, Title: "Chương 3: Vào cục"},
+		{Chapter: 4, Title: "Truy vấn"},
+		{Chapter: 5, Title: "Chương 5: Hồi âm"},
 	}); err != nil {
 		t.Fatalf("save outline: %v", err)
 	}
-	if err := s.Characters.Save([]domain.Character{{Name: "林墨", Aliases: []string{"药童"}}}); err != nil {
+	if err := s.Characters.Save([]domain.Character{{Name: "Lâm Mặc", Aliases: []string{"dược đồng"}}}); err != nil {
 		t.Fatalf("save characters: %v", err)
 	}
 	for ch := 1; ch <= 5; ch++ {
-		text := "# 标题\n\n不是风停了，而是所有人都屏住呼吸。沉默了片刻，林墨握紧药囊。"
+		text := "# Tiêu đề\n\nKhông phải gió ngừng, mà là tất cả mọi người đều nín thở. Im lặng một lúc, Lâm Mặc siết chặt túi thuốc."
 		if err := s.Drafts.SaveFinalChapter(ch, text); err != nil {
 			t.Fatalf("save chapter %d: %v", ch, err)
 		}
@@ -58,16 +58,16 @@ func TestCollectReadsStyleUsageAndToolCalls(t *testing.T) {
 
 	col := Collect(dir, nil)
 	if len(col.LoadErrors) != 0 {
-		t.Fatalf("不应有读取错误: %v", col.LoadErrors)
+		t.Fatalf("Không nên có lỗi đọc: %v", col.LoadErrors)
 	}
 	if col.Style.Status != "ok" || col.Style.Stats == nil {
-		t.Fatalf("stylestat 应可计算，得到 status=%s stats=%v", col.Style.Status, col.Style.Stats)
+		t.Fatalf("stylestat phải tính được, nhận status=%s stats=%v", col.Style.Status, col.Style.Stats)
 	}
 	if col.Style.Stats.TitleFormats == nil {
-		t.Fatal("标题混用应被 stylestat 捕获")
+		t.Fatal("stylestat phải bắt được việc trộn lẫn tiêu đề")
 	}
 	if !col.Usage.UsageRecorded || col.Usage.Input != 100 || col.Usage.Output != 40 || col.Usage.CostUSD != 0.12 {
-		t.Fatalf("usage 读取不正确: %+v", col.Usage)
+		t.Fatalf("Đọc usage không đúng: %+v", col.Usage)
 	}
 	if col.ToolCalls != 2 {
 		t.Fatalf("tool calls = %d want 2", col.ToolCalls)
@@ -80,12 +80,12 @@ func TestCollectStyleInsufficientSample(t *testing.T) {
 	if err := s.Progress.Save(&domain.Progress{CompletedChapters: []int{1}}); err != nil {
 		t.Fatalf("save progress: %v", err)
 	}
-	if err := s.Drafts.SaveFinalChapter(1, "只有一章"); err != nil {
+	if err := s.Drafts.SaveFinalChapter(1, "Chỉ có một chương"); err != nil {
 		t.Fatalf("save chapter: %v", err)
 	}
 	col := Collect(dir, nil)
 	if col.Style.Status != "insufficient_sample" {
-		t.Fatalf("一章样本应 insufficient_sample，得到 %s", col.Style.Status)
+		t.Fatalf("Mẫu một chương phải là insufficient_sample, nhận %s", col.Style.Status)
 	}
 }
 
@@ -96,8 +96,8 @@ func TestCollectFailsLoudWhenCompletedChapterMissing(t *testing.T) {
 		t.Fatalf("save progress: %v", err)
 	}
 	col := Collect(dir, nil)
-	if !containsString(col.LoadErrors, "progress 标记已完成但终稿为空") {
-		t.Fatalf("缺终稿应进入 LoadErrors，实际 %v", col.LoadErrors)
+	if !containsString(col.LoadErrors, "progress đánh dấu đã hoàn thành nhưng bản cuối trống") {
+		t.Fatalf("Thiếu bản cuối phải vào LoadErrors, thực tế %v", col.LoadErrors)
 	}
 }
 
@@ -108,11 +108,11 @@ func TestChapterTitleUsesLayeredEntryChapter(t *testing.T) {
 		{
 			Index: 1,
 			Arcs: []domain.ArcOutline{
-				{Index: 1}, // 未展开 arc 不应让后续章节位置漂移
+				{Index: 1}, // Arc chưa mở rộng không được làm lệch vị trí các chương phía sau
 				{
 					Index: 2,
 					Chapters: []domain.OutlineEntry{
-						{Chapter: 7, Title: "第七章 真标题"},
+						{Chapter: 7, Title: "Chương bảy: Tiêu đề thật"},
 					},
 				},
 			},
@@ -121,9 +121,9 @@ func TestChapterTitleUsesLayeredEntryChapter(t *testing.T) {
 		t.Fatalf("save layered outline: %v", err)
 	}
 
-	got := chapterTitle(s, 7, "# 正文兜底标题\n\n内容", func(string, error) {})
-	if got != "第七章 真标题" {
-		t.Fatalf("应按 entry.Chapter 匹配分层标题，得到 %q", got)
+	got := chapterTitle(s, 7, "# Tiêu đề dự phòng của thân bài\n\nNội dung", func(string, error) {})
+	if got != "Chương bảy: Tiêu đề thật" {
+		t.Fatalf("Phải khớp tiêu đề phân tầng theo entry.Chapter, nhận %q", got)
 	}
 }
 
@@ -132,14 +132,14 @@ func TestChapterTitleUsesCommittedTitle(t *testing.T) {
 	if err := s.Init(); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.Outline.SaveOutline([]domain.OutlineEntry{{Chapter: 1, Title: "计划标题"}}); err != nil {
+	if err := s.Outline.SaveOutline([]domain.OutlineEntry{{Chapter: 1, Title: "Tiêu đề kế hoạch"}}); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.Summaries.SaveSummary(domain.ChapterSummary{Chapter: 1, Title: "终稿标题"}); err != nil {
+	if err := s.Summaries.SaveSummary(domain.ChapterSummary{Chapter: 1, Title: "Tiêu đề bản cuối"}); err != nil {
 		t.Fatal(err)
 	}
-	got := chapterTitle(s, 1, "# 正文标题\n\n内容", func(string, error) {})
-	if got != "终稿标题" {
+	got := chapterTitle(s, 1, "# Tiêu đề nội dung\n\nNội dung", func(string, error) {})
+	if got != "Tiêu đề bản cuối" {
 		t.Fatalf("chapterTitle = %q, want committed title", got)
 	}
 }

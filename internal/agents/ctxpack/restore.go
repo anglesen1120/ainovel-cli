@@ -11,9 +11,9 @@ import (
 )
 
 // ---------------------------------------------------------------------------
-// Writer summary prompts — narrative-oriented replacements for agentcore's
-// code-assistant defaults. These guide the LLM to preserve continuity
-// information that matters for fiction writing.
+// Lời nhắc tóm tắt dành cho người viết — các bản thay thế thiên về tự sự cho
+// các mặc định của agentcore dành cho trợ lý lập trình. Chúng hướng dẫn LLM
+// giữ lại những thông tin mạch lạc cần thiết cho việc viết tiểu thuyết.
 // ---------------------------------------------------------------------------
 
 const WriterSummarySystemPrompt = `你是一个小说创作上下文摘要助手。你的任务是阅读 AI 写作助手与协调器之间的对话，
@@ -95,23 +95,23 @@ const WriterTurnPrefixPrompt = `这是一个对话轮次的前缀部分，因太
 
 保持简洁。聚焦于理解后缀所需的信息。`
 
-// restoreBudgetTokens is the maximum total token budget for the post-compact
-// restore message. Sized to hold a typical chapter plan + outline + compressed
-// character snapshots without re-stuffing the freshly compacted context.
+// restoreBudgetTokens là ngân sách token tổng tối đa cho thông điệp khôi phục
+// sau khi thu gọn. Kích thước này đủ chứa kế hoạch chương điển hình + dàn ý +
+// các ảnh chụp nhân vật đã nén mà không nạp lại toàn bộ ngữ cảnh vừa thu gọn.
 const restoreBudgetTokens = 6000
 
-// WriterRestorePack holds pre-assembled context that the Writer needs after
-// compression. It is refreshed by the orchestrator at key lifecycle points
-// (chapter start, commit, recovery) and consumed by the PostSummaryHook as a
-// pure in-memory injection — no I/O in the hook path.
+// WriterRestorePack chứa ngữ cảnh đã được lắp ghép trước mà Writer cần sau khi
+// nén. Bộ nhớ đệm được bộ điều phối làm mới tại các mốc vòng đời chính (bắt đầu
+// chương, commit, khôi phục) và PostSummaryHook tiêu thụ như một phép chèn chỉ
+// trong bộ nhớ — đường dẫn hook không thực hiện I/O.
 type WriterRestorePack struct {
 	mu      sync.RWMutex
 	text    string
 	chapter int
 }
 
-// Refresh loads the current chapter's context from store and caches it.
-// Called by the orchestrator before each writing cycle or on recovery.
+// Refresh nạp ngữ cảnh chương hiện tại từ store và lưu vào bộ nhớ đệm.
+// Được bộ điều phối gọi trước mỗi chu kỳ viết hoặc khi khôi phục.
 func (p *WriterRestorePack) Refresh(s *store.Store) {
 	if s == nil {
 		p.Clear()
@@ -158,7 +158,7 @@ func (p *WriterRestorePack) setWarning(scope string, err error) {
 	p.text = fmt.Sprintf("<post-compact-context>\n## 数据告警\n%s：%v\n</post-compact-context>", scope, err)
 }
 
-// Clear drops cached data (e.g., when switching chapters).
+// Clear loại bỏ dữ liệu đã lưu trong bộ nhớ đệm (ví dụ khi chuyển chương).
 func (p *WriterRestorePack) Clear() {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -166,8 +166,8 @@ func (p *WriterRestorePack) Clear() {
 	p.chapter = 0
 }
 
-// Hook returns a PostSummaryHook that injects the cached restore pack.
-// The hook performs no I/O — it only reads the in-memory pack under a read lock.
+// Hook trả về một PostSummaryHook chèn bộ khôi phục đã lưu trong bộ nhớ đệm.
+// Hook không thực hiện I/O — chỉ đọc bộ nhớ đệm dưới khóa đọc.
 func (p *WriterRestorePack) Hook() corecontext.PostSummaryHook {
 	return func(_ context.Context, _ corecontext.SummaryInfo, _ []agentcore.AgentMessage, room int) ([]agentcore.AgentMessage, error) {
 		msg, ok, err := p.buildMessage(min(restoreBudgetTokens, room))
@@ -181,7 +181,7 @@ func (p *WriterRestorePack) Hook() corecontext.PostSummaryHook {
 	}
 }
 
-// buildMessage returns the cached restore message when it fits.
+// buildMessage trả về thông điệp khôi phục đã lưu trong bộ nhớ đệm nếu vừa ngân sách.
 func (p *WriterRestorePack) buildMessage(budgetTokens int) (agentcore.Message, bool, error) {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
@@ -197,11 +197,11 @@ func (p *WriterRestorePack) buildMessage(budgetTokens int) (agentcore.Message, b
 	return msg, true, nil
 }
 
-// truncateJSONToTokens keeps the first portion of JSON bytes that fits within
-// the token budget. Simple byte-level truncation — the result may not be valid
-// JSON, but it preserves the most important leading content (keys, early fields).
+// truncateJSONToTokens giữ lại phần đầu của các byte JSON vừa ngân sách token.
+// Đây là phép cắt đơn giản ở mức byte — kết quả có thể không còn là JSON hợp lệ,
+// nhưng vẫn bảo toàn phần đầu quan trọng nhất (khóa và các trường đầu tiên).
 func truncateJSONToTokens(b []byte, budgetTokens int) string {
-	// Rough: 1 token ≈ 4 bytes for ASCII-dominant JSON
+	// Ước lượng: 1 token ≈ 4 byte đối với JSON chủ yếu là ASCII
 	maxBytes := budgetTokens * 4
 	if maxBytes >= len(b) {
 		return string(b)

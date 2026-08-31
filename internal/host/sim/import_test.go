@@ -26,7 +26,7 @@ func TestImportProfileValidatesSchemaAndMergesByFingerprint(t *testing.T) {
 	if err := os.WriteFile(badPath, []byte(`{"version":"wrong"}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := ImportProfile(context.Background(), st, badPath); err == nil || !strings.Contains(err.Error(), "unsupported simulation profile") {
+	if _, err := ImportProfile(context.Background(), st, badPath); err == nil || !strings.Contains(err.Error(), "phiên bản hồ sơ mô phỏng không được hỗ trợ") {
 		t.Fatalf("expected schema validation error, got %v", err)
 	}
 

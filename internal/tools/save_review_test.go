@@ -98,8 +98,8 @@ func TestSaveReviewRejectsMissingDimensions(t *testing.T) {
 		t.Fatalf("Marshal: %v", err)
 	}
 
-	if _, err := tool.Execute(context.Background(), args); err == nil || !strings.Contains(err.Error(), "dimensions must contain at least one") {
-		t.Fatalf("expected dimensions validation error, got %v", err)
+	if _, err := tool.Execute(context.Background(), args); err == nil || !strings.Contains(err.Error(), "dimensions phải chứa ít nhất một đánh giá dựa trên bằng chứng") {
+		t.Fatalf("phải báo lỗi kiểm tra dimensions, nhận được %v", err)
 	}
 }
 
@@ -136,8 +136,8 @@ func TestSaveReviewRejectsDimensionWithoutComment(t *testing.T) {
 		t.Fatalf("Marshal: %v", err)
 	}
 
-	if _, err := tool.Execute(context.Background(), args); err == nil || !strings.Contains(err.Error(), "dimension comment is required: pacing") {
-		t.Fatalf("expected dimension comment validation error, got %v", err)
+	if _, err := tool.Execute(context.Background(), args); err == nil || !strings.Contains(err.Error(), "nhận xét dimension là bắt buộc: pacing") {
+		t.Fatalf("phải báo lỗi khi dimension thiếu comment, nhận được %v", err)
 	}
 }
 
@@ -182,8 +182,8 @@ func TestSaveReviewRejectsIssueOutsideChapterScope(t *testing.T) {
 		t.Fatalf("Marshal: %v", err)
 	}
 
-	if _, err := tool.Execute(context.Background(), args); err == nil || !strings.Contains(err.Error(), "must reference chapter 58") {
-		t.Fatalf("expected out-of-scope affected chapter rejection, got %v", err)
+	if _, err := tool.Execute(context.Background(), args); err == nil || !strings.Contains(err.Error(), "vấn đề trong đánh giá chương phải tham chiếu chương 58, nhưng nhận được 65") {
+		t.Fatalf("phải từ chối chương chịu ảnh hưởng ngoài phạm vi, nhận được %v", err)
 	}
 	review, err := s.World.LoadReview(58)
 	if err != nil {
@@ -270,8 +270,8 @@ func TestSaveReviewRejectsRewriteWithoutActionableIssue(t *testing.T) {
 		t.Fatalf("Marshal: %v", err)
 	}
 
-	if _, err := tool.Execute(context.Background(), args); err == nil || !strings.Contains(err.Error(), "requires at least one issue") {
-		t.Fatalf("expected actionable issue validation error, got %v", err)
+	if _, err := tool.Execute(context.Background(), args); err == nil || !strings.Contains(err.Error(), "cần ít nhất một vấn đề có requires_change=true") {
+		t.Fatalf("phải báo lỗi kiểm tra vấn đề có thể xử lý, nhận được %v", err)
 	}
 }
 
@@ -304,8 +304,8 @@ func TestSaveReviewRejectsIssueWithoutEvidence(t *testing.T) {
 		t.Fatalf("Marshal: %v", err)
 	}
 
-	if _, err := tool.Execute(context.Background(), args); err == nil || !strings.Contains(err.Error(), "issue evidence is required") {
-		t.Fatalf("expected issue evidence validation error, got %v", err)
+	if _, err := tool.Execute(context.Background(), args); err == nil || !strings.Contains(err.Error(), "bằng chứng vấn đề là bắt buộc") {
+		t.Fatalf("phải báo lỗi khi vấn đề thiếu bằng chứng, nhận được %v", err)
 	}
 }
 
@@ -360,8 +360,8 @@ func TestSaveReviewDoesNotDirtyQueueOnIllegalFlowTransition(t *testing.T) {
 		t.Fatalf("Marshal: %v", err)
 	}
 
-	if _, err := tool.Execute(context.Background(), args); err == nil || !strings.Contains(err.Error(), "apply review outcome") {
-		t.Fatalf("expected illegal flow transition error, got %v", err)
+	if _, err := tool.Execute(context.Background(), args); err == nil || !strings.Contains(err.Error(), "áp dụng kết quả đánh giá") {
+		t.Fatalf("phải báo lỗi chuyển flow bất hợp lệ, nhận được %v", err)
 	}
 
 	p, _ := s.Progress.Load()
@@ -409,8 +409,8 @@ func TestSaveReviewKeepsOutcomeWhenReviewArtifactWriteFails(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := NewSaveReviewTool(s).Execute(context.Background(), args); err == nil || !strings.Contains(err.Error(), "save review") {
-		t.Fatalf("expected review write failure, got %v", err)
+	if _, err := NewSaveReviewTool(s).Execute(context.Background(), args); err == nil || !strings.Contains(err.Error(), "lưu đánh giá") {
+		t.Fatalf("phải báo lỗi ghi đánh giá, nhận được %v", err)
 	}
 
 	p, err := s.Progress.Load()
@@ -485,8 +485,8 @@ func arcReviewArgs(t *testing.T, issueChapter int) []byte {
 
 func TestSaveReviewRejectsIssueOutsideArcSpan(t *testing.T) {
 	s := setupArcReviewStore(t)
-	if _, err := NewSaveReviewTool(s).Execute(context.Background(), arcReviewArgs(t, 2)); err == nil || !strings.Contains(err.Error(), "outside 3-4") {
-		t.Fatalf("expected arc range rejection, got %v", err)
+	if _, err := NewSaveReviewTool(s).Execute(context.Background(), arcReviewArgs(t, 2)); err == nil || !strings.Contains(err.Error(), "chương 2 của vấn đề đánh giá cung nằm ngoài phạm vi 3-4") {
+		t.Fatalf("phải từ chối phạm vi cung, nhận được %v", err)
 	}
 	if p, _ := s.Progress.Load(); len(p.PendingRewrites) != 0 {
 		t.Fatalf("invalid review must not enqueue rewrites: %v", p.PendingRewrites)
@@ -519,8 +519,8 @@ func TestSaveReviewRetriesCheckpointWithoutReapplyingOutcome(t *testing.T) {
 	tool := NewSaveReviewTool(s)
 	args := arcReviewArgs(t, 3)
 
-	if _, err := tool.Execute(context.Background(), args); err == nil || !strings.Contains(err.Error(), "checkpoint review") {
-		t.Fatalf("expected checkpoint failure, got %v", err)
+	if _, err := tool.Execute(context.Background(), args); err == nil || !strings.Contains(err.Error(), "ghi checkpoint đánh giá") {
+		t.Fatalf("phải báo lỗi checkpoint, nhận được %v", err)
 	}
 	if err := os.Remove(checkpointPath); err != nil {
 		t.Fatal(err)
@@ -588,8 +588,8 @@ func TestSaveReviewRejectsFutureArc(t *testing.T) {
 		}
 	}
 
-	if _, err := NewSaveReviewTool(s).Execute(context.Background(), arcReviewArgs(t, 3)); err == nil || !strings.Contains(err.Error(), "must be completed") {
-		t.Fatalf("expected future arc rejection, got %v", err)
+	if _, err := NewSaveReviewTool(s).Execute(context.Background(), arcReviewArgs(t, 3)); err == nil || !strings.Contains(err.Error(), "chương 4 cần được hoàn thành trước khi đánh giá") {
+		t.Fatalf("phải từ chối cung tương lai, nhận được %v", err)
 	}
 	if review, err := s.World.LoadReview(4); err != nil || review != nil {
 		t.Fatalf("future review must not be persisted, review=%+v err=%v", review, err)

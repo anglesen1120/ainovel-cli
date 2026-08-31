@@ -73,8 +73,8 @@ type Request[T any] struct {
 	Hooks        Hooks
 }
 
-const promptCorrection = "上面的输出不符合 JSON Schema。请根据错误修正，并只输出完整 JSON 对象，不要解释或 Markdown 围栏。"
-const semanticCorrection = "上面的 JSON 结构合法但字段取值未通过业务校验。请根据错误修正，并重新输出完整 JSON 对象。"
+const promptCorrection = "Đầu ra ở trên không tuân thủ JSON Schema. Hãy sửa theo lỗi và chỉ xuất đối tượng JSON hoàn chỉnh, không giải thích hoặc dùng hàng rào Markdown."
+const semanticCorrection = "Cấu trúc JSON ở trên hợp lệ nhưng giá trị trường không qua được kiểm tra nghiệp vụ. Hãy sửa theo lỗi và xuất lại đối tượng JSON hoàn chỉnh."
 
 // Execute 统一完成协议选择、提示词准备、请求重试、停止原因分类、Schema/DTO
 // 解码和业务反馈自愈。prompt 模式的格式/Schema 错误以及两种模式的业务错误会
@@ -82,13 +82,13 @@ const semanticCorrection = "上面的 JSON 结构合法但字段取值未通过�
 func Execute[T any](ctx context.Context, model llmretry.Generator, req Request[T]) (T, error) {
 	var zero T
 	if model == nil {
-		return zero, &Failure{Kind: FailureProtocol, Contract: req.Contract.Name, Err: errors.New("模型未配置")}
+		return zero, &Failure{Kind: FailureProtocol, Contract: req.Contract.Name, Err: errors.New("Mô hình chưa được cấu hình")}
 	}
 
 	schemaOptions, resolution := Plan(model, req.Contract)
 	systemPrompt, err := PreparePrompt(req.SystemPrompt, req.Contract, resolution)
 	if err != nil {
-		return zero, &Failure{Kind: FailureContract, Contract: req.Contract.Name, Err: fmt.Errorf("准备输出契约: %w", err)}
+		return zero, &Failure{Kind: FailureContract, Contract: req.Contract.Name, Err: fmt.Errorf("Chuẩn bị hợp đồng đầu ra: %w", err)}
 	}
 	if req.Hooks.Resolved != nil {
 		req.Hooks.Resolved(resolution)
@@ -116,27 +116,27 @@ func Execute[T any](ctx context.Context, model llmretry.Generator, req Request[T
 			return zero, &Failure{Kind: FailureRequest, Contract: req.Contract.Name, Err: err}
 		}
 		if resp == nil {
-			return zero, &Failure{Kind: FailureProtocol, Contract: req.Contract.Name, Err: errors.New("模型返回空响应")}
+			return zero, &Failure{Kind: FailureProtocol, Contract: req.Contract.Name, Err: errors.New("Mô hình trả về phản hồi trống")}
 		}
 
 		raw := resp.Message.TextContent()
 		switch resp.Message.StopReason {
 		case agentcore.StopReasonLength:
-			return zero, &Failure{Kind: FailureLength, Contract: req.Contract.Name, Raw: raw, Err: errors.New("模型输出被长度截断(stop_reason=length)")}
+			return zero, &Failure{Kind: FailureLength, Contract: req.Contract.Name, Raw: raw, Err: errors.New("Đầu ra của mô hình bị cắt do giới hạn độ dài (stop_reason=length)")}
 		case agentcore.StopReasonSafety:
-			return zero, &Failure{Kind: FailureSafety, Contract: req.Contract.Name, Raw: raw, Err: errors.New("模型拒答或触发内容过滤(stop_reason=safety)")}
+			return zero, &Failure{Kind: FailureSafety, Contract: req.Contract.Name, Raw: raw, Err: errors.New("Mô hình từ chối trả lời hoặc kích hoạt bộ lọc nội dung (stop_reason=safety)")}
 		case agentcore.StopReasonError:
-			return zero, &Failure{Kind: FailureProtocol, Contract: req.Contract.Name, Raw: raw, Err: errors.New("模型以错误状态结束(stop_reason=error)")}
+			return zero, &Failure{Kind: FailureProtocol, Contract: req.Contract.Name, Raw: raw, Err: errors.New("Mô hình kết thúc với trạng thái lỗi (stop_reason=error)")}
 		case agentcore.StopReasonToolUse:
-			return zero, &Failure{Kind: FailureProtocol, Contract: req.Contract.Name, Raw: raw, Err: errors.New("结构化调用意外返回工具调用(stop_reason=tool_use)")}
+			return zero, &Failure{Kind: FailureProtocol, Contract: req.Contract.Name, Raw: raw, Err: errors.New("Lời gọi có cấu trúc bất ngờ trả về một lần gọi công cụ (stop_reason=tool_use)")}
 		case agentcore.StopReasonAborted:
-			return zero, &Failure{Kind: FailureProtocol, Contract: req.Contract.Name, Raw: raw, Err: errors.New("模型调用被中止(stop_reason=aborted)")}
+			return zero, &Failure{Kind: FailureProtocol, Contract: req.Contract.Name, Raw: raw, Err: errors.New("Lời gọi mô hình đã bị hủy (stop_reason=aborted)")}
 		}
 
 		body := strings.TrimSpace(raw)
 		if native {
 			if body == "" {
-				return zero, &Failure{Kind: FailureContract, Contract: req.Contract.Name, Raw: raw, Err: errors.New("原生 schema 返回空内容")}
+				return zero, &Failure{Kind: FailureContract, Contract: req.Contract.Name, Raw: raw, Err: errors.New("Schema gốc trả về nội dung trống")}
 			}
 		} else {
 			body = ExtractJSONObject(raw)
@@ -145,7 +145,7 @@ func Execute[T any](ctx context.Context, model llmretry.Generator, req Request[T
 		layer := "schema"
 		var cause error
 		if body == "" {
-			layer, cause = "decode", errors.New("输出中未找到 JSON 对象")
+			layer, cause = "decode", errors.New("Không tìm thấy đối tượng JSON trong đầu ra")
 		} else if err := ValidateJSON(req.Contract.Schema, []byte(body)); err != nil {
 			cause = err
 		} else {
@@ -153,7 +153,7 @@ func Execute[T any](ctx context.Context, model llmretry.Generator, req Request[T
 			if err := json.Unmarshal([]byte(body), &out); err != nil {
 				// Schema 已通过而 DTO 无法解码，说明静态契约与 Go 类型不一致，
 				// 继续要求模型重写无法修复代码缺陷。
-				return zero, &Failure{Kind: FailureContract, Contract: req.Contract.Name, Raw: raw, Err: fmt.Errorf("schema 与 DTO 不一致: %w", err)}
+				return zero, &Failure{Kind: FailureContract, Contract: req.Contract.Name, Raw: raw, Err: fmt.Errorf("Schema không khớp với DTO: %w", err)}
 			}
 			if req.Validate == nil {
 				return out, nil
@@ -166,7 +166,7 @@ func Execute[T any](ctx context.Context, model llmretry.Generator, req Request[T
 		}
 
 		if native && layer != "semantic" {
-			return zero, &Failure{Kind: FailureContract, Contract: req.Contract.Name, Raw: raw, Err: fmt.Errorf("原生 schema 契约违约: %w", cause)}
+			return zero, &Failure{Kind: FailureContract, Contract: req.Contract.Name, Raw: raw, Err: fmt.Errorf("Vi phạm hợp đồng Schema gốc: %w", cause)}
 		}
 		correction := Correction{Attempt: attempt, Layer: layer, Mode: resolution.Mode, Raw: raw, Err: cause}
 		if req.Hooks.Correction != nil {
@@ -178,7 +178,7 @@ func Execute[T any](ctx context.Context, model llmretry.Generator, req Request[T
 		}
 		messages = append(messages,
 			agentcore.Message{Role: agentcore.RoleAssistant, Content: []agentcore.ContentBlock{agentcore.TextBlock(raw)}},
-			agentcore.UserMsg(hint+"\n错误："+cause.Error()),
+			agentcore.UserMsg(hint+"\nLỗi: "+cause.Error()),
 		)
 	}
 }

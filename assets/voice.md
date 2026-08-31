@@ -1,14 +1,14 @@
-## 写作标准
+## Chuẩn viết
 
-这些是质量准则，不要逐条生硬打卡。章节首先要自然成立，其次才是检查项齐全。
+Đây là chuẩn chất lượng, không phải bảng checklist để gạch máy móc. Chương trước hết phải tự nhiên và đứng vững, sau đó mới đủ các điểm kiểm tra.
 
-- 开头尽快建立冲突、悬念、欲望或异常感，少用抽象回顾。
-- 用动作、对话、感官细节推进情节，少用概述和总结。
-- 角色对话要有身份差异、潜台词和行动目的，不要说教。
-- 情绪用身体反应和选择呈现，不直接贴标签。
-- 关系变化要有事件触发，不要一章内从陌生跃迁到绝对信任。
-- 秘密分批释放，不提前解释大纲未要求的重大谜底。
-- 章末钩子可以是危机、选择、情绪余波、关系变化或未完成目标，不必每章都做夸张悬念。
-- **去 AI 味**：写作时规避 `reference_pack.references.anti_ai_tone` 列出的全部模式（结构/用词/描写/对话/节奏五类）。其中可机械枚举的疲劳词、套句阈值见 `working_memory.user_rules.structured`，commit 时强制检查。
-- **句式多样性**：`episodic_memory.style_stats`（如有）是代码对你已写正文的统计——你自己的口头禅镜像。本章主动压低其中的高频项；最常见的固化源是矫正句（"不是…而是…"）、单一计时量词（"几息/数息"）和同型明喻连用。章末收束形式（短句斩断/对话余音/场景余像/悬念提问）与近期章节轮换，开篇避免每章都用"夜里/清晨/醒来"式时间起手。
-- **前情不复述**：`episodic_memory` 中的摘要、伏笔、状态是已写入正文的备忘，用于对照衔接，不是本章待写素材；上一章已交代的信息，新章只在剧情需要时以新视角触及，禁止前情提要式重写（跨章逐字复读会被 style_stats 的 repeated_sentences 记录在案）。
+- Mở đầu nhanh chóng tạo xung đột, bí ẩn, ham muốn hoặc cảm giác bất thường; hạn chế hồi tưởng trừu tượng.
+- Dùng hành động, đối thoại và chi tiết giác quan để đẩy cốt truyện; hạn chế tóm lược và kết luận thay người đọc.
+- Đối thoại cần khác biệt theo thân phận, có ẩn ý và mục đích hành động; không thuyết giáo.
+- Cảm xúc thể hiện qua phản ứng cơ thể và lựa chọn, không dán nhãn trực tiếp.
+- Biến chuyển quan hệ phải có sự kiện kích hoạt; đừng để người lạ nhảy sang tin tưởng tuyệt đối trong một chương.
+- Bí mật nhả theo từng đợt; không giải thích sớm những bí mật lớn mà outline chưa yêu cầu.
+- Móc cuối chương có thể là nguy cơ, lựa chọn, dư âm cảm xúc, biến đổi quan hệ hoặc mục tiêu chưa xong; không cần chương nào cũng phóng đại suspense.
+- **Giảm mùi AI**: khi viết, tránh toàn bộ mẫu trong `reference_pack.references.anti_ai_tone` (cấu trúc / từ ngữ / miêu tả / đối thoại / nhịp). Những phần đếm được bằng máy như từ mòn, câu khuôn và ngưỡng lặp nằm trong `working_memory.user_rules.structured`, được kiểm tra bắt buộc lúc commit.
+- **Đa dạng câu**: `episodic_memory.style_stats` (nếu có) là thống kê code rút ra từ văn bản bạn đã viết — tấm gương phản chiếu thói quen câu chữ. Chủ động giảm các mục tần suất cao; nguồn đông cứng thường gặp là câu chỉnh lý ("không phải... mà là..."), lượng từ thời gian đơn điệu và so sánh cùng dạng. Cách khép chương (câu ngắn / dư âm đối thoại / dư ảnh cảnh / câu hỏi móc) nên luân phiên với chương gần đây; mở đầu tránh lần nào cũng dùng kiểu thời điểm như đêm, sáng sớm, thức dậy.
+- **Không tóm tắt tiền truyện**: summary, foreshadow và state trong `episodic_memory` là ghi nhớ của nội dung đã xuất hiện, dùng để nối mạch chứ không phải chất liệu chờ viết lại. Thông tin chương trước đã trình bày thì chương mới chỉ chạm lại khi cốt truyện cần và từ góc nhìn mới; cấm viết lại kiểu recap đầu chương (lặp nguyên câu xuyên chương sẽ bị `style_stats.repeated_sentences` ghi nhận).

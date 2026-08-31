@@ -42,26 +42,26 @@ func rangeDigestJSON(start, end int, plot string) string {
 
 func synthesisFixtureJSON(endChapter int, status string) string {
 	data, err := json.Marshal(map[string]any{
-		"title":    "测试书",
-		"synopsis": "甲踏上旅程，寻找改变命运的答案。",
-		"premise":  "# 故事前提\n前提",
+		"title":    "Sách thử nghiệm",
+		"synopsis": "A lên đường, tìm kiếm câu trả lời để thay đổi số phận.",
+		"premise":  "# Tiền đề câu chuyện\nTiền đề",
 		"characters": []any{map[string]any{
-			"name": "甲", "aliases": []string{}, "role": "protagonist", "description": "d",
-			"arc": "a", "traits": []string{"坚韧"}, "tier": nil,
+			"name": "A", "aliases": []string{}, "role": "protagonist", "description": "d",
+			"arc": "a", "traits": []string{"kiên cường"}, "tier": nil,
 		}},
 		"world_rules": []any{},
 		"structure": []any{map[string]any{
-			"title": "卷一", "theme": "主题", "arcs": []any{map[string]any{
-				"title": "弧一", "goal": "目标", "start_chapter": 1, "end_chapter": endChapter,
+			"title": "Quyển một", "theme": "Chủ đề", "arcs": []any{map[string]any{
+				"title": "Cung một", "goal": "Mục tiêu", "start_chapter": 1, "end_chapter": endChapter,
 			}},
 		}},
 		"compass": map[string]any{
-			"ending_direction": "终局", "open_threads": []string{},
+			"ending_direction": "Kết cục", "open_threads": []string{},
 			"estimated_scale": nil, "last_updated": nil,
 		},
 		"planning_tier": "short",
 		"story_status":  status,
-		"status_reason": "根据正文判断",
+		"status_reason": "Dựa trên nội dung chính để nhận định",
 	})
 	if err != nil {
 		panic(err)
