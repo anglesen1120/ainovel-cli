@@ -1,7 +1,7 @@
-// Package llmcontract 是直接结构化返回的统一契约与执行层：静态 Contract
-// 是结构的单一来源，Execute 统一完成能力选择、提示词准备、请求重试、
-// Schema/DTO 解码和反馈自愈。
-// 协议在请求发出前确定；原生请求被拒或违约时原样暴露，禁止静默去掉 schema 重发。
+// Package llmcontract là tầng contract và thực thi thống nhất cho trả về cấu trúc trực tiếp: Contract tĩnh
+// là nguồn duy nhất của cấu trúc; Execute thống nhất chọn capability, chuẩn bị prompt, retry request,
+// decode Schema/DTO và tự phục hồi bằng phản hồi.
+// Giao thức được xác định trước khi gửi request; khi request native bị từ chối hoặc vi phạm contract thì lộ nguyên trạng, cấm âm thầm bỏ schema để gửi lại.
 package llmcontract
 
 import (
@@ -17,14 +17,14 @@ import (
 	"github.com/voocel/agentcore/llm"
 )
 
-// Contract 是一次直接结构化返回的静态契约,紧邻各边界 DTO 定义。
+// Contract là contract tĩnh của một lần trả về cấu trúc trực tiếp, đặt cạnh định nghĩa DTO ở từng biên.
 type Contract struct {
 	Name        string
 	Description string
 	Schema      map[string]any
 }
 
-// Mode 是本次调用采用的结构化协议。
+// Mode là giao thức cấu trúc được dùng cho lần gọi này.
 type Mode string
 
 const (
@@ -32,26 +32,26 @@ const (
 	ModePromptContract   Mode = "prompt_contract"
 )
 
-// Source 是能力判断的依据来源。
+// Source là nguồn căn cứ để phán định capability.
 type Source string
 
 const (
-	SourceConfig  Source = "config"  // 用户在 ModelConfig.json_schema 显式声明
-	SourceAdapter Source = "adapter" // provider adapter 的模型级能力表
-	SourceUnknown Source = "unknown" // 无声明且能力未知,保守走 prompt contract
+	SourceConfig  Source = "config"  // người dùng khai báo rõ trong ModelConfig.json_schema
+	SourceAdapter Source = "adapter" // bảng capability cấp mô hình của provider adapter
+	SourceUnknown Source = "unknown" // không khai báo và capability chưa biết, bảo thủ dùng prompt contract
 )
 
-// Resolution 是请求发出前确定的协议选择结果,供调用方分支与日志。
+// Resolution là kết quả chọn giao thức trước khi gửi request, cho bên gọi phân nhánh và ghi log.
 type Resolution struct {
 	Mode     Mode
 	Source   Source
-	Strict   bool // native 时是否携带 strict
+	Strict   bool // khi native có kèm strict hay không
 	Provider string
 	Model    string
 }
 
-// jsonSchemaOverrider 由携带 config 三态覆盖的模型包装器实现
-// (bootstrap.SwappableModel 及透传它的包装层)。
+// jsonSchemaOverrider do wrapper mô hình mang override ba trạng thái config implement
+// (bootstrap.SwappableModel và các tầng wrapper truyền xuyên nó).
 type jsonSchemaOverrider interface {
 	JSONSchemaOverride() *bool
 }
@@ -60,8 +60,8 @@ type modelInfoProvider interface {
 	Info() llm.ModelInfo
 }
 
-// ModelFacts 是一次能力解析所需的同一时刻快照。热切换包装器实现该接口，
-// 避免 Resolve 分别读取能力、配置覆盖和模型身份时混入两次切换之间的状态。
+// ModelFacts là snapshot cùng thời điểm cần cho một lần phân tích capability. Wrapper hot-swap implement interface này,
+// tránh Resolve đọc riêng capability, override config và định danh mô hình rồi lẫn trạng thái giữa hai lần chuyển đổi.
 type ModelFacts struct {
 	Capabilities       llm.Capabilities
 	Info               llm.ModelInfo
@@ -72,8 +72,8 @@ type modelFactsProvider interface {
 	StructuredOutputFacts() ModelFacts
 }
 
-// Resolve 每次调用现读当前模型事实(热切换后下一次调用即用新值):
-// config 三态优先,其次 adapter 模型级能力,未知一律 prompt contract。
+// Resolve đọc facts mô hình hiện tại ở mỗi lần gọi (sau hot-swap, lần gọi kế tiếp dùng giá trị mới):
+// ba trạng thái config ưu tiên trước, sau đó là capability cấp mô hình của adapter; chưa biết thì luôn dùng prompt contract.
 func Resolve(model any) Resolution {
 	res := Resolution{Mode: ModePromptContract, Source: SourceUnknown}
 
@@ -106,8 +106,8 @@ func Resolve(model any) Resolution {
 		res.Source = SourceConfig
 		if *override {
 			res.Mode = ModeNativeJSONSchema
-			// 用户声明 endpoint 遵守 Structured Outputs 契约即默认 strict;
-			// adapter 明确说不支持 strict 时才只发 schema 不发 strict。
+			// Người dùng khai báo endpoint tuân thủ contract Structured Outputs thì mặc định strict;
+			// chỉ khi adapter nói rõ không hỗ trợ strict mới chỉ gửi schema mà không gửi strict.
 			res.Strict = caps.Structured.Strict != llm.SupportNo
 		}
 		return res
@@ -124,7 +124,7 @@ func Resolve(model any) Resolution {
 	return res
 }
 
-// Plan 解析协议并在原生模式下生成调用选项;prompt contract 模式返回 nil opts。
+// Plan phân tích giao thức và sinh call option trong native mode; prompt contract mode trả nil opts.
 func Plan(model any, c Contract) ([]agentcore.CallOption, Resolution) {
 	res := Resolve(model)
 	if res.Mode != ModeNativeJSONSchema {
@@ -135,9 +135,9 @@ func Plan(model any, c Contract) ([]agentcore.CallOption, Resolution) {
 	}, res
 }
 
-// PreparePrompt 保持业务语义提示词只有一份：原生模式直接返回原文；prompt
-// contract 模式从同一份 Schema 自动生成格式后缀。调用方不维护第二套模板，字段
-// 变更也不会让提示词与 response_format 分叉。
+// PreparePrompt giữ chỉ một prompt ngữ nghĩa nghiệp vụ: native mode trả thẳng nguyên văn; prompt
+// contract mode tự sinh hậu tố format từ cùng một Schema. Bên gọi không duy trì bộ template thứ hai; field
+// thay đổi cũng không làm prompt và response_format rẽ nhánh.
 func PreparePrompt(base string, c Contract, res Resolution) (string, error) {
 	if res.Mode != ModePromptContract {
 		return base, nil
@@ -146,8 +146,8 @@ func PreparePrompt(base string, c Contract, res Resolution) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("llmcontract: marshal %s prompt schema: %w", c.Name, err)
 	}
-	contract := "## 输出契约\n\n" +
-		"只输出一个符合下列 JSON Schema 的 JSON 对象，不要输出解释、Markdown 围栏或标签本身。\n\n" +
+	contract := "## Contract đầu ra\n\n" +
+		"Chỉ xuất một object JSON phù hợp JSON Schema dưới đây, không xuất giải thích, Markdown fence hoặc chính thẻ.\n\n" +
 		"<output-json-schema>\n" + string(schemaJSON) + "\n</output-json-schema>"
 	if strings.TrimSpace(base) == "" {
 		return contract, nil
@@ -155,8 +155,8 @@ func PreparePrompt(base string, c Contract, res Resolution) (string, error) {
 	return strings.TrimSpace(base) + "\n\n" + contract, nil
 }
 
-// Nullable 把一个 schema 的 type 扩展为可空联合(["<t>","null"]),用于 strict
-// 模式下"全字段 required、可选语义用 null"的表达。返回拷贝,不修改传入 map。
+// Nullable mở rộng type của một schema thành union nullable (["<t>","null"]), dùng trong strict
+// mode để biểu đạt "mọi field required, ngữ nghĩa tùy chọn dùng null". Trả bản sao, không sửa map đầu vào.
 func Nullable(s map[string]any) map[string]any {
 	out := maps.Clone(s)
 	if t, ok := out["type"].(string); ok {
@@ -181,10 +181,10 @@ func Nullable(s map[string]any) map[string]any {
 	return out
 }
 
-// ValidateStrictReady 递归校验 schema 满足 OpenAI strict 子集的结构前提:
-// 所有 object 的属性都必须列入 required(可选语义用 null 联合表达)。litellm
-// 在请求期做同样校验并自动补 additionalProperties:false;契约测试用本函数
-// 前置断言(RFC §11.1),不把结构问题留到运行时。
+// ValidateStrictReady kiểm tra đệ quy schema thỏa tiền đề cấu trúc của subset strict OpenAI:
+// mọi property của object phải được liệt kê trong required (ngữ nghĩa tùy chọn biểu đạt bằng union null). litellm
+// làm kiểm tra tương tự ở lúc request và tự bổ sung additionalProperties:false; kiểm thử contract dùng hàm này
+// để assert trước (RFC §11.1), không để vấn đề cấu trúc tới runtime.
 func ValidateStrictReady(s map[string]any) error {
 	return validateStrictReady(s, "$")
 }
@@ -195,7 +195,7 @@ func validateStrictReady(s map[string]any, path string) error {
 		required, _ := s["required"].([]string)
 		for name, sub := range props {
 			if !slices.Contains(required, name) {
-				return fmt.Errorf("%s.%s 未列入 required(strict 要求全属性 required)", path, name)
+				return fmt.Errorf("%s.%s chưa được đưa vào required(strict yêu cầu mọi thuộc tính là required)", path, name)
 			}
 			if subMap, ok := sub.(map[string]any); ok {
 				if err := validateStrictReady(subMap, path+"."+name); err != nil {
@@ -220,8 +220,8 @@ func typeIncludes(t any, want string) bool {
 	return false
 }
 
-// Fingerprint 返回 schema 规范化 JSON 的 sha256 前 12 位 hex,用于日志关联;
-// encoding/json 对 map 键排序,同一契约天然稳定。
+// Fingerprint trả 12 ký tự hex đầu của sha256 JSON schema chuẩn hóa, dùng liên kết log;
+// encoding/json sắp xếp key map, cùng một contract tự nhiên ổn định.
 func (c Contract) Fingerprint() string {
 	data, err := json.Marshal(c.Schema)
 	if err != nil {

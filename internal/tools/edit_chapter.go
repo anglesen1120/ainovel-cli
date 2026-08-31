@@ -13,15 +13,16 @@ import (
 	"github.com/voocel/ainovel-cli/internal/store"
 )
 
-// EditChapterTool 对章节草稿做定点字符串替换，适用于打磨场景。
-// 相比 draft_chapter 整章重写，token 节省 10x+。
+// EditChapterTool thực hiện thay thế chuỗi cục bộ trên bản nháp chương, phù hợp cho giai đoạn tinh chỉnh.
+// So với việc viết lại toàn bộ chương bằng draft_chapter, công cụ này tiết kiệm token hơn 10 lần trở lên.
 //
-// 落盘契约：只改 drafts/{ch:02d}.draft.md，禁止直接改 chapters/（终稿由 commit_chapter 独占）。
-// Seed 语义：drafts 不存在但 chapters 有 → 自动把 chapters 复制到 drafts 作为起点。
-// 归属检查：仅允许编辑已完成且位于 PendingRewrites 队列中的章节。
+// Cam kết ghi đĩa: chỉ sửa drafts/{ch:02d}.draft.md, cấm sửa trực tiếp chapters/ (bản cuối chỉ do commit_chapter đảm nhiệm).
+// Ngữ nghĩa Seed: drafts chưa tồn tại nhưng chapters có → tự sao chép chapters sang drafts làm điểm khởi đầu.
+// Kiểm tra quyền sở hữu: chỉ cho phép sửa các chương đã hoàn thành và nằm trong hàng đợi PendingRewrites.
 //
-// 本工具是 agentcore.EditTool 的薄封装，找-换逻辑（多级容错匹配、diff 输出、行尾/BOM 保留）
-// 全部复用上游实现。
+// Công cụ này là lớp bọc mỏng của agentcore.EditTool; toàn bộ logic tìm-thay thế
+// (khớp dự phòng nhiều tầng, xuất diff, giữ nguyên ký tự xuống dòng cuối/BOM)
+// đều dùng lại triển khai từ upstream.
 type EditChapterTool struct {
 	store *store.Store
 	edit  *agentcoretools.EditTool
@@ -35,35 +36,38 @@ func NewEditChapterTool(s *store.Store) *EditChapterTool {
 }
 
 func (t *EditChapterTool) Name() string  { return "edit_chapter" }
-func (t *EditChapterTool) Label() string { return "编辑章节" }
+func (t *EditChapterTool) Label() string { return "Chỉnh sửa chương" }
 
-// ReadOnly 明确声明写工具（配合 ConcurrencySafeTool 防止被并发调度）。
+// ReadOnly khai báo rõ đây là công cụ ghi dữ liệu (kết hợp với ConcurrencySafeTool để tránh bị lên lịch song song).
 func (t *EditChapterTool) ReadOnly(_ json.RawMessage) bool { return false }
 
-// ConcurrencySafe 显式禁止并发：同章节多次 edit_chapter 并行会读-改-写竞态，
-// 即使不同章节并行也会穿插 checkpoint 顺序。统一串行最稳。
+// ConcurrencySafe cấm chạy song song một cách rõ ràng: nhiều lần edit_chapter trên cùng chương chạy đồng thời
+// sẽ gây tranh chấp đọc-sửa-ghi, và ngay cả các chương khác nhau chạy song song cũng có thể làm lệch thứ tự checkpoint.
+// Chạy tuần tự là an toàn nhất.
 func (t *EditChapterTool) ConcurrencySafe(_ json.RawMessage) bool { return false }
 
-// ActivityDescription 供 UI/日志展示当前工具的活动描述。
-func (t *EditChapterTool) ActivityDescription(_ json.RawMessage) string { return "编辑章节草稿" }
+// ActivityDescription dùng để hiển thị mô tả hoạt động hiện tại của công cụ trong UI/log.
+func (t *EditChapterTool) ActivityDescription(_ json.RawMessage) string {
+	return "Chỉnh sửa bản nháp chương"
+}
 
 func (t *EditChapterTool) Description() string {
-	return "仅对已完成且进入 PendingRewrites 队列的章节草稿做定点字符串替换（打磨场景首选，比 draft_chapter 整章重写省 token）。" +
-		"新章初稿禁止使用本工具；初稿有硬伤请调用 draft_chapter(mode=\"write\") 整章覆盖。" +
-		"找到 old_string 并替换为 new_string，要求精确匹配且唯一（多处匹配需 replace_all=true）。" +
-		"old_string 必须从最近一次 read_chapter(source=\"draft\") 的返回中逐字复制，禁止凭记忆重构原文；" +
-		"注意返回值是 JSON 字符串，\\n 须还原为真实换行。draft_chapter 改写过草稿后必须先重新 read_chapter 再编辑。" +
-		"匹配失败的报错会附上草稿中最接近的候选片段，请从候选逐字复制后重试。" +
-		"写入 drafts/{ch}.draft.md；drafts 不存在时自动从 chapters 播种。" +
-		"章节已完成且不在 PendingRewrites 队列中时拒绝执行。每次调用只改一处，多处修改请多次调用。"
+	return "Chỉ thực hiện thay thế chuỗi cục bộ trên bản nháp của các chương đã hoàn thành và đã vào hàng đợi PendingRewrites (ưu tiên cho giai đoạn tinh chỉnh, tiết kiệm token hơn so với viết lại toàn bộ bằng draft_chapter)." +
+		"Không dùng công cụ này cho bản nháp đầu tiên của chương mới; nếu bản nháp đầu tiên có vấn đề nghiêm trọng, hãy gọi draft_chapter(mode=\"write\") để ghi đè toàn bộ." +
+		"Tìm old_string và thay bằng new_string, yêu cầu khớp chính xác và duy nhất (nếu có nhiều vị trí khớp thì phải dùng replace_all=true)." +
+		"old_string phải được sao chép nguyên văn từ kết quả lần read_chapter(source=\"draft\") gần nhất; không được tự nhớ rồi tái tạo lại văn bản gốc;" +
+		"lưu ý giá trị trả về là chuỗi JSON, \\n phải được khôi phục thành xuống dòng thật. Sau khi draft_chapter đã viết lại bản nháp, bắt buộc phải read_chapter lại rồi mới được chỉnh sửa." +
+		"Nếu khớp thất bại, lỗi sẽ kèm theo đoạn gần đúng nhất trong bản nháp; hãy sao chép nguyên văn từ đoạn gợi ý rồi thử lại." +
+		"Ghi vào drafts/{ch}.draft.md; khi drafts chưa tồn tại thì tự seed từ chapters." +
+		"Khi chương đã hoàn thành nhưng không có trong hàng đợi PendingRewrites thì sẽ bị từ chối thực thi. Mỗi lần gọi chỉ sửa một chỗ; nếu cần sửa nhiều chỗ, hãy gọi nhiều lần."
 }
 
 func (t *EditChapterTool) Schema() map[string]any {
 	return schema.Object(
-		schema.Property("chapter", schema.Int("章节号")).Required(),
-		schema.Property("old_string", schema.String("要替换的原文精确片段，多行需包含换行；不加 replace_all 时必须在草稿中唯一出现")).Required(),
-		schema.Property("new_string", schema.String("替换后的新文本")).Required(),
-		schema.Property("replace_all", schema.Bool("替换所有匹配（默认 false）")),
+		schema.Property("chapter", schema.Int("Số chương")).Required(),
+		schema.Property("old_string", schema.String("Đoạn gốc chính xác cần thay thế; nếu nhiều dòng thì phải bao gồm ký tự xuống dòng; khi không bật replace_all thì phải chỉ xuất hiện duy nhất trong bản nháp")).Required(),
+		schema.Property("new_string", schema.String("Văn bản mới thay thế vào")).Required(),
+		schema.Property("replace_all", schema.Bool("Thay thế tất cả các vị trí khớp (mặc định false)")),
 	)
 }
 
@@ -81,41 +85,42 @@ func (t *EditChapterTool) Execute(ctx context.Context, args json.RawMessage) (js
 		return nil, fmt.Errorf("chapter must be > 0: %w", errs.ErrToolArgs)
 	}
 	if a.OldString == "" {
-		return nil, fmt.Errorf("old_string 不能为空: %w", errs.ErrToolArgs)
+		return nil, fmt.Errorf("old_string không được để trống: %w", errs.ErrToolArgs)
 	}
 	if a.OldString == a.NewString {
-		return nil, fmt.Errorf("old_string 与 new_string 相同，无需修改: %w", errs.ErrToolArgs)
+		return nil, fmt.Errorf("old_string và new_string giống nhau, không cần sửa: %w", errs.ErrToolArgs)
 	}
 	if err := t.store.Progress.ValidateChapterWork(a.Chapter); err != nil {
 		return nil, err
 	}
 
-	// 归属检查：机械落实 writer 协议。新章初稿只能整章覆盖，不能依赖
-	// 模型自行遵守提示词后仍把脆弱的精确编辑暴露为可执行路径。
+	// Kiểm tra quyền sở hữu: thực thi máy móc giao thức của writer. Bản nháp đầu tiên của chương mới
+	// chỉ được ghi đè toàn bộ, không được dựa vào việc mô hình tự tuân thủ lời nhắc rồi mới lộ ra
+	// đường đi chỉnh sửa chính xác nhưng mong manh dưới dạng một lệnh có thể thực thi.
 	completed, err := t.store.Progress.IsChapterCompleted(a.Chapter)
 	if err != nil {
 		return nil, fmt.Errorf("load progress: %w: %w", errs.ErrStoreRead, err)
 	}
 	if !completed {
-		return nil, fmt.Errorf("第 %d 章尚未完成，初稿禁止使用 edit_chapter；有硬伤请调用 draft_chapter(mode=\"write\", chapter=%d) 整章覆盖: %w", a.Chapter, a.Chapter, errs.ErrToolPrecondition)
+		return nil, fmt.Errorf("chương %d chưa hoàn thành, bản nháp đầu tiên không được dùng edit_chapter; nếu có lỗi nghiêm trọng hãy gọi draft_chapter(mode=\"write\", chapter=%d) để ghi đè toàn bộ: %w", a.Chapter, a.Chapter, errs.ErrToolPrecondition)
 	}
 	progress, err := t.store.Progress.Load()
 	if err != nil {
 		return nil, fmt.Errorf("load progress: %w: %w", errs.ErrStoreRead, err)
 	}
 	if progress == nil || !slices.Contains(progress.PendingRewrites, a.Chapter) {
-		return nil, fmt.Errorf("第 %d 章已完成且不在 PendingRewrites 队列中，不能编辑；需修改请先由 editor 评审触发重写/打磨: %w", a.Chapter, errs.ErrToolPrecondition)
+		return nil, fmt.Errorf("chương %d đã hoàn thành và không có trong hàng đợi PendingRewrites, không thể chỉnh sửa; nếu cần thay đổi thì trước hết editor phải đánh giá để kích hoạt viết lại/tinh chỉnh: %w", a.Chapter, errs.ErrToolPrecondition)
 	}
 	if err := EnsureChapterExpanded(t.store, a.Chapter); err != nil {
 		return nil, err
 	}
 
-	// Seed：drafts 不存在时从 chapters 复制一份作为起点
+	// Seed: nếu drafts chưa tồn tại thì sao chép từ chapters để làm điểm khởi đầu
 	if err := t.ensureDraft(a.Chapter); err != nil {
 		return nil, err
 	}
 
-	// 委托 agentcore.EditTool 完成找-换
+	// Ủy quyền cho agentcore.EditTool thực hiện tìm-thay thế
 	subArgs, _ := json.Marshal(map[string]any{
 		"path":        fmt.Sprintf("drafts/%02d.draft.md", a.Chapter),
 		"file_path":   fmt.Sprintf("drafts/%02d.draft.md", a.Chapter),
@@ -137,20 +142,21 @@ func (t *EditChapterTool) Execute(ctx context.Context, args json.RawMessage) (js
 		return nil, fmt.Errorf("checkpoint edit: %w: %w", errs.ErrStoreWrite, err)
 	}
 
-	// 附加指引：让 writer 知道后续步骤，避免遗漏 check_consistency / commit_chapter
+	// Gợi ý bổ sung: giúp writer biết bước tiếp theo để tránh bỏ sót check_consistency / commit_chapter
 	var passthrough map[string]any
 	if err := json.Unmarshal(result, &passthrough); err != nil {
 		return result, nil
 	}
 	passthrough["chapter"] = a.Chapter
-	passthrough["next_step"] = "edit 已落盘。仍有硬伤可再次 edit_chapter；否则 check_consistency 后 commit_chapter"
+	passthrough["next_step"] = "edit đã được ghi xuống đĩa. Nếu vẫn còn lỗi nặng có thể gọi edit_chapter lần nữa; nếu không thì chạy check_consistency rồi commit_chapter"
 	return json.Marshal(passthrough)
 }
 
-// ensureDraft 保证 drafts/{ch}.draft.md 存在：
-//   - 已有草稿 → 直接返回
-//   - 无草稿但有终稿 → 把终稿复制到 drafts 作为修改起点（常见于打磨场景）
-//   - 都没有 → 报错，提示先用 draft_chapter 创建初稿
+// ensureDraft bảo đảm drafts/{ch}.draft.md tồn tại:
+//   - Đã có bản nháp → trả về ngay
+//   - Chưa có bản nháp nhưng đã có bản cuối → sao chép bản cuối vào drafts làm điểm bắt đầu chỉnh sửa
+//     (thường gặp trong giai đoạn tinh chỉnh)
+//   - Không có cả hai → báo lỗi, yêu cầu trước hết dùng draft_chapter để tạo bản nháp đầu tiên
 func (t *EditChapterTool) ensureDraft(chapter int) error {
 	draft, err := t.store.Drafts.LoadDraft(chapter)
 	if err != nil {
@@ -164,7 +170,7 @@ func (t *EditChapterTool) ensureDraft(chapter int) error {
 		return fmt.Errorf("load chapter: %w: %w", errs.ErrStoreRead, err)
 	}
 	if text == "" {
-		return fmt.Errorf("第 %d 章无草稿也无终稿，请先调 draft_chapter(mode=write, chapter=%d) 创建初稿: %w", chapter, chapter, errs.ErrToolPrecondition)
+		return fmt.Errorf("chương %d không có bản nháp cũng không có bản cuối, hãy gọi draft_chapter(mode=write, chapter=%d) trước để tạo bản nháp đầu tiên: %w", chapter, chapter, errs.ErrToolPrecondition)
 	}
 	if err := t.store.Drafts.SaveDraft(chapter, text); err != nil {
 		return fmt.Errorf("seed draft from chapter: %w: %w", errs.ErrStoreWrite, err)

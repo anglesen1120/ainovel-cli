@@ -11,9 +11,9 @@ import (
 	"github.com/voocel/ainovel-cli/internal/utils"
 )
 
-// renderEventContent 将事件列表渲染为层次化事件流。
-// DISPATCH 作为顶级标题，子代理工具缩进显示，形成清晰的调度树。
-// spinnerFrame 用于给"进行中"的行渲染动态图标（跟 topbar spinner 同步）。
+// renderEventContent render danh sách event thành luồng sự kiện phân tầng。
+// DISPATCH là tiêu đề cấp cao nhất, công cụ subagent hiển thị thụt vào, tạo cây điều phối rõ ràng.
+// spinnerFrame dùng để kết xuất biểu tượng động cho các dòng "đang chạy" (đồng bộ với topbar spinner).
 func renderEventContent(events []host.Event, width, spinnerFrame int) string {
 	var b strings.Builder
 	for i, ev := range events {
@@ -25,7 +25,7 @@ func renderEventContent(events []host.Event, width, spinnerFrame int) string {
 	return b.String()
 }
 
-// 进行中的调用类事件使用的 spinner 帧（bubbles.Spinner.Dot，独立于顶栏 MiniDot）。
+// Các sự kiện kiểu gọi đang chạy dùng spinner frame (bubbles.Spinner.Dot, độc lập với MiniDot trên thanh trên).
 var eventRunningFrames = toolSpinnerFrames
 
 func runningSpinner(frame int) string {
@@ -63,7 +63,7 @@ func renderEventLine(ev host.Event, width, spinnerFrame int) string {
 		return line
 
 	case ev.Category == "DISPATCH":
-		// 三态：进行中（accent spinner + 加粗）/ 失败（红 ✕）/ 完成（绿 ✓）
+		// Ba trạng thái: đang chạy (accent spinner + in đậm) / thất bại (dấu ✕ đỏ) / hoàn tất (dấu ✓ xanh)
 		var icon string
 		switch {
 		case running:
@@ -75,7 +75,7 @@ func renderEventLine(ev host.Event, width, spinnerFrame int) string {
 		}
 		sum := renderDispatchSummary(ev.Summary, maxSumW)
 		if running {
-			// 进行中保持原样但加粗
+			// đang chạygiữ nguyên nhưng in đậm
 			sum = lipgloss.NewStyle().Bold(true).Render(sum)
 		}
 		line := tsStr + " " + icon + " " + sum
@@ -85,7 +85,7 @@ func renderEventLine(ev host.Event, width, spinnerFrame int) string {
 		return line
 
 	case ev.Category == "TOOL":
-		// Worker 内部工具（Depth=1）
+		// Công cụ nội bộ của Worker (Depth=1)
 		var icon, sum string
 		switch {
 		case running:
@@ -128,8 +128,8 @@ func renderEventLine(ev host.Event, width, spinnerFrame int) string {
 		return tsStr + " " + indent + icon + " " + sum
 
 	case ev.Category == "USER":
-		// 用户在输入框发送的 Steer / Continue 文本回显；与 SYSTEM 的 ⚙ 拉开形态，用 ✎ 暗示"输入"。
-		// 颜色用 colorAccent2（青绿）与 SYSTEM 的金色拉开，避免误读为系统消息。
+		// echo văn bản Steer / Continue người dùng gửi từ ô nhập; tách hình thức với ⚙ của SYSTEM, dùng ✎ gợi ý "nhập".
+		// Màu dùng colorAccent2 (xanh ngọc) tách khỏi màu vàng của SYSTEM, tránh bị hiểu nhầm là thông điệp hệ thống.
 		icon := lipgloss.NewStyle().Foreground(colorAccent2).Bold(true).Render("✎")
 		sum := lipgloss.NewStyle().Foreground(colorAccent2).Render(truncate(ev.Summary, maxSumW))
 		return tsStr + " " + indent + icon + " " + sum
@@ -144,7 +144,7 @@ func renderEventLine(ev host.Event, width, spinnerFrame int) string {
 		return tsStr + " " + indent + icon + " " + sum
 
 	default:
-		// 已知 category 走映射色；未知 category 跟随终端默认前景，避免硬塞 colorText。
+		// category đã biết dùng màu ánh xạ; category lạ dùng foreground mặc định của terminal, tránh nhét cứng colorText.
 		if color, ok := categoryColors[ev.Category]; ok {
 			icon := lipgloss.NewStyle().Foreground(color).Render("·")
 			sum := lipgloss.NewStyle().Foreground(color).Render(truncate(ev.Summary, maxSumW))
@@ -155,9 +155,9 @@ func renderEventLine(ev host.Event, width, spinnerFrame int) string {
 	}
 }
 
-// retryCountdown 返回重试倒计时文案（"7s 后重试"）；未设截止或已到点（请求已在途）返回空。
-// 事件只携带截止时刻，剩余秒数在渲染时计算——spinner tick 驱动重绘即形成逐秒倒数，
-// 事件面板与导入面板共用（对齐"同 ID/Key 一行跳动"的原地更新机制）。
+// retryCountdown trả về văn bản đếm ngược thử lại ("7s nữa rồi thử lại"); nếu chưa đặt hạn chót hoặc đã đến lúc (request đang trên đường) thì trả về rỗng.
+// Sự kiện chỉ mang theo thời điểm hết hạn, số giây còn lại được tính khi render——spinner tick kích hoạt vẽ lại sẽ tạo thành đếm ngược từng giây,
+// Bảng sự kiện và bảng nhập dùng chung (khớp với cơ chế cập nhật tại chỗ "cùng ID/Key nhảy trên một dòng").
 func retryCountdown(retryAt, now time.Time) string {
 	if retryAt.IsZero() {
 		return ""
@@ -167,10 +167,10 @@ func retryCountdown(retryAt, now time.Time) string {
 		return ""
 	}
 	secs := int((remain + time.Second - 1) / time.Second)
-	return fmt.Sprintf("%ds 后重试", secs)
+	return fmt.Sprintf("%ds nữa rồi thử lại", secs)
 }
 
-// renderDispatchSummary 渲染 DISPATCH 摘要：Agent 名用角色色，任务用淡色。
+// renderDispatchSummary hiển thị tóm tắt DISPATCH: tên Agent dùng màu theo vai trò, nhiệm vụ dùng màu nhạt.
 func renderDispatchSummary(summary string, maxW int) string {
 	agentName := summary
 	taskPart := ""
@@ -194,7 +194,7 @@ func renderDispatchSummary(summary string, maxW int) string {
 	return result
 }
 
-// eventAgentColor 返回 Agent 角色对应的主题色。
+// eventAgentColor trả về màu theme của Agent tương ứng với vai trò.
 func eventAgentColor(agent string) lipgloss.AdaptiveColor {
 	switch {
 	case strings.HasPrefix(agent, "architect"):
@@ -208,7 +208,7 @@ func eventAgentColor(agent string) lipgloss.AdaptiveColor {
 	}
 }
 
-// renderEventDuration 将 Duration 渲染为淡色括号标注，零值返回空。
+// renderEventDuration hiển thị Duration dưới dạng chú thích trong ngoặc màu nhạt; giá trị 0 thì trả về rỗng.
 func renderEventDuration(d time.Duration) string {
 	if d <= 0 {
 		return ""
@@ -266,14 +266,14 @@ func renderEventSparkle(frame, width int) string {
 	return " " + b.String()
 }
 
-// renderEventFlowViewport 用 viewport 包装渲染事件流面板。
+// renderEventFlowViewport dùng viewport để bọc việc hiển thị bảng Luồng sự kiện.
 func renderEventFlowViewport(vp viewport.Model, width, height int, focused bool) string {
-	// 标题栏
+	// thanh tiêu đề
 	titleColor := colorDim
 	if focused {
 		titleColor = colorAccent
 	}
-	title := lipgloss.NewStyle().Foreground(titleColor).Render(":: 事件流")
+	title := lipgloss.NewStyle().Foreground(titleColor).Render(":: Luồng sự kiện")
 	lineW := width - lipgloss.Width(title) - 4
 	if lineW < 0 {
 		lineW = 0
@@ -293,12 +293,12 @@ func renderEventFlowViewport(vp viewport.Model, width, height int, focused bool)
 	return header + "\n" + style.Render(vp.View())
 }
 
-// renderStreamPanel 渲染流式输出面板（中间列下半部分）。
+// renderStreamPanel hiển thị bảng Xuất luồng (nửa dưới của cột giữa).
 func renderStreamPanel(vp viewport.Model, width, height int, focused, running bool, frame int) string {
-	// 分隔标题栏（始终醒目）：粗竖条前缀 + 永远 Bold + 强调色，避免与思考的淡灰斜体撞色
-	// focused 时额外下划线，区分焦点态。
+	// Thanh tiêu đề phân cách (luôn nổi bật): tiền tố là vạch dọc đậm + luôn Bold + màu nhấn, tránh lẫn với phần suy nghĩ màu xám nhạt in nghiêng
+	// Khi focused thì gạch chân thêm, để phân biệt trạng thái focus.
 	titleStyle := lipgloss.NewStyle().Foreground(colorAccent).Bold(true).Underline(focused)
-	title := titleStyle.Render("▍实时输出")
+	title := titleStyle.Render("▍Đầu ra thời gian thực")
 	if running {
 		status := renderStreamActivity(frame)
 		title += " " + status
@@ -310,10 +310,10 @@ func renderStreamPanel(vp viewport.Model, width, height int, focused, running bo
 	separator := lipgloss.NewStyle().Foreground(colorDim).Render(strings.Repeat("─", lineW))
 	header := " " + title + " " + separator
 
-	// viewport 内容（height 包含 header 行，viewport 实际高度需减 1）。
-	// 外层 vpStyle 不设 Foreground —— 章节正文颜色由 renderChapterBlock 内部的
-	// contentStyle 管（亮底深棕 / 暗底终端默认）。如果外层加 Foreground，亮底
-	// 主题下 agent 调度块（✻ 金色 + 青色 label）会被深棕"压"成普通正文色。
+	// Nội dung viewport (height đã tính cả dòng header, nên chiều cao thực của viewport phải trừ 1).
+	// vpStyle bên ngoài không đặt Foreground —— màu của phần nội dung Chương do bên trong renderChapterBlock
+	// contentStyle quản lý (nền sáng nâu sẫm / nền tối theo mặc định của terminal). Nếu bên ngoài thêm Foreground, nền sáng
+	// khối điều phối agent trong theme (✻ vàng kim + label xanh ngọc) sẽ bị nâu sẫm "đè" thành màu văn bản bình thường.
 	vpH := height - 1
 	if vpH < 1 {
 		vpH = 1
@@ -356,9 +356,9 @@ func renderStreamActivity(frame int) string {
 	return major + " " + minor
 }
 
-// renderStreamContent 将流式输出按轮次渲染为语义分块。
-// Agent 调度块（以 ▸ 或 ✻ 开头）用 accent 标题 + dim 指令；正文块跟随终端默认色。
-// cursor 非空时追加在末尾，表示 AI 正在输出。
+// renderStreamContent hiển thị Xuất luồng theo từng lượt thành các khối ngữ nghĩa.
+// Khối điều phối Agent (bắt đầu bằng ▸ hoặc ✻) dùng tiêu đề accent + chỉ dẫn dim; khối nội dung đi theo màu mặc định của terminal.
+// Khi cursor không rỗng thì nối thêm ở cuối, biểu thị AI đang Xuất.
 func renderStreamContent(rounds []string, width int, cursor string) string {
 	if width < 24 {
 		width = 24
@@ -383,19 +383,19 @@ func renderStreamContent(rounds []string, width int, cursor string) string {
 	return result
 }
 
-// renderAgentBlock 渲染 Agent 调度块：图标 + 标题 + 分隔线 + 任务指令。
+// renderAgentBlock hiển thị khối điều phối Agent: biểu tượng + tiêu đề + đường phân cách + chỉ dẫn nhiệm vụ.
 //
-// label 用 colorAccent2 青绿 + Bold + Underline 三重强调 —— 之前 colorAccent
-// 金色 + Bold 在暗底跟 colorDim 灰的思考行视觉太接近，分不出主次。青绿是冷色，
-// 跟思考行用的暖灰在色相上完全拉开；Underline 在所有终端都稳定生效，比 Bold
-// 更可靠的视觉锚。图标 ✻ 反过来用金色作锚点，跟 label 形成双色对比。
+// label dùng colorAccent2 xanh ngọc + Bold + Underline nhấn mạnh ba lớp —— trước đây colorAccent
+// vàng kim + Bold trên nền tối quá giống với dòng suy nghĩ màu xám colorDim, không phân biệt được chính phụ. Xanh ngọc là màu lạnh,
+// đối lập hoàn toàn về sắc độ với tông xám ấm dùng cho dòng suy nghĩ; Underline ổn định trên mọi terminal, đáng tin hơn Bold
+// như một mốc thị giác. Biểu tượng ✻ thì ngược lại dùng vàng kim làm điểm neo, tạo tương phản hai màu với label.
 func renderAgentBlock(text string, width int) string {
 	headerLine, body, _ := strings.Cut(text, "\n")
 
 	iconStyle := lipgloss.NewStyle().Foreground(colorAccent).Bold(true)
 	labelStyle := lipgloss.NewStyle().Foreground(colorAccent2).Bold(true).Underline(true)
 
-	// 拆分前缀图标（✻ 或 ▸）和正文 label，分别染色；无图标的旧格式保持单色。
+	// Tách biểu tượng tiền tố (✻ hoặc ▸) và label nội dung để tô màu riêng; định dạng cũ không có biểu tượng vẫn giữ đơn sắc.
 	var headerStyled string
 	if first, rest, ok := strings.Cut(headerLine, " "); ok && (first == "✻" || first == "▸") {
 		headerStyled = iconStyle.Render(first) + " " + labelStyle.Render(rest)
@@ -403,7 +403,7 @@ func renderAgentBlock(text string, width int) string {
 		headerStyled = labelStyle.Render(headerLine)
 	}
 
-	// 标题行 + 分隔线（lineW 用 headerLine 的视觉宽度而非渲染后的字节宽度）
+	// Dòng tiêu đề + đường phân cách (lineW dùng độ rộng hiển thị của headerLine chứ không phải độ rộng byte sau khi render)
 	titleW := lipgloss.Width(headerLine)
 	lineW := max(0, width-titleW-1)
 	header := headerStyled +
@@ -412,7 +412,7 @@ func renderAgentBlock(text string, width int) string {
 	var b strings.Builder
 	b.WriteString(header)
 
-	// 任务指令：dim 色，缩进 2 格；与 header 之间留一行空行，防止视觉贴一起。
+	// Chỉ dẫn nhiệm vụ: màu dim, thụt vào 2 khoảng; chừa một dòng trống giữa nó và header để tránh dính sát về mặt thị giác.
 	body = strings.TrimSpace(body)
 	if body != "" {
 		taskStyle := lipgloss.NewStyle().Foreground(colorMuted)
@@ -428,16 +428,16 @@ func renderAgentBlock(text string, width int) string {
 	return b.String()
 }
 
-// renderChapterBlock 渲染正文块，自动区分思考内容和章节正文。
-// 思考内容（ThinkingSep 标记的段落）用 colorDim 斜体；章节正文走 bodyTextColor：
-// 暗底继承终端默认前景，亮底用深棕保留暖调。
+// renderChapterBlock hiển thị khối nội dung, tự động phân biệt phần suy nghĩ và nội dung Chương.
+// Phần suy nghĩ (các đoạn được đánh dấu ThinkingSep) dùng colorDim in nghiêng; nội dung Chương đi theo bodyTextColor:
+// Nền tối kế thừa foreground mặc định của terminal, nền sáng dùng nâu sẫm để giữ tông ấm.
 func renderChapterBlock(text string, width int) string {
 	contentStyle := lipgloss.NewStyle().Foreground(bodyTextColor)
 	thinkStyle := lipgloss.NewStyle().Foreground(colorDim).Italic(true)
 	wrapW := max(16, width-4)
 
-	// 按 ThinkingSep 分割：奇数段是思考，偶数段是正文
-	// 格式：[正文] \x02 [思考] [正文] \x02 [思考] ...
+	// Tách theo ThinkingSep: đoạn lẻ là phần suy nghĩ, đoạn chẵn là phần nội dung
+	// Định dạng: [nội dung] \x02 [suy nghĩ] [nội dung] \x02 [suy nghĩ] ...
 	parts := strings.Split(text, utils.ThinkingSep)
 
 	var b strings.Builder
@@ -446,7 +446,7 @@ func renderChapterBlock(text string, width int) string {
 		if part == "" {
 			continue
 		}
-		isThinking := i > 0 && i%2 != 0 // ThinkingSep 之后的奇数段是思考
+		isThinking := i > 0 && i%2 != 0 // Các đoạn lẻ sau ThinkingSep là phần suy nghĩ
 
 		style := contentStyle
 		if isThinking {
@@ -456,7 +456,7 @@ func renderChapterBlock(text string, width int) string {
 		lines := wrapStreamText(part, wrapW)
 		for j, line := range lines {
 			if b.Len() > 0 && j == 0 {
-				b.WriteString("\n\n") // 段间空行：思考与正文之间留出视觉间隔
+				b.WriteString("\n\n") // Dòng trống giữa các đoạn: chừa khoảng cách thị giác giữa phần suy nghĩ và nội dung
 			} else if j > 0 {
 				b.WriteString("\n")
 			}

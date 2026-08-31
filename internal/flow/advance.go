@@ -6,8 +6,8 @@ import (
 	"github.com/voocel/ainovel-cli/internal/domain"
 )
 
-// StartsForwardChapter 判断一条指令是否会开始尚未完成的正向新章。
-// 它只读事实，不决定是否放行；Task/Reason 文案不参与判断。
+// StartsForwardChapter xác định một instruction có bắt đầu chương mới theo hướng tiến chưa hoàn tất hay không.
+// nó chỉ đọc fact, không quyết định có cho qua hay không; văn bản Task/Reason không tham gia phán đoán.
 func StartsForwardChapter(inst *Instruction, progress *domain.Progress, pending *domain.PendingCommit) bool {
 	if inst == nil || inst.Agent != "writer" || progress == nil || progress.Phase != domain.PhaseWriting {
 		return false
@@ -22,7 +22,7 @@ func StartsForwardChapter(inst *Instruction, progress *domain.Progress, pending 
 	return target > 0 && target == progress.NextChapter()
 }
 
-// AdvanceHoldResolution 是一次性暂停在当前事实下的处理结果。
+// AdvanceHoldResolution là kết quả xử lý tạm dừng một lần theo fact hiện tại.
 type AdvanceHoldResolution int
 
 const (
@@ -31,8 +31,8 @@ const (
 	AdvanceHoldConsumeAndStop
 )
 
-// ResolveAdvanceHold 纯函数解析一次性暂停。未知条件和缺失事实显式报错，
-// 不允许按“继续运行”静默降级。
+// ResolveAdvanceHold là pure function phân giải tạm dừng một lần. Điều kiện không xác định và fact bị thiếu phải báo lỗi rõ ràng,
+// không được âm thầm hạ cấp thành “tiếp tục chạy”.
 func ResolveAdvanceHold(hold *domain.AdvanceHold, progress *domain.Progress) (AdvanceHoldResolution, error) {
 	if hold == nil {
 		return AdvanceHoldKeep, nil
@@ -41,13 +41,13 @@ func ResolveAdvanceHold(hold *domain.AdvanceHold, progress *domain.Progress) (Ad
 		return AdvanceHoldKeep, err
 	}
 	if progress == nil {
-		return AdvanceHoldKeep, fmt.Errorf("缺少 Progress，无法解析一次性暂停")
+		return AdvanceHoldKeep, fmt.Errorf("thiếu Progress, không thể phân giải tạm dừng một lần")
 	}
 	if progress.Phase == domain.PhaseComplete {
 		return AdvanceHoldConsume, nil
 	}
 	if progress.Phase != domain.PhaseWriting {
-		return AdvanceHoldKeep, fmt.Errorf("一次性暂停仅适用于 writing/complete 阶段（当前 %s）", progress.Phase)
+		return AdvanceHoldKeep, fmt.Errorf("tạm dừng một lần chỉ áp dụng cho giai đoạn writing/complete (hiện tại %s)", progress.Phase)
 	}
 	switch hold.After {
 	case domain.AdvanceHoldAtBoundary:
@@ -63,6 +63,6 @@ func ResolveAdvanceHold(hold *domain.AdvanceHold, progress *domain.Progress) (Ad
 		}
 		return AdvanceHoldConsumeAndStop, nil
 	default:
-		return AdvanceHoldKeep, fmt.Errorf("不支持的一次性暂停条件 %q", hold.After)
+		return AdvanceHoldKeep, fmt.Errorf("điều kiện tạm dừng một lần không được hỗ trợ %q", hold.After)
 	}
 }

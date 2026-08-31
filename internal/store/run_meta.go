@@ -8,19 +8,19 @@ import (
 	"github.com/voocel/ainovel-cli/internal/domain"
 )
 
-// RunMetaStore 管理运行元信息（模型、干预历史、规划级别等）。
+// RunMetaStore quản lý siêu thông tin chạy (mô hình, lịch sử can thiệp, cấp độ lập kế hoạch, v.v.).
 type RunMetaStore struct{ io *IO }
 
 func NewRunMetaStore(io *IO) *RunMetaStore { return &RunMetaStore{io: io} }
 
-// Save 保存运行元信息到 meta/run.json。
+// Save lưu siêu thông tin chạy vào meta/run.json.
 func (s *RunMetaStore) Save(meta domain.RunMeta) error {
 	s.io.mu.Lock()
 	defer s.io.mu.Unlock()
 	return s.saveUnlocked(meta)
 }
 
-// Load 读取运行元信息。
+// Load đọc siêu thông tin chạy.
 func (s *RunMetaStore) Load() (*domain.RunMeta, error) {
 	s.io.mu.RLock()
 	defer s.io.mu.RUnlock()
@@ -42,9 +42,10 @@ func (s *RunMetaStore) saveUnlocked(meta domain.RunMeta) error {
 	return s.io.WriteJSONUnlocked("meta/run.json", meta)
 }
 
-// Init 初始化或更新运行元信息;跨重启保留全部运行意图事实——
-// PlanStart 尤其关键:规划期(启动裁定已落盘、首个 foundation 未落盘)崩溃后,
-// 它是恢复规划师身份的唯一依据,被 Init 覆盖会让恢复直接停机。
+// Init khởi tạo hoặc cập nhật siêu thông tin chạy; giữ lại toàn bộ sự kiện về ý định chạy qua các lần khởi động lại  —
+// PlanStart đặc biệt quan trọng: sau sự cố trong giai đoạn lập kế hoạch (phán định khởi động đã được ghi xuống đĩa,
+// foundation đầu tiên chưa được ghi xuống đĩa),
+// nó là căn cứ duy nhất để khôi phục thân phận người lập kế hoạch; nếu bị Init ghi đè, quá trình khôi phục sẽ dừng máy ngay.
 func (s *RunMetaStore) Init(style, provider, model string) error {
 	return s.io.WithWriteLock(func() error {
 		existing, err := s.loadUnlocked()
@@ -81,10 +82,10 @@ func validateAdvanceControl(meta domain.RunMeta) error {
 		return &domain.UnsupportedAdvanceModeError{Mode: meta.AdvanceMode}
 	}
 	if meta.AdvancePermitChapter < 0 {
-		return fmt.Errorf("章节许可不能为负数: %d", meta.AdvancePermitChapter)
+		return fmt.Errorf("giấy phép chương không được là số âm: %d", meta.AdvancePermitChapter)
 	}
 	if meta.AdvanceMode == domain.ChapterAdvanceAuto && meta.AdvancePermitChapter != 0 {
-		return fmt.Errorf("auto 模式不能保留章节许可: %d", meta.AdvancePermitChapter)
+		return fmt.Errorf("chế độ auto không được giữ lại giấy phép chương: %d", meta.AdvancePermitChapter)
 	}
 	if meta.AdvanceHold != nil {
 		if err := meta.AdvanceHold.Validate(); err != nil {
@@ -94,9 +95,9 @@ func validateAdvanceControl(meta domain.RunMeta) error {
 	return nil
 }
 
-// SetStartPrompt 固化用户的原始创作需求——输入事实,在启动裁定**之前**落盘。
-// 裁定失败(如模型故障)时它仍然在,恢复/继续由引擎据此补裁(engine.planStartFallback),
-// 启动失败不再是死局。
+// SetStartPrompt cố định yêu cầu sáng tác ban đầu của người dùng  —  sự kiện đầu vào, được ghi xuống đĩa **trước** phán định khởi động.
+// Khi phán định thất bại (như lỗi mô hình), nó vẫn còn; engine dựa vào đó để phán định bù khi khôi phục/tiếp tục (engine.planStartFallback),
+// khởi động thất bại không còn là ngõ cụt.
 func (s *RunMetaStore) SetStartPrompt(prompt string) error {
 	return s.io.WithWriteLock(func() error {
 		meta, err := s.loadUnlocked()
@@ -111,7 +112,7 @@ func (s *RunMetaStore) SetStartPrompt(prompt string) error {
 	})
 }
 
-// SetPendingSteer 记录未完成的 Steer 指令。
+// SetPendingSteer ghi lại chỉ thị Steer chưa hoàn tất.
 func (s *RunMetaStore) SetPendingSteer(input string) error {
 	return s.io.WithWriteLock(func() error {
 		meta, err := s.loadUnlocked()
@@ -126,7 +127,7 @@ func (s *RunMetaStore) SetPendingSteer(input string) error {
 	})
 }
 
-// ClearPendingSteer 清除已处理的 Steer 指令。
+// ClearPendingSteer xóa chỉ thị Steer đã xử lý.
 func (s *RunMetaStore) ClearPendingSteer() error {
 	return s.io.WithWriteLock(func() error {
 		meta, err := s.loadUnlocked()
@@ -141,7 +142,7 @@ func (s *RunMetaStore) ClearPendingSteer() error {
 	})
 }
 
-// SetAdvanceMode 切换章节推进模式。切回 auto 时在同一写锁内清除章节许可。
+// SetAdvanceMode chuyển đổi chế độđẩy tiến độ chương. Khi chuyển về auto, xóa giấy phép chương trong cùng khóa ghi.
 func (s *RunMetaStore) SetAdvanceMode(mode domain.ChapterAdvanceMode) error {
 	if !mode.Valid() {
 		return &domain.UnsupportedAdvanceModeError{Mode: mode}
@@ -152,7 +153,7 @@ func (s *RunMetaStore) SetAdvanceMode(mode domain.ChapterAdvanceMode) error {
 			return err
 		}
 		if meta == nil {
-			return fmt.Errorf("run meta 未初始化")
+			return fmt.Errorf("run meta chưa được khởi tạo")
 		}
 		meta.AdvanceMode = mode
 		if mode == domain.ChapterAdvanceAuto {
@@ -162,10 +163,10 @@ func (s *RunMetaStore) SetAdvanceMode(mode domain.ChapterAdvanceMode) error {
 	})
 }
 
-// GrantAdvancePermit 为 review 模式持久化一个精确章节许可。
+// GrantAdvancePermit lưu bền vững một giấy phép chương chính xác cho chế độ review.
 func (s *RunMetaStore) GrantAdvancePermit(chapter int) error {
 	if chapter <= 0 {
-		return fmt.Errorf("章节许可必须大于 0: %d", chapter)
+		return fmt.Errorf("giấy phép chương phải lớn hơn 0: %d", chapter)
 	}
 	return s.io.WithWriteLock(func() error {
 		meta, err := s.loadUnlocked()
@@ -173,23 +174,23 @@ func (s *RunMetaStore) GrantAdvancePermit(chapter int) error {
 			return err
 		}
 		if meta == nil {
-			return fmt.Errorf("run meta 未初始化")
+			return fmt.Errorf("run meta chưa được khởi tạo")
 		}
 		if meta.AdvanceMode != domain.ChapterAdvanceReview {
-			return fmt.Errorf("仅逐章验收模式可授权下一章（当前 %s）", meta.AdvanceMode)
+			return fmt.Errorf("chỉ chế độ nghiệm thu từng chương mới có thể cấp quyền cho chương tiếp theo (hiện tại %s)", meta.AdvanceMode)
 		}
 		if meta.AdvancePermitChapter == chapter {
 			return nil
 		}
 		if meta.AdvancePermitChapter != 0 {
-			return fmt.Errorf("已有第 %d 章许可，拒绝覆盖为第 %d 章", meta.AdvancePermitChapter, chapter)
+			return fmt.Errorf("đã có giấy phép chương %d, từ chối ghi đè thành chương %d", meta.AdvancePermitChapter, chapter)
 		}
 		meta.AdvancePermitChapter = chapter
 		return s.saveUnlocked(*meta)
 	})
 }
 
-// ClearAdvancePermit 仅消费匹配的章节许可；目标已不存在时幂等。
+// ClearAdvancePermit chỉ tiêu thụ giấy phép chương khớp; khi mục tiêu không còn tồn tại thì idempotent.
 func (s *RunMetaStore) ClearAdvancePermit(chapter int) error {
 	return s.io.WithWriteLock(func() error {
 		meta, err := s.loadUnlocked()
@@ -200,14 +201,14 @@ func (s *RunMetaStore) ClearAdvancePermit(chapter int) error {
 			return nil
 		}
 		if meta.AdvancePermitChapter != chapter {
-			return fmt.Errorf("章节许可已变化：期望第 %d 章，实际第 %d 章", chapter, meta.AdvancePermitChapter)
+			return fmt.Errorf("giấy phép chương đã thay đổi: mong đợi chương %d, thực tế chương %d", chapter, meta.AdvancePermitChapter)
 		}
 		meta.AdvancePermitChapter = 0
 		return s.saveUnlocked(*meta)
 	})
 }
 
-// SetAdvanceHold 登记一次性暂停意图；在途意图不允许被另一条静默覆盖。
+// SetAdvanceHold đăng ký một ý định tạm dừng dùng một lần; ý định đang xử lý không được phép bị một ý định khác âm thầm ghi đè.
 func (s *RunMetaStore) SetAdvanceHold(hold domain.AdvanceHold) error {
 	if err := hold.Validate(); err != nil {
 		return err
@@ -218,20 +219,20 @@ func (s *RunMetaStore) SetAdvanceHold(hold domain.AdvanceHold) error {
 			return err
 		}
 		if meta == nil {
-			return fmt.Errorf("run meta 未初始化")
+			return fmt.Errorf("run meta chưa được khởi tạo")
 		}
 		if meta.AdvanceHold != nil {
 			if *meta.AdvanceHold == hold {
 				return nil
 			}
-			return fmt.Errorf("已有一次性暂停意图（%s：%s），拒绝覆盖", meta.AdvanceHold.After, meta.AdvanceHold.Reason)
+			return fmt.Errorf("đã có ý định tạm dừng dùng một lần (%s: %s), từ chối ghi đè", meta.AdvanceHold.After, meta.AdvanceHold.Reason)
 		}
 		meta.AdvanceHold = &hold
 		return s.saveUnlocked(*meta)
 	})
 }
 
-// ClearAdvanceHold 只消费调用方刚读取的同一个意图；目标已不存在时幂等。
+// ClearAdvanceHold chỉ tiêu thụ đúng cùng một ý định mà bên gọi vừa đọc; khi mục tiêu không còn tồn tại thì idempotent.
 func (s *RunMetaStore) ClearAdvanceHold(expected domain.AdvanceHold) error {
 	return s.io.WithWriteLock(func() error {
 		meta, err := s.loadUnlocked()
@@ -242,14 +243,14 @@ func (s *RunMetaStore) ClearAdvanceHold(expected domain.AdvanceHold) error {
 			return nil
 		}
 		if *meta.AdvanceHold != expected {
-			return fmt.Errorf("一次性暂停意图已变化，拒绝误清")
+			return fmt.Errorf("ý định tạm dừng dùng một lần đã thay đổi, từ chối xóa nhầm")
 		}
 		meta.AdvanceHold = nil
 		return s.saveUnlocked(*meta)
 	})
 }
 
-// SetPlanningTier 记录当前作品的规划级别。
+// SetPlanningTier ghi lại cấp độ lập kế hoạch của tác phẩm hiện tại.
 func (s *RunMetaStore) SetPlanningTier(tier domain.PlanningTier) error {
 	return s.io.WithWriteLock(func() error {
 		meta, err := s.loadUnlocked()
@@ -264,7 +265,7 @@ func (s *RunMetaStore) SetPlanningTier(tier domain.PlanningTier) error {
 	})
 }
 
-// SetPlanStart 固化启动裁定事实(裁定先落事实再起执行;规划期崩溃恢复据此续跑)。
+// SetPlanStart cố định sự kiện phán định khởi động (phán định ghi sự kiện trước rồi mới bắt đầu thực thi; sự cố trong giai đoạn lập kế hoạch sẽ dựa vào đó để tiếp tục chạy).
 func (s *RunMetaStore) SetPlanStart(rec domain.PlanStartRecord) error {
 	return s.io.WithWriteLock(func() error {
 		meta, err := s.loadUnlocked()

@@ -8,13 +8,13 @@ import (
 	"github.com/voocel/ainovel-cli/internal/host"
 )
 
-// renderStatusBar 渲染屏幕最底部的用量状态栏，占用输入区原有的末尾空行（零额外高度）：
+// renderStatusBar hiển thị thanh trạng thái sử dụng ở đáy màn hình, chiếm dòng trống cuối vốn có của vùng Nhập (không thêm chiều cao):
 //
-//	◆ provider model(窗口,思考) │ ↑输入 ↓输出 ⚡近期缓存命中 │ 花费(/预算) 省X    ./书目录
+//	◆ provider model(cửa sổ,suy nghĩ) │ ↑Nhập ↓Xuất ⚡cache gần đây trúng trung bình │ chi phí(/ngân sách) tiết kiệm X    ./thư mục sách
 //
-// 定位是"一眼看开销"：为之付费的模型身份、会话累计令牌、花费与预算逼近告警。
-// 数据来自 3s 轮询的 UISnapshot（每次模型调用完成 usage 即累计入账）；
-// per-role/per-model 明细与缓存诊断仍由左侧栏承载，这里不重复。
+// Định vị là "nhìn thoáng biết chi phí": danh tính Mô hình được trả phí, token lũy kế của phiên, chi phí và cảnh báo tiệm cận ngân sách.
+// Dữ liệu đến từ UISnapshot được thăm dò mỗi 3s (mỗi lần gọi Mô hình hoàn tất, usage sẽ được cộng dồn vào sổ);
+// Chi tiết per-role/per-model và chẩn đoán cache vẫn do thanh bên trái đảm nhiệm, không lặp lại ở đây.
 func renderStatusBar(snap host.UISnapshot, outputDir string, width int) string {
 	dim := lipgloss.NewStyle().Foreground(colorDim)
 	val := lipgloss.NewStyle().Foreground(colorMuted)
@@ -34,7 +34,7 @@ func renderStatusBar(snap host.UISnapshot, outputDir string, width int) string {
 	if snap.TotalInputTokens > 0 || snap.TotalOutputTokens > 0 {
 		s := dim.Render("↑") + val.Render(formatTokensCompact(snap.TotalInputTokens)) +
 			" " + dim.Render("↓") + val.Render(formatTokensCompact(snap.TotalOutputTokens))
-		// 近期命中率只在模型真支持 prompt cache 且有样本时展示，避免"0% 需要排查"的误读。
+		// Chỉ hiển thị tỷ lệ hit gần đây khi model thật sự hỗ trợ prompt cache và có mẫu, để tránh hiểu lầm “0% cần điều tra”.
 		if snap.OverallCacheCapable && snap.OverallRecentSamples > 0 && snap.OverallRecentInput > 0 {
 			rate := cacheHitRate(snap.OverallRecentCacheRead, snap.OverallRecentInput)
 			s += " " + lipgloss.NewStyle().Foreground(cacheHitColor(rate)).Render("⚡"+formatPercent(rate))
@@ -48,7 +48,7 @@ func renderStatusBar(snap host.UISnapshot, outputDir string, width int) string {
 		}
 		style := val
 		if snap.BudgetLimitUSD > 0 {
-			// 预算逼近/超限用告警色——状态栏常驻可见，是预算最该被看见的位置。
+			// ngân sách tiến gần/vượt giới hạn dùng màu cảnh báo——thanh trạng thái luôn hiển thị, là vị trí ngân sách nên được nhìn thấy nhất.
 			switch ratio := snap.TotalCostUSD / snap.BudgetLimitUSD; {
 			case ratio >= 1:
 				style = lipgloss.NewStyle().Foreground(colorError).Bold(true)
@@ -61,7 +61,7 @@ func renderStatusBar(snap host.UISnapshot, outputDir string, width int) string {
 			s += dim.Render("/" + formatCostUSD(snap.BudgetLimitUSD))
 		}
 		if saved := formatCostUSD(snap.TotalSavedUSD); saved != "" {
-			s += dim.Render(" 省" + saved)
+			s += dim.Render(" tiết kiệm " + saved)
 		}
 		segs = append(segs, s)
 	}
@@ -72,12 +72,12 @@ func renderStatusBar(snap host.UISnapshot, outputDir string, width int) string {
 		right = dim.Render("./" + filepath.Base(outputDir))
 	}
 	if left == "" && right == "" {
-		return dim.Render("READY")
+		return dim.Render("SẴN SÀNG")
 	}
 	return joinInlineSides(left, right, width)
 }
 
-// modelInfoSuffix 组装模型括注：上下文窗口 + 思考等级，如 "200K,med"。
+// modelInfoSuffix ghép chú thích cho Mô hình: cửa sổ ngữ cảnh + mức suy nghĩ, ví dụ "200K,med".
 func modelInfoSuffix(snap host.UISnapshot) string {
 	var parts []string
 	if w := formatContextWindow(snap.ModelContextWindow); w != "" {

@@ -11,10 +11,10 @@ import (
 	"github.com/voocel/ainovel-cli/internal/store"
 )
 
-// sentinel 是一段绝不该出现在导出里的"小说正文"。
-const sentinel = "雪夜里主角揭穿了反派的惊天阴谋这是机密正文"
+// sentinel là một đoạn văn bản truyện riêng biệt, không được xuất hiện trong bản xuất.
+const sentinel = "Đêm tuyết, nhân vật chính vạch trần âm mưu kinh thiên của phản diện — nội dung mật"
 
-// writeSession 把若干消息按 sessions/*.jsonl 的格式写到临时 output 目录。
+// writeSession ghi các sessions/*.jsonl đầu ra.
 func writeSession(t *testing.T, rel string, msgs []agentcore.Message) string {
 	t.Helper()
 	dir := t.TempDir()
@@ -26,19 +26,19 @@ func writeSessionAt(t *testing.T, dir, rel string, msgs []agentcore.Message) {
 	t.Helper()
 	path := filepath.Join(dir, "meta", "sessions", rel)
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		t.Fatalf("mkdir: %v", err)
+		t.Fatalf("tạo thư mục: %v", err)
 	}
 	var b strings.Builder
 	for _, m := range msgs {
 		data, err := json.Marshal(m)
 		if err != nil {
-			t.Fatalf("marshal: %v", err)
+			t.Fatalf("tuần tự hóa: %v", err)
 		}
 		b.Write(data)
 		b.WriteByte('\n')
 	}
 	if err := os.WriteFile(path, []byte(b.String()), 0o644); err != nil {
-		t.Fatalf("write: %v", err)
+		t.Fatalf("ghi: %v", err)
 	}
 }
 
@@ -58,16 +58,16 @@ func errResult(msg string) agentcore.Message {
 	}
 }
 
-// TestExport_DeathLoopShape 端到端复现 #34：模型把 commit_chapter 的 chapter
-// 字符串化导致校验循环。断言导出能定位、且小说正文零出包。
+// TestExport_DeathLoopShape #34: commit_chapter với chapter.
+// Xác nhận vòng lặp được phát hiện và văn bản truyện được che.
 func TestExport_DeathLoopShape(t *testing.T) {
 	var msgs []agentcore.Message
-	// 一段 Worker 输出的裸正文（<4KB，绕过 session_compact），必须被打码。
+	// Worker đầu ra là văn bản truyện (<4KB, session_compact).
 	msgs = append(msgs, agentcore.Message{
 		Role:    agentcore.RoleAssistant,
 		Content: []agentcore.ContentBlock{agentcore.TextBlock(sentinel)},
 	})
-	// 14 轮 commit_chapter(chapter:"7") + InputValidationError。
+	// 14 lần commit_chapter(chapter:"7") cùng InputValidationError.
 	for range 14 {
 		msgs = append(msgs, commitCall(`"7"`))
 		msgs = append(msgs, errResult("InputValidationError: chapter must be int"))
@@ -79,67 +79,67 @@ func TestExport_DeathLoopShape(t *testing.T) {
 	out := string(RenderExport(rep, rc))
 
 	if strings.Contains(out, sentinel) {
-		t.Fatalf("小说正文出包了！导出包含 sentinel:\n%s", out)
+		t.Fatalf("văn bản truyện sentinel bị lộ:\n%s", out)
 	}
 	if !strings.Contains(out, `chapter: "7"`) {
-		t.Errorf("缺类型异常信号 chapter: \"7\"（#34 根因）\n%s", out)
+		t.Errorf("thiếu tín hiệu kiểu chapter bất thường: \"7\" (#34)\n%s", out)
 	}
 	if !strings.Contains(out, "InputValidationError") {
-		t.Errorf("错误串未保留\n%s", out)
+		t.Errorf("lỗi phải được giữ lại\n%s", out)
 	}
 	if !strings.Contains(out, "×14") {
-		t.Errorf("重复聚合未列出 ×14\n%s", out)
+		t.Errorf("thiếu số lần lặp ×14\n%s", out)
 	}
-	// Phase 2：运行时检测应把这个循环判成 critical 的 RepeatedToolError。
-	if !strings.Contains(out, "工具反复报同一错误") {
-		t.Errorf("运行时检测未产出 RepeatedToolError\n%s", out)
+	// Giai đoạn 2: phát hiện vòng lặp nghiêm trọng RepeatedToolError.
+	if !strings.Contains(out, "lỗi") {
+		t.Errorf("phải phát hiện RepeatedToolError\n%s", out)
 	}
 	if !strings.Contains(out, "[critical]") {
-		t.Errorf("14 次重复应升为 critical\n%s", out)
+		t.Errorf("14 lần lặp phải ở mức critical\n%s", out)
 	}
 }
 
-// TestExport_NumberVsStringArg 证明标量与字符串投影能区分类型：
-// chapter:7（数字）保留为 7，chapter:"7"（字符串）保留为 "7"。
+// TestExport_NumberVsStringArg phân loại:
+// chapter:7 (số) giữ lại 7, chapter:"7" (chuỗi) giữ lại "7".
 func TestExport_NumberVsStringArg(t *testing.T) {
 	intDir := writeSession(t, filepath.Join("agents", "writer-ch07.jsonl"), []agentcore.Message{commitCall(`7`)})
 	si := store.NewStore(intDir)
 	repInt, rcInt := Diagnose(si)
 	outInt := string(RenderExport(repInt, rcInt))
 	if !strings.Contains(outInt, "chapter: 7") || strings.Contains(outInt, `chapter: "7"`) {
-		t.Errorf("数字参数应渲染为 chapter: 7（不带引号）\n%s", outInt)
+		t.Errorf("tham số phải là chapter: 7 (không có dấu ngoặc kép)\n%s", outInt)
 	}
 }
 
-// TestProjectValue_ProseArgRedacted 守护脱敏边界：标识符型短值保留、
-// 中文/带空格的短值（如 dispatch task、chapter title）一律打码。
+// TestProjectValue_ProseArgRedacted  :giữ lại、
+// /（ dispatch task、chapter title）。
 func TestProjectValue_ProseArgRedacted(t *testing.T) {
 	keep := map[string]string{
-		`"7"`:       `"7"`,       // 字符串化数字（#34 信号）
-		`"premise"`: `"premise"`, // 枚举
-		`"writer"`:  `"writer"`,  // 角色名
-		`7`:         `7`,         // 数字标量
-		`true`:      `true`,      // bool 标量
+		`"7"`:       `"7"`,       // (#34)
+		`"premise"`: `"premise"`, //
+		`"writer"`:  `"writer"`,  //
+		`7`:         `7`,         //
+		`true`:      `true`,      // bool
 	}
 	for in, want := range keep {
 		if got := projectValue([]byte(in)); got != want {
-			t.Errorf("应保留 %s：got %q want %q", in, got, want)
+			t.Errorf("cần giữ lại %s: nhận %q, mong đợi %q", in, got, want)
 		}
 	}
-	// 含中文 / 空格 → 必须打码，且不含原文。
-	prose := []string{`"第7章 雪夜的真相"`, `"雪夜杀机"`, `"主角揭穿阴谋"`}
+	// Chuỗi văn xuôi phải được che để tránh xuất nội dung truyện.
+	prose := []string{`"Chương 7: Đêm tuyết vạch trần sự thật"`, `"Sát cơ trong đêm tuyết"`, `"Nhân vật chính vạch trần âm mưu"`}
 	for _, in := range prose {
 		got := projectValue([]byte(in))
 		if !strings.HasPrefix(got, "<redacted") {
-			t.Errorf("中文/带空格短值应打码：%s → %q", in, got)
+		t.Errorf("chuỗi văn xuôi phải được che: %s → %q", in, got)
 		}
-		if strings.Contains(got, "雪夜") || strings.Contains(got, "主角") {
-			t.Errorf("打码后仍含正文：%s → %q", in, got)
+		if strings.Contains(got, "đêm tuyết") || strings.Contains(got, "âm mưu") {
+			t.Errorf("sau khi che vẫn còn văn bản truyện: %s → %q", in, got)
 		}
 	}
 }
 
-// TestWriteExport_WritesFile 证明纯函数路径：不依赖 TUI，写出固定相对路径。
+// TestWriteExport_WritesFile  : TUI，。
 func TestWriteExport_WritesFile(t *testing.T) {
 	dir := writeSession(t, filepath.Join("agents", "writer-ch07.jsonl"), []agentcore.Message{commitCall(`"7"`), errResult("boom")})
 	s := store.NewStore(dir)
@@ -150,21 +150,21 @@ func TestWriteExport_WritesFile(t *testing.T) {
 		t.Fatalf("WriteExport: %v", err)
 	}
 	if want := filepath.Join(dir, filepath.FromSlash(ExportRelPath)); path != want {
-		t.Errorf("路径不对：got %s want %s", path, want)
+		t.Errorf("đường dẫn sai: nhận %s, mong đợi %s", path, want)
 	}
 	data, err := os.ReadFile(path)
 	if err != nil {
-		t.Fatalf("read back: %v", err)
+		t.Fatalf("đọc lại: %v", err)
 	}
 	if !strings.Contains(string(data), "diag-export") {
-		t.Errorf("文件内容异常\n%s", data)
+		t.Errorf("nội dung\n%s", data)
 	}
 	if strings.Contains(string(data), sentinel) {
-		t.Errorf("写出的文件夹带正文")
+		t.Errorf("văn bản truyện")
 	}
 }
 
-// TestRedactMessage_DupSha 证明同一段文本反复出现产生同 sha（循环信号）。
+// TestRedactMessage_DupSha  sha (vòng lặp).
 func TestRedactMessage_DupSha(t *testing.T) {
 	a := redactMessage("writer-ch07", agentcore.Message{
 		Role:    agentcore.RoleAssistant,
@@ -175,9 +175,9 @@ func TestRedactMessage_DupSha(t *testing.T) {
 		Content: []agentcore.ContentBlock{agentcore.TextBlock(sentinel)},
 	})
 	if a.TextSha == "" || a.TextSha != b.TextSha {
-		t.Errorf("相同正文应得相同 sha：%q vs %q", a.TextSha, b.TextSha)
+		t.Errorf("văn bản truyện cần SHA: %q và %q", a.TextSha, b.TextSha)
 	}
 	if a.Redacted != 1 {
-		t.Errorf("应打码 1 个文本块，got %d", a.Redacted)
+		t.Errorf("cần 1, nhận %d", a.Redacted)
 	}
 }

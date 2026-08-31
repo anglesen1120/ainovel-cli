@@ -9,7 +9,7 @@ import (
 	"github.com/voocel/ainovel-cli/internal/store"
 )
 
-// ReadChapterTool 读取章节原文，让 Agent 能回读自己和前文的文字。
+// ReadChapterTool đọc nguyên văn chương để Agent có thể đọc lại nội dung của chính mình và phần trước.
 type ReadChapterTool struct {
 	store *store.Store
 }
@@ -20,22 +20,22 @@ func NewReadChapterTool(store *store.Store) *ReadChapterTool {
 
 func (t *ReadChapterTool) Name() string { return "read_chapter" }
 func (t *ReadChapterTool) Description() string {
-	return "读取章节原文。可读终稿、草稿，或提取角色对话片段"
+	return "Đọc nguyên văn chương. Có thể đọc bản cuối, bản nháp hoặc trích đoạn thoại nhân vật"
 }
-func (t *ReadChapterTool) Label() string { return "读取章节" }
+func (t *ReadChapterTool) Label() string { return "Đọc chương" }
 
-// 纯读工具，可被并发调度（editor 审阅时常一次读多章）。
+// Công cụ chỉ đọc, có thể điều phối song song (editor thường đọc nhiều chương một lần khi rà soát).
 func (t *ReadChapterTool) ReadOnly(_ json.RawMessage) bool        { return true }
 func (t *ReadChapterTool) ConcurrencySafe(_ json.RawMessage) bool { return true }
 
 func (t *ReadChapterTool) Schema() map[string]any {
 	return schema.Object(
-		schema.Property("chapter", schema.Int("章节号（读单章时必填）")),
-		schema.Property("from", schema.Int("起始章节号（读范围时使用）")),
-		schema.Property("to", schema.Int("结束章节号（读范围时使用）")),
-		schema.Property("source", schema.Enum("来源", "final", "draft")).Required(),
-		schema.Property("character", schema.String("角色名（提取对话片段时使用）")),
-		schema.Property("max_runes", schema.Int("每章最大字符数（范围读取时截取，默认 2000）")),
+		schema.Property("chapter", schema.Int("số chương (bắt buộc khi đọc một chương)")),
+		schema.Property("from", schema.Int("số chương bắt đầu (dùng khi đọc phạm vi)")),
+		schema.Property("to", schema.Int("số chương kết thúc (dùng khi đọc phạm vi)")),
+		schema.Property("source", schema.Enum("nguồn", "final", "draft")).Required(),
+		schema.Property("character", schema.String("tên nhân vật (dùng khi trích đoạn thoại)")),
+		schema.Property("max_runes", schema.Int("số ký tự tối đa mỗi chương (cắt khi đọc khoảng, mặc định 2000)")),
 	)
 }
 
@@ -49,18 +49,18 @@ func (t *ReadChapterTool) Execute(_ context.Context, args json.RawMessage) (json
 		MaxRunes  int    `json:"max_runes"`
 	}
 	if err := json.Unmarshal(args, &a); err != nil {
-		return nil, fmt.Errorf("invalid args: %w", err)
+		return nil, fmt.Errorf("đối số không hợp lệ: %w", err)
 	}
 	if a.Source != "final" && a.Source != "draft" {
-		return nil, fmt.Errorf("source must be final or draft")
+		return nil, fmt.Errorf("source phải là final hoặc draft")
 	}
 
-	// 模式 1：提取角色对话
+	// Chế độ 1: trích thoại nhân vật
 	if a.Character != "" {
 		var warnings []string
 		warn := func(scope string, err error) {
 			if err != nil {
-				warnings = append(warnings, fmt.Sprintf("%s 读取失败: %v", scope, err))
+				warnings = append(warnings, fmt.Sprintf("%s đọc thất bại: %v", scope, err))
 			}
 		}
 		chars, err := t.store.Characters.Load()
@@ -85,7 +85,7 @@ func (t *ReadChapterTool) Execute(_ context.Context, args json.RawMessage) (json
 			"samples":   samples,
 		}
 		if len(samples) == 0 {
-			result["hint"] = "该角色暂无可用的已提交对话样本"
+			result["hint"] = "nhân vật này hiện chưa có mẫu thoại đã nộp có thể dùng"
 		}
 		if len(warnings) > 0 {
 			result["status"] = "partial"
@@ -94,7 +94,7 @@ func (t *ReadChapterTool) Execute(_ context.Context, args json.RawMessage) (json
 		return json.Marshal(result)
 	}
 
-	// 模式 2：范围读取
+	// Chế độ 2: đọc theo khoảng
 	if a.From > 0 && a.To > 0 {
 		maxRunes := a.MaxRunes
 		if maxRunes <= 0 {
@@ -110,7 +110,7 @@ func (t *ReadChapterTool) Execute(_ context.Context, args json.RawMessage) (json
 		for ch := a.From; ch <= a.To; ch++ {
 			chapter, err := load(ch)
 			if err != nil {
-				return nil, fmt.Errorf("load %s chapter %d: %w", a.Source, ch, err)
+				return nil, fmt.Errorf("không thể tải chương %d từ nguồn %s: %w", ch, a.Source, err)
 			}
 			if chapter == "" {
 				continue
@@ -129,9 +129,9 @@ func (t *ReadChapterTool) Execute(_ context.Context, args json.RawMessage) (json
 		})
 	}
 
-	// 模式 3：单章读取
+	// Chế độ 3: đọc một chương
 	if a.Chapter <= 0 {
-		return nil, fmt.Errorf("chapter is required")
+		return nil, fmt.Errorf("bắt buộc có chapter")
 	}
 
 	var content string
@@ -143,14 +143,14 @@ func (t *ReadChapterTool) Execute(_ context.Context, args json.RawMessage) (json
 		content, err = t.store.Drafts.LoadChapterText(a.Chapter)
 	}
 	if err != nil {
-		return nil, fmt.Errorf("read chapter %d: %w", a.Chapter, err)
+		return nil, fmt.Errorf("không thể đọc chương %d: %w", a.Chapter, err)
 	}
 	if content == "" {
 		return json.Marshal(map[string]any{
 			"chapter": a.Chapter,
 			"source":  a.Source,
 			"exists":  false,
-			"hint":    "请求的来源中没有该章节；如需读取另一来源，请明确指定 source",
+			"hint":    "nguồn được yêu cầu không có chương này; nếu cần đọc nguồn khác, hãy chỉ rõ source",
 		})
 	}
 
@@ -162,7 +162,7 @@ func (t *ReadChapterTool) Execute(_ context.Context, args json.RawMessage) (json
 	})
 }
 
-// maxCompletedChapter 返回已完成章节列表中的最大章节号。
+// maxCompletedChapter trả về số chương lớn nhất trong danh sách chương đã hoàn tất.
 func maxCompletedChapter(completed []int) int {
 	m := 0
 	for _, ch := range completed {

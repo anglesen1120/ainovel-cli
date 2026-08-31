@@ -15,17 +15,17 @@ func TestRuntimeStoreAppendQueueAssignsSeq(t *testing.T) {
 		Summary:  "first",
 	})
 	if err != nil {
-		t.Fatalf("AppendQueue first: %v", err)
+		t.Fatalf("AppendQueue lần đầu: %v", err)
 	}
 	second, err := store.Runtime.AppendQueue(domain.RuntimeQueueItem{
 		Priority: domain.RuntimePriorityControl,
 		Summary:  "second",
 	})
 	if err != nil {
-		t.Fatalf("AppendQueue second: %v", err)
+		t.Fatalf("AppendQueue lần hai: %v", err)
 	}
 	if first.Seq != 1 || second.Seq != 2 {
-		t.Fatalf("unexpected seq values: %d %d", first.Seq, second.Seq)
+		t.Fatalf("giá trị seq không mong đợi: %d %d", first.Seq, second.Seq)
 	}
 
 	items, err := store.Runtime.LoadQueue()
@@ -33,10 +33,10 @@ func TestRuntimeStoreAppendQueueAssignsSeq(t *testing.T) {
 		t.Fatalf("LoadQueue: %v", err)
 	}
 	if len(items) != 2 {
-		t.Fatalf("expected 2 items, got %d", len(items))
+		t.Fatalf("mong đợi 2 mục, nhận được %d", len(items))
 	}
 	if items[1].Summary != "second" {
-		t.Fatalf("expected second item persisted, got %+v", items[1])
+		t.Fatalf("mong đợi mục thứ hai được lưu bền vững, nhận %+v", items[1])
 	}
 }
 
@@ -47,7 +47,7 @@ func TestRuntimeStoreAppendTaskLog(t *testing.T) {
 	if err := store.Runtime.AppendTaskLog("task-1", domain.RuntimeTaskLogEntry{
 		Agent:   "writer",
 		Event:   "stream",
-		Summary: "开始落稿",
+		Summary: "bắt đầu soạn thảo",
 	}); err != nil {
 		t.Fatalf("AppendTaskLog 1: %v", err)
 	}
@@ -55,7 +55,7 @@ func TestRuntimeStoreAppendTaskLog(t *testing.T) {
 		Agent:   "writer",
 		Event:   "tool",
 		Tool:    "draft_chapter",
-		Summary: "正文输出完成",
+		Summary: "đã hoàn tất xuất nội dung chính",
 	}); err != nil {
 		t.Fatalf("AppendTaskLog 2: %v", err)
 	}
@@ -65,10 +65,10 @@ func TestRuntimeStoreAppendTaskLog(t *testing.T) {
 		t.Fatalf("LoadTaskLog: %v", err)
 	}
 	if len(entries) != 2 {
-		t.Fatalf("expected 2 task log entries, got %d", len(entries))
+		t.Fatalf("mong đợi 2 mục nhật ký tác vụ, nhận được %d", len(entries))
 	}
 	if entries[1].Tool != "draft_chapter" {
-		t.Fatalf("expected tool persisted, got %+v", entries[1])
+		t.Fatalf("mong đợi tool được lưu bền vững, nhận %+v", entries[1])
 	}
 }
 
@@ -90,10 +90,10 @@ func TestRuntimeStoreLoadQueueAfter(t *testing.T) {
 		t.Fatalf("LoadQueueAfter: %v", err)
 	}
 	if len(items) != 2 {
-		t.Fatalf("expected 2 items after seq 1, got %d", len(items))
+		t.Fatalf("mong đợi 2 mục sau seq 1, nhận được %d", len(items))
 	}
 	if items[0].Summary != "two" || items[1].Summary != "three" {
-		t.Fatalf("unexpected items: %+v", items)
+		t.Fatalf("các mục không mong đợi: %+v", items)
 	}
 }
 
@@ -107,7 +107,7 @@ func TestRuntimeStoreReset(t *testing.T) {
 	})
 	_ = store.Runtime.AppendTaskLog("task-1", domain.RuntimeTaskLogEntry{
 		Event:   "stream_delta",
-		Summary: "delta",
+		Summary: "chênh lệch",
 	})
 
 	if err := store.Runtime.Reset(); err != nil {
@@ -116,17 +116,17 @@ func TestRuntimeStoreReset(t *testing.T) {
 
 	items, err := store.Runtime.LoadQueue()
 	if err != nil {
-		t.Fatalf("LoadQueue after reset: %v", err)
+		t.Fatalf("LoadQueue sau khi reset: %v", err)
 	}
 	if len(items) != 0 {
-		t.Fatalf("expected empty queue after reset, got %d", len(items))
+		t.Fatalf("mong đợi hàng đợi rỗng sau khi reset, nhận được %d", len(items))
 	}
 
 	logs, err := store.Runtime.LoadTaskLog("task-1")
 	if err != nil {
-		t.Fatalf("LoadTaskLog after reset: %v", err)
+		t.Fatalf("LoadTaskLog sau khi reset: %v", err)
 	}
 	if len(logs) != 0 {
-		t.Fatalf("expected empty task log after reset, got %d", len(logs))
+		t.Fatalf("mong đợi nhật ký tác vụ rỗng sau khi reset, nhận được %d", len(logs))
 	}
 }

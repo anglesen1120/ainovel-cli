@@ -4,7 +4,7 @@ import (
 	"testing"
 )
 
-// findViolation 在结果中按 rule + target 查找第一条违规。
+// findViolation tìm violation đầu tiên trong kết quả theo rule + target.
 func findViolation(vs []Violation, rule, target string) *Violation {
 	for i := range vs {
 		if vs[i].Rule == rule && vs[i].Target == target {
@@ -15,14 +15,14 @@ func findViolation(vs []Violation, rule, target string) *Violation {
 }
 
 func TestCheck_EmptyStructured(t *testing.T) {
-	vs := Check("任何内容", Structured{})
+	vs := Check("Bất kỳ nội dung nào", Structured{})
 	if vs != nil {
 		t.Errorf("empty structured should return nil, got %+v", vs)
 	}
 }
 
 func TestCheck_ForbiddenChars(t *testing.T) {
-	text := "他笑了——又叹了口气——离去。"
+	text := "Anh ấy cười——rồi thở dài——rời đi."
 	vs := Check(text, Structured{
 		ForbiddenChars: []string{"——"},
 	})
@@ -39,7 +39,7 @@ func TestCheck_ForbiddenChars(t *testing.T) {
 }
 
 func TestCheck_ForbiddenCharsNotPresent(t *testing.T) {
-	vs := Check("普通文本无违规", Structured{
+	vs := Check("Văn bản bình thường không có vi phạm", Structured{
 		ForbiddenChars: []string{"——"},
 	})
 	if len(vs) != 0 {
@@ -48,9 +48,9 @@ func TestCheck_ForbiddenCharsNotPresent(t *testing.T) {
 }
 
 func TestCheck_ForbiddenPhrases(t *testing.T) {
-	text := "不是……而是真相被掩盖了。这里探讨核心动机。"
+	text := "Không phải……mà là sự thật đã bị che giấu. Ở đây bàn về động cơ cốt lõi."
 	vs := Check(text, Structured{
-		ForbiddenPhrases: []string{"不是……而是", "核心动机"},
+		ForbiddenPhrases: []string{"Không phải……mà là", "động cơ cốt lõi"},
 	})
 	if len(vs) != 2 {
 		t.Errorf("expected 2 violations, got %d: %+v", len(vs), vs)
@@ -63,9 +63,9 @@ func TestCheck_ForbiddenPhrases(t *testing.T) {
 }
 
 func TestCheck_FatigueWordsUnderLimit(t *testing.T) {
-	text := "他不禁笑了。"
+	text := "Anh ấy bất giác cười."
 	vs := Check(text, Structured{
-		FatigueWords: map[string]int{"不禁": 1},
+		FatigueWords: map[string]int{"bất giác": 1},
 	})
 	if len(vs) != 0 {
 		t.Errorf("under limit should not violate, got %+v", vs)
@@ -73,10 +73,10 @@ func TestCheck_FatigueWordsUnderLimit(t *testing.T) {
 }
 
 func TestCheck_FatigueWordsAtLimit(t *testing.T) {
-	// limit=1，actual=1 → 不违规
-	text := "他不禁笑了。"
+	// limit=1, actual=1 -> không vi phạm
+	text := "Anh ấy bất giác cười."
 	vs := Check(text, Structured{
-		FatigueWords: map[string]int{"不禁": 1},
+		FatigueWords: map[string]int{"bất giác": 1},
 	})
 	if len(vs) != 0 {
 		t.Errorf("at limit should not violate (limit 1 actual 1), got %+v", vs)
@@ -84,12 +84,12 @@ func TestCheck_FatigueWordsAtLimit(t *testing.T) {
 }
 
 func TestCheck_FatigueWordsOverLimit(t *testing.T) {
-	// limit=1，actual=3 → warning
-	text := "他不禁笑了，又不禁皱眉，最后不禁离去。"
+	// limit=1, actual=3 -> warning
+	text := "Anh ấy bất giác cười, rồi bất giác cau mày, cuối cùng bất giác rời đi."
 	vs := Check(text, Structured{
-		FatigueWords: map[string]int{"不禁": 1},
+		FatigueWords: map[string]int{"bất giác": 1},
 	})
-	v := findViolation(vs, "fatigue_words", "不禁")
+	v := findViolation(vs, "fatigue_words", "bất giác")
 	if v == nil {
 		t.Fatal("expected fatigue_words violation")
 	}
@@ -105,14 +105,14 @@ func TestCheck_FatigueWordsOverLimit(t *testing.T) {
 }
 
 func TestCheck_MultipleRulesAtOnce(t *testing.T) {
-	text := "他不禁——又不禁——离去。"
+	text := "Anh ấy bất giác——lại bất giác——rời đi."
 	s := Structured{
 		ForbiddenChars: []string{"——"},
-		FatigueWords:   map[string]int{"不禁": 1},
+		FatigueWords:   map[string]int{"bất giác": 1},
 	}
 	vs := Check(text, s)
 
-	// 应同时触发两类：forbidden_chars + fatigue_words
+	// Phải kích hoạt đồng thời hai loại: forbidden_chars + fatigue_words
 	rules := map[string]bool{}
 	for _, v := range vs {
 		rules[v.Rule] = true
@@ -123,10 +123,10 @@ func TestCheck_MultipleRulesAtOnce(t *testing.T) {
 }
 
 func TestCheck_FatigueZeroLimitSkipped(t *testing.T) {
-	// limit=0 是非法值，应跳过整条规则（parser 也会过滤，这里防御）
-	text := "不禁不禁不禁"
+	// limit=0 là giá trị không hợp lệ, phải bỏ qua toàn bộ quy tắc (parser cũng lọc; đây là phòng vệ)
+	text := "bất giác bất giác bất giác"
 	vs := Check(text, Structured{
-		FatigueWords: map[string]int{"不禁": 0},
+		FatigueWords: map[string]int{"bất giác": 0},
 	})
 	if len(vs) != 0 {
 		t.Errorf("limit=0 should be skipped, got %+v", vs)
@@ -134,8 +134,8 @@ func TestCheck_FatigueZeroLimitSkipped(t *testing.T) {
 }
 
 func TestCheck_EmptyTargetsSkipped(t *testing.T) {
-	// 空字符串目标不应导致 false positive
-	vs := Check("任何文本", Structured{
+	// Target là chuỗi rỗng không được gây false positive
+	vs := Check("Bất kỳ văn bản nào", Structured{
 		ForbiddenChars:   []string{""},
 		ForbiddenPhrases: []string{""},
 		FatigueWords:     map[string]int{"": 1},

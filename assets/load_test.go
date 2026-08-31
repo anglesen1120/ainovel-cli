@@ -7,9 +7,9 @@ import (
 	"testing"
 )
 
-// TestBuildWriterPrompt_ByteIdenticalToPreSplit 是文风层验收标准 ①:
-// 不放任何覆盖文件时,组装产物与拆分前的 writer.md 管线逐字节一致。
-// golden 是拆分前 writer.md 的原始快照(testdata/writer-golden.md)。
+// TestBuildWriterPrompt_ByteIdenticalToPreSplit là tiêu chuẩn nghiệm thu tầng văn phong ①:
+// khi không có tệp ghi đè, sản phẩm lắp ráp phải giống từng byte với pipeline writer.md trước khi tách.
+// golden là ảnh chụp gốc của writer.md trước khi tách (testdata/writer-golden.md).
 func TestBuildWriterPrompt_ByteIdenticalToPreSplit(t *testing.T) {
 	golden, err := os.ReadFile("testdata/writer-golden.md")
 	if err != nil {
@@ -18,49 +18,49 @@ func TestBuildWriterPrompt_ByteIdenticalToPreSplit(t *testing.T) {
 	protocol := mustRead(promptsFS, "prompts/writer.md")
 	voice := mustRead(voiceFS, "voice.md")
 
-	// 文件级:占位符回填 == 拆分前原文
+	// Cấp tệp: điền placeholder == nguyên văn trước khi tách
 	if got := strings.Replace(protocol, voicePlaceholder, strings.TrimSpace(voice), 1); got != string(golden) {
-		t.Fatalf("占位符回填与拆分前不一致:\n--- 长度 golden=%d got=%d", len(golden), len(got))
+		t.Fatalf("Điền placeholder không khớp bản trước khi tách:\n--- độ dài golden=%d got=%d", len(golden), len(got))
 	}
 
-	// 管线级:新组装 == 旧管线(writer.md → simGuidance → style)
-	const style = "## 某风格\n\n- 测试"
+	// Cấp pipeline: lắp ráp mới == pipeline cũ (writer.md → simGuidance → style)
+	const style = "## Phong cách thử nghiệm\n\n- Kiểm thử"
 	old := WithSimulationGuidance(string(golden), "writer") + "\n\n" + style
 	got := BuildWriterPrompt(WithSimulationGuidance(protocol, "writer"), voice, style)
 	if got != old {
-		t.Fatal("组装管线与拆分前不等价")
+		t.Fatal("Pipeline lắp ráp không tương đương bản trước khi tách")
 	}
 
-	// 无风格追加时也等价
+	// Khi không nối thêm style cũng tương đương
 	if BuildWriterPrompt(WithSimulationGuidance(protocol, "writer"), voice, "") != WithSimulationGuidance(string(golden), "writer") {
-		t.Fatal("无 style 时组装管线与拆分前不等价")
+		t.Fatal("Pipeline lắp ráp khi không có style không tương đương bản trước khi tách")
 	}
 }
 
-// TestLoad_NoOverrides 零覆盖时 Voice/AntiAITone 与内置逐字节一致。
+// TestLoad_NoOverrides xác nhận Voice/AntiAITone khớp từng byte với bản nhúng khi không có ghi đè.
 func TestLoad_NoOverrides(t *testing.T) {
 	b := Load("default", LoadOptions{})
 	if b.Voice != mustRead(voiceFS, "voice.md") {
-		t.Fatal("无覆盖时 Voice 应与内置逐字节一致")
+		t.Fatal("Khi không ghi đè, Voice phải khớp từng byte với bản nhúng")
 	}
 	if b.References.AntiAITone != mustRead(referencesFS, "references/anti-ai-tone.md") {
-		t.Fatal("无覆盖时 AntiAITone 应与内置逐字节一致")
+		t.Fatal("Khi không ghi đè, AntiAITone phải khớp từng byte với bản nhúng")
 	}
 	if _, ok := b.Styles["default"]; !ok {
-		t.Fatal("内置风格集应含 default")
+		t.Fatal("Tập phong cách nhúng phải có default")
 	}
 }
 
 func TestInterventionPromptsKeepScopeContract(t *testing.T) {
 	prompts := loadPrompts()
-	for _, phrase := range []string{"上下文不等于修改授权", "最小充分范围", "分析范围不等于修改范围"} {
+	for _, phrase := range []string{"ngữ cảnh không đồng nghĩa với ủy quyền sửa đổi", "phạm vi tối thiểu đủ", "phạm vi phân tích không đồng nghĩa với phạm vi sửa đổi"} {
 		if !strings.Contains(prompts.ArbiterIntervention, phrase) {
-			t.Fatalf("Arbiter 干预提示缺少范围契约 %q", phrase)
+			t.Fatalf("Prompt can thiệp Arbiter thiếu hợp đồng phạm vi %q", phrase)
 		}
 	}
-	for _, phrase := range []string{"用户原始干预", "分析范围不等于修改范围", "最小充分章节集合"} {
+	for _, phrase := range []string{"can thiệp nguyên thủy của người dùng", "phạm vi phân tích không đồng nghĩa với phạm vi chỉnh sửa", "tập hợp chương tối thiểu đủ dùng"} {
 		if !strings.Contains(prompts.Editor, phrase) {
-			t.Fatalf("Editor 提示缺少范围契约 %q", phrase)
+			t.Fatalf("Prompt Editor thiếu hợp đồng phạm vi %q", phrase)
 		}
 	}
 }
@@ -71,9 +71,9 @@ func TestStructuredArbiterPromptsContainOnlySemantics(t *testing.T) {
 		"plan_start": prompts.ArbiterPlanStart,
 		"failure":    prompts.ArbiterFailure,
 	} {
-		for _, duplicate := range []string{"```json", "不要 Markdown", "输出一个 JSON 对象"} {
+		for _, duplicate := range []string{"```json", "Đừng dùng Markdown", "Xuất một đối tượng JSON"} {
 			if strings.Contains(prompt, duplicate) {
-				t.Fatalf("%s 提示词仍重复维护输出格式 %q", name, duplicate)
+				t.Fatalf("%s prompt vẫn bảo trì lặp định dạng đầu ra %q", name, duplicate)
 			}
 		}
 	}
@@ -89,84 +89,84 @@ func writeFile(t *testing.T, path, content string) {
 	}
 }
 
-// TestLoad_ThreeTierAppendAndReplace 覆盖三层优先级与逐资产语义(验收标准 ②)。
+// TestLoad_ThreeTierAppendAndReplace kiểm tra ưu tiên ghi đè ba tầng và ngữ nghĩa từng asset (tiêu chuẩn nghiệm thu ②).
 func TestLoad_ThreeTierAppendAndReplace(t *testing.T) {
 	home := t.TempDir()
 	book := t.TempDir()
 	opts := LoadOptions{HomeStyleDir: home, BookStyleDir: book}
 
-	// voice / anti-ai-tone:追加语义,全局在前、本书在后,带边界标记
-	writeFile(t, filepath.Join(home, "voice.md"), "全局:少用成语")
-	writeFile(t, filepath.Join(book, "voice.md"), "本书:多写对话")
-	writeFile(t, filepath.Join(book, "anti-ai-tone.md"), "本书判据:禁排比")
+	// voice / anti-ai-tone: nối thêm ngữ nghĩa, toàn cục trước, sách này sau, có marker ranh giới
+	writeFile(t, filepath.Join(home, "voice.md"), "Toàn cục: ít dùng thành ngữ")
+	writeFile(t, filepath.Join(book, "voice.md"), "Sách này: tăng đối thoại")
+	writeFile(t, filepath.Join(book, "anti-ai-tone.md"), "Tiêu chí sách này: cấm liệt kê song hành")
 
-	// styles:同名整文件替换 + 新名新增;非法名忽略
-	writeFile(t, filepath.Join(home, "styles", "fantasy.md"), "全局改写的奇幻")
-	writeFile(t, filepath.Join(book, "styles", "xianxia.md"), "自定义仙侠")
-	writeFile(t, filepath.Join(book, "styles", "Bad Name!.md"), "非法")
+	// styles: cùng tên thì thay toàn bộ tệp + tên mới thì thêm; tên không hợp lệ bị bỏ qua
+	writeFile(t, filepath.Join(home, "styles", "fantasy.md"), "Fantasy viết lại toàn cục")
+	writeFile(t, filepath.Join(book, "styles", "xianxia.md"), "Xianxia tùy chỉnh")
+	writeFile(t, filepath.Join(book, "styles", "Bad Name!.md"), "Không hợp lệ")
 
-	// 题材参考:同名整文件替换,本书 > 全局
-	writeFile(t, filepath.Join(home, "genres", "fantasy", "style-references.md"), "全局参考")
-	writeFile(t, filepath.Join(book, "genres", "fantasy", "style-references.md"), "本书参考")
+	// Tham khảo đề tài: cùng tên thì thay toàn bộ tệp, sách này > toàn cục
+	writeFile(t, filepath.Join(home, "genres", "fantasy", "style-references.md"), "Tham khảo toàn cục")
+	writeFile(t, filepath.Join(book, "genres", "fantasy", "style-references.md"), "Tham khảo sách này")
 
 	b := Load("fantasy", opts)
 
 	builtinVoice := mustRead(voiceFS, "voice.md")
 	if !strings.HasPrefix(b.Voice, builtinVoice) {
-		t.Fatal("追加语义必须保留内置原文为前缀")
+		t.Fatal("Ngữ nghĩa nối thêm phải giữ nguyên văn nhúng làm tiền tố")
 	}
-	giIdx := strings.Index(b.Voice, "## 用户全局文风覆盖")
-	bkIdx := strings.Index(b.Voice, "## 本书文风覆盖")
+	giIdx := strings.Index(b.Voice, "## Ghi đè văn phong toàn cục của người dùng (các yêu cầu sau ưu tiên hơn mặc định dự án)")
+	bkIdx := strings.Index(b.Voice, "## Ghi đè văn phong của sách này (các yêu cầu sau ưu tiên hơn toàn bộ phần trên)")
 	if giIdx < 0 || bkIdx < 0 || giIdx > bkIdx {
-		t.Fatalf("追加段顺序错误:global=%d book=%d", giIdx, bkIdx)
+		t.Fatalf("Thứ tự đoạn nối thêm sai: global=%d book=%d", giIdx, bkIdx)
 	}
-	if !strings.Contains(b.Voice, "全局:少用成语") || !strings.Contains(b.Voice, "本书:多写对话") {
-		t.Fatal("覆盖内容缺失")
+	if !strings.Contains(b.Voice, "Toàn cục: ít dùng thành ngữ") || !strings.Contains(b.Voice, "Sách này: tăng đối thoại") {
+		t.Fatal("Thiếu nội dung ghi đè")
 	}
-	if !strings.Contains(b.References.AntiAITone, "本书判据:禁排比") {
-		t.Fatal("anti-ai-tone 本书追加缺失")
+	if !strings.Contains(b.References.AntiAITone, "Tiêu chí sách này: cấm liệt kê song hành") {
+		t.Fatal("Thiếu đoạn nối thêm anti-ai-tone của sách này")
 	}
 
-	if b.Styles["fantasy"] != "全局改写的奇幻" {
-		t.Fatal("styles 同名应整文件替换")
+	if b.Styles["fantasy"] != "Fantasy viết lại toàn cục" {
+		t.Fatal("style cùng tên phải thay toàn bộ tệp")
 	}
-	if b.Styles["xianxia"] != "自定义仙侠" {
-		t.Fatal("新增自定义风格应即放即用")
+	if b.Styles["xianxia"] != "Xianxia tùy chỉnh" {
+		t.Fatal("Phong cách tùy chỉnh mới phải dùng được ngay")
 	}
 	if _, ok := b.Styles["Bad Name!"]; ok {
-		t.Fatal("非法风格名必须被忽略")
+		t.Fatal("Tên phong cách không hợp lệ phải bị bỏ qua")
 	}
 
-	if b.References.StyleReference != "本书参考" {
-		t.Fatalf("题材参考应为本书覆盖优先,got %q", b.References.StyleReference)
+	if b.References.StyleReference != "Tham khảo sách này" {
+		t.Fatalf("Tham khảo đề tài phải ưu tiên ghi đè của sách này, got %q", b.References.StyleReference)
 	}
 }
 
-// TestLoad_BookOverridesHomeOnStyles 本书 styles 覆盖全局同名。
+// TestLoad_BookOverridesHomeOnStyles xác nhận styles của sách này ghi đè bản toàn cục cùng tên.
 func TestLoad_BookOverridesHomeOnStyles(t *testing.T) {
 	home := t.TempDir()
 	book := t.TempDir()
-	writeFile(t, filepath.Join(home, "styles", "romance.md"), "全局版")
-	writeFile(t, filepath.Join(book, "styles", "romance.md"), "本书版")
+	writeFile(t, filepath.Join(home, "styles", "romance.md"), "Bản toàn cục")
+	writeFile(t, filepath.Join(book, "styles", "romance.md"), "Bản sách này")
 	b := Load("default", LoadOptions{HomeStyleDir: home, BookStyleDir: book})
-	if b.Styles["romance"] != "本书版" {
-		t.Fatalf("本书应覆盖全局,got %q", b.Styles["romance"])
+	if b.Styles["romance"] != "Bản sách này" {
+		t.Fatalf("Sách này phải ghi đè toàn cục, got %q", b.Styles["romance"])
 	}
 }
 
-// TestOverrideVoice_SharesAssemblyPath eval 的 voice A/B 与生产同组装路径(验收标准 ④)。
+// TestOverrideVoice_SharesAssemblyPath xác nhận voice A/B trong eval dùng cùng đường lắp ráp với production (tiêu chuẩn nghiệm thu ④).
 func TestOverrideVoice_SharesAssemblyPath(t *testing.T) {
 	b := Load("default", LoadOptions{})
-	b.OverrideVoice("## 实验文风\n\n- 一句话")
+	b.OverrideVoice("## Văn phong thử nghiệm\n\n- Một câu")
 	got := BuildWriterPrompt(b.Prompts.Writer, b.Voice, "")
-	if !strings.Contains(got, "## 实验文风") {
-		t.Fatal("OverrideVoice 未生效")
+	if !strings.Contains(got, "## Văn phong thử nghiệm") {
+		t.Fatal("OverrideVoice chưa có hiệu lực")
 	}
 	if strings.Contains(got, voicePlaceholder) {
-		t.Fatal("占位符必须被消耗")
+		t.Fatal("Placeholder phải được tiêu thụ")
 	}
-	// 协议部分不受 voice 覆盖影响
-	if !strings.Contains(got, "## 执行协议") {
-		t.Fatal("协议模板不得被 voice 覆盖破坏")
+	// Phần giao thức không bị ghi đè voice ảnh hưởng
+	if !strings.Contains(got, "## Giao thức thực thi") {
+		t.Fatal("Template giao thức không được bị ghi đè voice phá vỡ")
 	}
 }

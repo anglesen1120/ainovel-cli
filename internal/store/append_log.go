@@ -8,10 +8,9 @@ import (
 	"os"
 )
 
-// appendLog 管理只增长事实的 JSONL 存储。调用方负责持有 io.mu 写锁。
+// appendLog quản lý kho JSONL chỉ tăng trưởng cho các sự kiện. Bên gọi chịu trách nhiệm giữ khóa ghi io.mu.
 //
-// 首次加载建立内存去重索引；正常追加只写新增记录。旧版 JSON 数组在第一次
-// 追加时一次性迁移，JSONL 成功落盘后再删除旧文件，因此任一中断窗口都可重放。
+// Lần tải đầu tiên thiết lập chỉ mục khử trùng lặp trong bộ nhớ; thao tác thêm bình thường chỉ ghi các bản ghi mới. Mảng JSON phiên bản cũ được di trú một lần trong lần thêm đầu tiên; sau khi JSONL được ghi bền vững thành công mới xóa file cũ, vì vậy mọi cửa sổ gián đoạn đều có thể phát lại.
 type appendLog[T any] struct {
 	path       string
 	legacyPath string
@@ -76,8 +75,7 @@ func (l *appendLog[T]) allUnlocked(io *IO) ([]T, error) {
 	return l.cloneValues(l.values), nil
 }
 
-// appendUnlocked 返回实际新增的记录。即使旧文件清理失败，已经提交到 JSONL 的
-// 新记录也会返回，调用方可据此把派生投影标记为待修复；下一次重放只做清理。
+// appendUnlocked trả về các bản ghi thực sự được thêm mới. Ngay cả khi dọn dẹp file cũ thất bại, các bản ghi mới đã được commit vào JSONL vẫn sẽ được trả về; bên gọi có thể dựa vào đó để đánh dấu projection phái sinh là cần sửa chữa; lần phát lại tiếp theo chỉ thực hiện dọn dẹp.
 func (l *appendLog[T]) appendUnlocked(io *IO, incoming []T) ([]T, error) {
 	if err := l.loadUnlocked(io); err != nil {
 		return nil, err
@@ -114,14 +112,13 @@ func (l *appendLog[T]) appendUnlocked(io *IO, incoming []T) ([]T, error) {
 			return nil, err
 		}
 		if err := io.AppendLineUnlocked(l.path, data); err != nil {
-			// 写入可能留下未换行的尾部。丢弃缓存，让下一次加载按提交协议
-			// 显式截断未提交尾部后再重放。
+			// Việc ghi có thể để lại phần đuôi chưa có ký tự xuống dòng. Hủy cache, để lần tải tiếp theo cắt bỏ rõ ràng phần đuôi chưa commit theo giao thức commit rồi phát lại.
 			l.reset()
 			return nil, err
 		}
 	} else if len(incoming) > 0 && l.hasLog {
-		// 上一次追加可能已写完整记录，但 Sync 返回了错误。
-		// 幂等重放在确认成功前再次同步，不把“当前可读”误当成“已持久化”。
+		// Lần thêm trước có thể đã ghi bản ghi hoàn chỉnh, nhưng Sync trả về lỗi.
+		// Phát lại idempotent sẽ đồng bộ lại trước khi xác nhận thành công, không nhầm “hiện có thể đọc” là “đã được lưu bền vững”.
 		if err := io.syncFileUnlocked(l.path); err != nil {
 			l.reset()
 			return nil, err
@@ -139,7 +136,7 @@ func (l *appendLog[T]) appendUnlocked(io *IO, incoming []T) ([]T, error) {
 			return l.cloneValues(added), err
 		}
 		l.legacyPresent = false
-		slog.Info("增长型事实已迁移为追加日志",
+		slog.Info("Sự kiện tăng trưởng đã được di trú thành nhật ký append",
 			"module", "store", "from", l.legacyPath, "to", l.path, "records", len(l.values))
 	}
 	return l.cloneValues(added), nil
@@ -197,7 +194,7 @@ func encodeJSONLines[T any](values []T) ([]byte, error) {
 	for i, value := range values {
 		line, err := json.Marshal(value)
 		if err != nil {
-			return nil, fmt.Errorf("encode jsonl record %d: %w", i+1, err)
+			return nil, fmt.Errorf("mã hóa bản ghi jsonl %d: %w", i+1, err)
 		}
 		data.Write(line)
 		data.WriteByte('\n')
@@ -215,15 +212,14 @@ func decodeJSONLines[T any](path string, data []byte) ([]T, error) {
 		}
 		var value T
 		if err := json.Unmarshal(line, &value); err != nil {
-			return nil, fmt.Errorf("parse %s line %d: %w", path, i+1, err)
+			return nil, fmt.Errorf("phân tích %s dòng %d: %w", path, i+1, err)
 		}
 		values = append(values, value)
 	}
 	return values, nil
 }
 
-// committedJSONLinesUnlocked 丢弃协议上可证明未提交的尾部：只有以换行结束的
-// JSONL 记录才算提交。完整行损坏仍严格报错，不做猜测式修复。
+// committedJSONLinesUnlocked loại bỏ phần đuôi có thể chứng minh là chưa commit theo giao thức: chỉ các bản ghi JSONL kết thúc bằng ký tự xuống dòng mới được xem là đã commit. Dòng đầy đủ bị hỏng vẫn báo lỗi nghiêm ngặt, không sửa chữa theo kiểu phỏng đoán.
 func committedJSONLinesUnlocked(io *IO, path string) ([]byte, error) {
 	data, err := io.ReadFileUnlocked(path)
 	if err != nil {
@@ -236,7 +232,7 @@ func committedJSONLinesUnlocked(io *IO, path string) ([]byte, error) {
 	if err := os.Truncate(io.path(path), int64(keep)); err != nil {
 		return nil, err
 	}
-	slog.Warn("已修复追加日志的未提交尾部",
+	slog.Warn("Đã sửa phần đuôi chưa commit của nhật ký append",
 		"module", "store", "file", path, "discarded_bytes", len(data)-keep)
 	return data[:keep], nil
 }

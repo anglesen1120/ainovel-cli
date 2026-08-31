@@ -16,7 +16,7 @@ func TestCheckConsistencyReturnsPartialFactsWithWarnings(t *testing.T) {
 	if err := st.Init(); err != nil {
 		t.Fatal(err)
 	}
-	if err := st.Drafts.SaveDraft(1, "可供检查的章节草稿"); err != nil {
+	if err := st.Drafts.SaveDraft(1, "bản thảo chương có thể kiểm tra"); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(filepath.Join(dir, "world_rules.json"), []byte("{"), 0o644); err != nil {
@@ -25,13 +25,13 @@ func TestCheckConsistencyReturnsPartialFactsWithWarnings(t *testing.T) {
 
 	raw, err := NewCheckConsistencyTool(st).Execute(context.Background(), json.RawMessage(`{"chapter":1}`))
 	if err != nil {
-		t.Fatalf("辅助事实损坏不应中止一致性检查: %v", err)
+		t.Fatalf("Dữ liệu phụ trợ bị hỏng không nên làm gián đoạn kiểm tra nhất quán: %v", err)
 	}
 	var got map[string]any
 	if err := json.Unmarshal(raw, &got); err != nil {
 		t.Fatal(err)
 	}
 	if got["status"] != "partial" || len(got["_warnings"].([]any)) == 0 || got["content"] == "" {
-		t.Fatalf("应返回正文、partial 和数据告警: %+v", got)
+		t.Fatalf("Phải trả về nội dung, partial và cảnh báo dữ liệu: %+v", got)
 	}
 }

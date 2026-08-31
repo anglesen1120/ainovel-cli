@@ -1,10 +1,10 @@
-## 悬疑推理风格
+## Phong cách trinh thám hồi hộp
 
-- **叙事结构**：多线叙事交织，信息差制造悬念，逐步揭示真相
-- **误导技法**：合理设置红鲱鱼（红herring），利用叙述视角盲区误导读者
-- **线索管理**：关键线索必须在揭示前至少出现两次，但不能太明显
-- **节奏控制**：紧张-舒缓交替，每章末留悬念钩子，高潮前适当减速蓄力
-- **氛围营造**：环境描写服务于紧张感，利用光影、声音、天气渲染不安
-- **人物行为**：角色的每个决策必须有动机支撑，避免"为了推动剧情而做蠢事"
-- **对话风格**：言外之意多于字面意思，审讯/对峙场景注重攻防节奏
-- **真相揭示**：不能靠巧合或未出现的证据，读者回看时能发现伏笔
+- **Cấu trúc kể chuyện**: Đan xen nhiều tuyến tự sự, tạo nghi vấn bằng chênh lệch thông tin, từng bước hé lộ sự thật
+- **Kỹ pháp đánh lạc hướng**: Thiết lập hợp lý mồi nhử sai (red herring), lợi dụng điểm mù của góc nhìn kể chuyện để đánh lạc hướng độc giả
+- **Quản lý manh mối**: Manh mối then chốt phải xuất hiện ít nhất hai lần trước khi được tiết lộ, nhưng không được quá lộ liễu
+- **Kiểm soát nhịp điệu**: Xen kẽ căng thẳng - thư giãn, mỗi chương đều để lại móc treo hồi hộp ở cuối, trước cao trào thì giảm tốc hợp lý để tích lực
+- **Xây dựng bầu không khí**: Miêu tả bối cảnh phục vụ cảm giác căng thẳng, tận dụng ánh sáng, âm thanh, thời tiết để tạo nên sự bất an
+- **Hành vi nhân vật**: Mọi quyết định của nhân vật đều phải có động cơ nâng đỡ, tránh "làm chuyện ngu ngốc chỉ để thúc đẩy cốt truyện"
+- **Phong cách đối thoại**: Hàm ý nhiều hơn nghĩa đen, các cảnh thẩm vấn/đối đầu chú trọng nhịp công phòng
+- **Tiết lộ sự thật**: Không thể dựa vào sự trùng hợp hay bằng chứng chưa từng xuất hiện, để khi độc giả đọc lại có thể phát hiện ra các chi tiết gieo trước

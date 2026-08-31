@@ -8,8 +8,8 @@ import (
 	"sync"
 )
 
-// IO 封装文件系统读写操作，提供加锁和原子写入。
-// 每个子存储持有独立的 IO 实例，拥有各自的 sync.RWMutex。
+// IO đóng gói thao tác đọc/ghi hệ thống tệp, cung cấp khóa và ghi nguyên tử.
+// Mỗi kho con giữ một phiên bản IO độc lập, có sync.RWMutex riêng.
 type IO struct {
 	dir string
 	mu  sync.RWMutex
@@ -97,11 +97,13 @@ func (io *IO) WriteMarkdown(rel string, content string) error {
 	return io.WriteFileUnlocked(rel, []byte(content))
 }
 
-// WriteMarkdownUnlocked 写出 .md sidecar。约定：每个 .md 都是对应 .json 的
-// best-effort 人类可读视图，绝非数据源——运行时与导出一律从 .json 重新渲染。
-// 各 Save 方法在同一写锁内先写 .json 再写此 .md，是两次独立的 tmp+rename；
-// 二者之间崩溃会留下 .md 落后于 .json，这是可接受的（无人把 .md 当数据读，
-// 下次写同一 scope 即自愈）。故意不为此加两文件原子提交——那是过度设计。
+// WriteMarkdownUnlocked ghi sidecar .md. Quy ước: mỗi .md đều là
+// dạng hiển thị dễ đọc cho con người theo nỗ lực tốt nhất của .json tương ứng,
+// tuyệt đối không phải nguồn dữ liệu — khi chạy và khi xuất đều kết xuất lại từ .json.
+// Các phương thức Save ghi .json trước rồi ghi .md này trong cùng một khóa ghi,
+// là hai lần tmp+rename độc lập; nếu sập giữa hai lần này thì .md sẽ lạc hậu so với .json,
+// điều đó chấp nhận được (không ai đọc .md làm dữ liệu, lần ghi tiếp theo trong cùng scope
+// sẽ tự lành). Cố ý không thêm commit nguyên tử hai tệp cho việc này — như vậy là thiết kế quá mức.
 func (io *IO) WriteMarkdownUnlocked(rel string, content string) error {
 	return io.WriteFileUnlocked(rel, []byte(content))
 }
@@ -128,8 +130,8 @@ func (io *IO) AppendLineUnlocked(rel string, data []byte) error {
 	return f.Sync()
 }
 
-// syncFileUnlocked 在幂等重放时确认已存在的追加记录已持久化。
-// 调用方负责持有 io.mu 写锁。
+// syncFileUnlocked xác nhận trong khi phát lại lũy đẳng rằng các bản ghi append đã tồn tại đã được lưu bền vững.
+// Bên gọi chịu trách nhiệm giữ khóa ghi io.mu.
 func (io *IO) syncFileUnlocked(rel string) error {
 	f, err := os.OpenFile(io.path(rel), os.O_WRONLY, 0)
 	if err != nil {
@@ -162,11 +164,11 @@ func (io *IO) WithWriteLock(fn func() error) error {
 	return fn()
 }
 
-// EnsureDirs 创建指定的子目录。
+// EnsureDirs tạo các thư mục con được chỉ định.
 func (io *IO) EnsureDirs(dirs []string) error {
 	for _, d := range dirs {
 		if err := os.MkdirAll(filepath.Join(io.dir, d), 0o755); err != nil {
-			return fmt.Errorf("create dir %s: %w", d, err)
+			return fmt.Errorf("tạo thư mục %s: %w", d, err)
 		}
 	}
 	return nil

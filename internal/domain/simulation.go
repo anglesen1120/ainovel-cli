@@ -133,15 +133,15 @@ func SimulationSourceFingerprint(relativePath, sha256 string) string {
 
 func ValidateSimulationProfile(p *SimulationProfile) error {
 	if p == nil {
-		return fmt.Errorf("simulation profile is nil")
+		return fmt.Errorf("hồ sơ mô phỏng không được để trống")
 	}
 	if p.Version != SimulationProfileVersion {
-		return fmt.Errorf("unsupported simulation profile version %q", p.Version)
+		return fmt.Errorf("phiên bản hồ sơ mô phỏng không được hỗ trợ %q", p.Version)
 	}
 	for i := range p.Corpus.Sources {
 		source := &p.Corpus.Sources[i]
 		if source.RelativePath == "" || source.SHA256 == "" {
-			return fmt.Errorf("source[%d] requires relative_path and sha256", i)
+			return fmt.Errorf("source[%d] yêu cầu relative_path và sha256", i)
 		}
 		if source.Fingerprint == "" {
 			source.Fingerprint = SimulationSourceFingerprint(source.RelativePath, source.SHA256)

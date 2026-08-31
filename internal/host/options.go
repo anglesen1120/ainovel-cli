@@ -8,12 +8,12 @@ type newOptions struct {
 	logAttrs      []slog.Attr
 }
 
-// NewOption 配置 Host 构造过程，运行时资源仍由 Host 持有。
+// NewOption cấu hình quá trình tạo Host, tài nguyên lúc chạy vẫn do Host giữ.
 type NewOption func(*newOptions)
 
-// WithFileLog 让 Host 持有一个运行时日志会话。日志只在取得小说目录租约后打开，
-// 并在 Host 的所有关闭日志完成后关闭。打开失败时继续使用当前进程 logger，
-// 调用方必须通过 FileLogError 显式处理该错误。
+// WithFileLog để Host giữ một phiên nhật ký lúc chạy. Nhật ký chỉ được mở sau khi lấy được lease của thư mục tiểu thuyết,
+// và sẽ đóng sau khi mọi nhật ký đóng của Host hoàn tất. Khi mở thất bại, tiếp tục dùng logger của tiến trình hiện tại,
+// bên gọi phải xử lý lỗi này một cách rõ ràng qua FileLogError.
 func WithFileLog(filename string, alsoStderr bool, attrs ...slog.Attr) NewOption {
 	return func(opts *newOptions) {
 		opts.logFile = filename

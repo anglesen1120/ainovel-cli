@@ -17,7 +17,7 @@ import (
 
 const runtimeQueuePath = "meta/runtime/queue.jsonl"
 
-// RuntimeStore 管理统一运行时队列和每任务日志。
+// RuntimeStore quản lý hàng đợi runtime thống nhất và nhật ký cho từng tác vụ.
 type RuntimeStore struct {
 	io *IO
 
@@ -30,7 +30,7 @@ func NewRuntimeStore(io *IO) *RuntimeStore {
 	return &RuntimeStore{io: io}
 }
 
-// AppendQueue 追加一条运行时队列记录，并自动分配递增序号。
+// AppendQueue thêm một bản ghi hàng đợi runtime và tự động phân bổ số thứ tự tăng dần.
 func (s *RuntimeStore) AppendQueue(item domain.RuntimeQueueItem) (domain.RuntimeQueueItem, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -49,12 +49,12 @@ func (s *RuntimeStore) AppendQueue(item domain.RuntimeQueueItem) (domain.Runtime
 	return item, nil
 }
 
-// LoadQueue 读取当前持久化的全部运行时队列项。
+// LoadQueue đọc tất cả các mục hàng đợi runtime hiện được lưu bền vững.
 func (s *RuntimeStore) LoadQueue() ([]domain.RuntimeQueueItem, error) {
 	return loadJSONLines[domain.RuntimeQueueItem](s.io, runtimeQueuePath)
 }
 
-// LoadQueueAfter 返回指定序号之后的队列项。
+// LoadQueueAfter trả về các mục hàng đợi sau số thứ tự đã chỉ định.
 func (s *RuntimeStore) LoadQueueAfter(afterSeq int64) ([]domain.RuntimeQueueItem, error) {
 	items, err := s.LoadQueue()
 	if err != nil || afterSeq <= 0 {
@@ -69,7 +69,7 @@ func (s *RuntimeStore) LoadQueueAfter(afterSeq int64) ([]domain.RuntimeQueueItem
 	return append([]domain.RuntimeQueueItem(nil), filtered...), nil
 }
 
-// AppendTaskLog 追加某个任务的运行日志。
+// AppendTaskLog thêm nhật ký chạy cho một tác vụ.
 func (s *RuntimeStore) AppendTaskLog(taskID string, entry domain.RuntimeTaskLogEntry) error {
 	taskID = strings.TrimSpace(taskID)
 	if taskID == "" {
@@ -84,7 +84,7 @@ func (s *RuntimeStore) AppendTaskLog(taskID string, entry domain.RuntimeTaskLogE
 	return s.appendJSONLine(taskLogPath(taskID), entry)
 }
 
-// LoadTaskLog 读取某个任务的全部运行日志。
+// LoadTaskLog đọc toàn bộ nhật ký chạy của một tác vụ.
 func (s *RuntimeStore) LoadTaskLog(taskID string) ([]domain.RuntimeTaskLogEntry, error) {
 	taskID = strings.TrimSpace(taskID)
 	if taskID == "" {
@@ -97,7 +97,7 @@ func taskLogPath(taskID string) string {
 	return filepath.Join("meta", "runtime", "tasks", taskID+".log")
 }
 
-// Reset 清空运行时队列和任务日志。
+// Reset xóa sạch hàng đợi runtime và nhật ký tác vụ.
 func (s *RuntimeStore) Reset() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -117,7 +117,7 @@ func (s *RuntimeStore) Reset() error {
 	}
 	if len(errs) > 0 {
 		sort.Strings(errs)
-		return fmt.Errorf("reset runtime store: %s", strings.Join(errs, "; "))
+		return fmt.Errorf("đặt lại runtime store: %s", strings.Join(errs, "; "))
 	}
 	return nil
 }
@@ -165,7 +165,7 @@ func loadJSONLines[T any](io *IO, rel string) ([]T, error) {
 		}
 		var item T
 		if err := json.Unmarshal([]byte(line), &item); err != nil {
-			return nil, fmt.Errorf("parse %s: %w", rel, err)
+			return nil, fmt.Errorf("phân tích %s: %w", rel, err)
 		}
 		out = append(out, item)
 	}

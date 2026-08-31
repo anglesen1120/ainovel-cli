@@ -7,10 +7,10 @@ import (
 	"golang.org/x/text/encoding/simplifiedchinese"
 )
 
-// DecodeText 把用户提供的文本文件字节解码为 UTF-8：非法 UTF-8 时按 GB18030
-// （GBK 超集）转码——网络流传的中文小说 txt 大量为 GBK 编码，直接当 UTF-8 读
-// 全是乱码。非 GBK 的字节序列会被解码器替换为 U+FFFD（本就是乱码，由调用方的
-// 零命中兜底报错引导用户）。最后剥离 UTF-8 BOM（否则行首匹配会带上它）。
+// DecodeText giải mã byte file văn bản người dùng cung cấp thành UTF-8. Nếu dữ liệu không phải UTF-8 hợp lệ thì chuyển mã theo GB18030,
+// là superset của GBK, vì nhiều file tiểu thuyết txt lưu hành trên mạng dùng GBK và đọc thẳng như UTF-8 sẽ thành mojibake.
+// Chuỗi byte không phải GBK sẽ được decoder thay bằng U+FFFD; đó vẫn là dữ liệu lỗi mã hóa để caller dùng cơ chế lỗi dự phòng hướng dẫn người dùng.
+// Cuối cùng loại bỏ UTF-8 BOM để khớp đầu dòng không bị dính marker này.
 func DecodeText(data []byte) string {
 	if !utf8.Valid(data) {
 		if decoded, err := simplifiedchinese.GB18030.NewDecoder().Bytes(data); err == nil {

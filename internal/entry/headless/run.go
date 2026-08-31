@@ -21,9 +21,9 @@ type Options struct {
 	Stderr io.Writer
 }
 
-// Run 以无界面模式运行会话内核，直接消费 Engine 事件与流式输出。
-// 未来若新增“续写已有小说”等共享启动方式，不应直接堆到这里，
-// 而应先落到 internal/entry/startup，再由 headless 入口调用。
+// Run chạy lõi phiên ở chế độ không giao diện, trực tiếp tiêu thụ event và stream từ Engine.
+// nếu sau này thêm các chế độ dùng chung như “viết tiếp tiểu thuyết có sẵn”, không nên dồn trực tiếp vào đây，
+// Thay vào đó, nên hạ cánh trước vào internal/entry/startup, rồi do entry headless gọi.
 func Run(cfg bootstrap.Config, bundle assets.Bundle, opts Options) error {
 	stdout := opts.Stdout
 	if stdout == nil {
@@ -39,13 +39,13 @@ func Run(cfg bootstrap.Config, bundle assets.Bundle, opts Options) error {
 	}
 	defer eng.Close()
 	if logErr := eng.FileLogError(); logErr != nil {
-		fmt.Fprintf(stderr, "警告：文件日志不可用，继续使用终端日志：%v\n", logErr)
+		fmt.Fprintf(stderr, "Cảnh báo: nhật ký tệp không khả dụng, tiếp tục dùng nhật ký terminal: %v\n", logErr)
 	}
-	// 运行结束 / 出错返回时落一份脱敏诊断，方便 headless 用户贴 issue。
-	// （外部 kill 的挂死不走 defer，仍需在 TUI 里手动 /diag。）
+	// Khi chạy kết thúc / trả về do lỗi, ghi lại một bản chẩn đoán đã khử nhạy cảm để người dùng headless tiện dán vào issue.
+	// (Trường hợp bị treo do kill từ bên ngoài sẽ không đi qua defer, vẫn cần thực hiện thủ công /diag trong TUI.)
 	defer func() {
 		if _, err := diag.Export(store.NewStore(eng.Dir())); err != nil {
-			fmt.Fprintf(stderr, "警告：诊断报告导出失败：%v\n", err)
+			fmt.Fprintf(stderr, "Cảnh báo: xuất báo cáo chẩn đoán thất bại: %v\n", err)
 		}
 	}()
 
@@ -55,8 +55,8 @@ func Run(cfg bootstrap.Config, bundle assets.Bundle, opts Options) error {
 		if err != nil {
 			return err
 		}
-		fmt.Fprintf(stderr, "headless 启动: %s\n", eng.Dir())
-		// 启动侧确定性生成本书用户规则快照（用原始 prompt 归一化），须在 StartPrepared 前。
+		fmt.Fprintf(stderr, "headless khởi động: %s\n", eng.Dir())
+		// phía khởi động tạo snapshot quy tắc người dùng của sách một cách xác định (chuẩn hóa prompt gốc), phải thực hiện trước StartPrepared。
 		if err := eng.PrepareUserRules(prompt); err != nil {
 			return err
 		}
@@ -74,9 +74,9 @@ func Run(cfg bootstrap.Config, bundle assets.Bundle, opts Options) error {
 			return err
 		}
 		if label == "" {
-			return fmt.Errorf("headless 模式需要 --prompt，或输出目录 %q 下已有可恢复会话", eng.Dir())
+			return fmt.Errorf("Chế độ headless cần --prompt, hoặc trong thư mục đầu ra %q đã có phiên có thể khôi phục", eng.Dir())
 		}
-		fmt.Fprintf(stderr, "headless 恢复: %s (%s)\n", eng.Dir(), label)
+		fmt.Fprintf(stderr, "headless khôi phục: %s (%s)\n", eng.Dir(), label)
 		return consume(eng, stdout, stderr, false)
 	}
 

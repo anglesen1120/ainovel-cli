@@ -14,8 +14,8 @@ import (
 	"github.com/voocel/ainovel-cli/internal/llmcontract"
 )
 
-// FailoverEvent 表示一次显式 provider 切换。
-// Reason 为短标签（rate_limit / timeout / stream_idle / network），用于结构化日志。
+// FailoverEvent biểu thị một lần chuyển provider rõ ràng.
+// Reason là nhãn ngắn (rate_limit / timeout / stream_idle / network), dùng cho log có cấu trúc.
 type FailoverEvent struct {
 	Role         string
 	Reason       string
@@ -26,7 +26,7 @@ type FailoverEvent struct {
 	Err          error
 }
 
-// FailoverReporter 在发生显式切换时被调用。
+// FailoverReporter được gọi khi xảy ra chuyển đổi rõ ràng.
 type FailoverReporter func(FailoverEvent)
 
 type modelTarget struct {
@@ -36,15 +36,15 @@ type modelTarget struct {
 	jsonSchema *bool
 }
 
-// SwappableModel 是可热切换的 ChatModel 包装器。
-// 已开始的请求继续使用旧实例；后续请求自动切到新实例。
+// SwappableModel là bộ bọc ChatModel có thể hot-swap.
+// Các yêu cầu đã bắt đầu tiếp tục dùng instance cũ; các yêu cầu sau tự động chuyển sang instance mới.
 type SwappableModel struct {
 	*agentcore.SwappableModel
 	mu       sync.RWMutex
 	provider string
 	name     string
-	// jsonSchema 是当前选中模型的 config json_schema 三态声明，与 provider/name
-	// 同锁原子切换；llmcontract.Resolve 经结构匹配接口每次现读。
+	// jsonSchema là khai báo ba trạng thái json_schema của config cho mô hình đang được chọn, cùng với provider/name
+	// được chuyển đổi nguyên tử dưới cùng một lock; llmcontract.Resolve đọc trực tiếp mỗi lần qua interface khớp theo cấu trúc.
 	jsonSchema *bool
 }
 
@@ -67,8 +67,8 @@ func (m *SwappableModel) Info() llm.ModelInfo {
 	return m.StructuredOutputFacts().Info
 }
 
-// StructuredOutputFacts 在同一把锁下读取模型实例、身份和配置覆盖，保证一次
-// 结构化协议选择只观察到一个完整版本。
+// StructuredOutputFacts đọc instance mô hình, danh tính và ghi đè cấu hình dưới cùng một lock, bảo đảm mỗi lần
+// lựa chọn giao thức có cấu trúc chỉ quan sát được một phiên bản hoàn chỉnh.
 func (m *SwappableModel) StructuredOutputFacts() llmcontract.ModelFacts {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
@@ -106,7 +106,7 @@ func (m *SwappableModel) Swap(provider, name string, model agentcore.ChatModel, 
 	m.jsonSchema = jsonSchema
 }
 
-// JSONSchemaOverride 返回当前选中模型的 config json_schema 三态声明。
+// JSONSchemaOverride trả về khai báo ba trạng thái json_schema của config cho mô hình đang được chọn hiện tại.
 func (m *SwappableModel) JSONSchemaOverride() *bool {
 	return m.StructuredOutputFacts().JSONSchemaOverride
 }
@@ -125,7 +125,7 @@ func (m *SwappableModel) Current() (provider, name string) {
 	return m.provider, m.name
 }
 
-// ModelSet 持有按角色分配的模型实例，未配置的角色回退到默认模型。
+// ModelSet giữ các instance mô hình được phân theo vai trò, vai trò chưa cấu hình sẽ quay về mô hình mặc định.
 type ModelSet struct {
 	mu        sync.RWMutex
 	Default   *SwappableModel
@@ -134,7 +134,7 @@ type ModelSet struct {
 	config    Config
 }
 
-// ForRole 返回指定角色的模型，未配置时返回默认模型。
+// ForRole trả về mô hình của vai trò được chỉ định, nếu chưa cấu hình thì trả về mô hình mặc định.
 func (ms *ModelSet) ForRole(role string) agentcore.ChatModel {
 	ms.mu.RLock()
 	defer ms.mu.RUnlock()
@@ -144,8 +144,8 @@ func (ms *ModelSet) ForRole(role string) agentcore.ChatModel {
 	return ms.Default
 }
 
-// ForRoleWithFailover 返回带有单次请求级 fallback 的角色模型。
-// 仅当该角色显式配置了 fallbacks 时生效；未配置时退化为普通模型。
+// ForRoleWithFailover trả về mô hình của vai trò với fallback ở mức một yêu cầu.
+// Chỉ có hiệu lực khi vai trò đó được cấu hình fallbacks rõ ràng; nếu chưa cấu hình thì lui về mô hình thường.
 func (ms *ModelSet) ForRoleWithFailover(role string, report FailoverReporter) agentcore.ChatModel {
 	ms.mu.RLock()
 	defer ms.mu.RUnlock()
@@ -162,7 +162,7 @@ func (ms *ModelSet) ForRoleWithFailover(role string, report FailoverReporter) ag
 	}
 }
 
-// Summary 返回模型分配摘要（供日志使用）。
+// Summary trả về tóm tắt phân bổ mô hình (dùng cho log).
 func (ms *ModelSet) Summary() string {
 	ms.mu.RLock()
 	defer ms.mu.RUnlock()
@@ -179,8 +179,8 @@ func (ms *ModelSet) Summary() string {
 	return fmt.Sprintf("default=%s/%s %s", provider, name, strings.Join(parts, " "))
 }
 
-// CurrentSelection 返回角色当前生效的 provider/model。
-// role 为空或 "default" 时返回默认模型。
+// CurrentSelection trả về provider/model đang có hiệu lực hiện tại của vai trò.
+// khi role rỗng hoặc "default" thì trả về mô hình mặc định.
 func (ms *ModelSet) CurrentSelection(role string) (provider, model string, explicit bool) {
 	ms.mu.RLock()
 	defer ms.mu.RUnlock()
@@ -196,18 +196,18 @@ func (ms *ModelSet) CurrentSelection(role string) (provider, model string, expli
 	return provider, model, false
 }
 
-// Swap 切换默认模型或指定角色模型。
-// role 为空或 "default" 时切换默认模型；其他角色切换为显式覆盖。
+// Swap chuyển đổi mô hình mặc định hoặc mô hình của vai trò được chỉ định.
+// khi role rỗng hoặc "default" thì chuyển mô hình mặc định; các vai trò khác chuyển thành ghi đè rõ ràng.
 func (ms *ModelSet) Swap(role, provider, model string) error {
 	ms.mu.Lock()
 	defer ms.mu.Unlock()
 	pc, ok := ms.config.Providers[provider]
 	if !ok {
-		return fmt.Errorf("provider %q is not configured: %w", provider, errs.ErrConfig)
+		return fmt.Errorf("provider %q chưa được cấu hình: %w", provider, errs.ErrConfig)
 	}
 	next, err := createModelFromConfig(provider, model, pc, make(map[string]agentcore.ChatModel))
 	if err != nil {
-		return fmt.Errorf("切换模型失败: %w", err)
+		return fmt.Errorf("chuyển đổi mô hình thất bại: %w", err)
 	}
 
 	jsonSchema := ms.config.ModelJSONSchema(provider, model)
@@ -219,7 +219,7 @@ func (ms *ModelSet) Swap(role, provider, model string) error {
 	}
 
 	if !knownRoles[role] {
-		return fmt.Errorf("unknown role %q: %w", role, errs.ErrConfig)
+		return fmt.Errorf("vai trò không xác định %q: %w", role, errs.ErrConfig)
 	}
 
 	if existing, ok := ms.models[role]; ok {
@@ -237,16 +237,16 @@ func (ms *ModelSet) Swap(role, provider, model string) error {
 	return nil
 }
 
-// ResolveContextWindow 使用 ModelSet 的最新配置解析窗口，供运行时热切换后的
-// ContextManagerFactory 使用，避免捕获启动时的 Config 副本。
+// ResolveContextWindow sử dụng cấu hình mới nhất của ModelSet để phân tích cửa sổ, phục vụ cho
+// ContextManagerFactory sử dụng, tránh bắt giữ bản sao Config lúc khởi động.
 func (ms *ModelSet) ResolveContextWindow(provider, model string) (int, ContextWindowSource) {
 	ms.mu.RLock()
 	defer ms.mu.RUnlock()
 	return ms.config.ResolveContextWindow(provider, model)
 }
 
-// ApplyPrepared 提交一个已成功构建的候选 ModelSet。已有 SwappableModel 的地址
-// 保持不变，因此已装配的 Worker/Arbiter 会在下一次请求自动使用新客户端。
+// ApplyPrepared gửi một ModelSet ứng viên đã được xây dựng thành công. Địa chỉ của SwappableModel hiện có
+// được giữ nguyên, vì vậy Worker/Arbiter đã lắp đặt sẽ tự động dùng client mới ở lần yêu cầu tiếp theo.
 func (ms *ModelSet) ApplyPrepared(candidate *ModelSet) {
 	if candidate == nil {
 		return
@@ -278,8 +278,8 @@ func (ms *ModelSet) fallbackTargets(role string) []modelTarget {
 	return append([]modelTarget(nil), ms.fallbacks[role]...)
 }
 
-// ModelName 从 ChatModel 中提取当前模型名，失败返回空字符串。
-// 支持 SwappableModel 的热切换：调用时总是返回最新值。
+// ModelName trích xuất tên mô hình hiện tại từ ChatModel, nếu thất bại trả về chuỗi rỗng.
+// Hỗ trợ hot-swap của SwappableModel: khi gọi luôn trả về giá trị mới nhất.
 func ModelName(m agentcore.ChatModel) string {
 	if info, ok := m.(interface{ Info() llm.ModelInfo }); ok {
 		return info.Info().Name
@@ -287,7 +287,7 @@ func ModelName(m agentcore.ChatModel) string {
 	return ""
 }
 
-// ModelProvider 从 ChatModel 中提取当前 provider 名称，失败返回空字符串。
+// ModelProvider trích xuất tên provider hiện tại từ ChatModel, nếu thất bại trả về chuỗi rỗng.
 func ModelProvider(m agentcore.ChatModel) string {
 	if info, ok := m.(interface{ Info() llm.ModelInfo }); ok {
 		return info.Info().Provider
@@ -298,16 +298,16 @@ func ModelProvider(m agentcore.ChatModel) string {
 	return ""
 }
 
-// NewModelSet 根据配置创建多模型集合。
-// 相同 provider+model 组合复用同一个实例。
+// NewModelSet tạo tập hợp nhiều mô hình dựa trên cấu hình.
+// Tổ hợp provider+model giống nhau sẽ tái sử dụng cùng một instance.
 func NewModelSet(cfg Config) (*ModelSet, error) {
 	cache := make(map[string]agentcore.ChatModel)
 
-	// 创建默认模型
+	// tạo mô hình mặc định
 	defaultPC := cfg.DefaultProviderConfig()
 	defaultModel, err := createModelFromConfig(cfg.Provider, cfg.ModelName, defaultPC, cache)
 	if err != nil {
-		return nil, fmt.Errorf("default model: %w", err)
+		return nil, fmt.Errorf("model mặc định: %w", err)
 	}
 
 	ms := &ModelSet{
@@ -317,18 +317,18 @@ func NewModelSet(cfg Config) (*ModelSet, error) {
 		config:    cfg,
 	}
 
-	// 创建角色覆盖模型
+	// tạo mô hình ghi đè theo vai trò
 	for role, rc := range cfg.Roles {
 		pc, ok := cfg.Providers[rc.Provider]
 		if !ok {
-			return nil, fmt.Errorf("role %s references unknown provider %q: %w", role, rc.Provider, errs.ErrConfig)
+			return nil, fmt.Errorf("vai trò %s tham chiếu provider không xác định %q: %w", role, rc.Provider, errs.ErrConfig)
 		}
 		m, err := createModelFromConfig(rc.Provider, rc.Model, pc, cache)
 		if err != nil {
-			return nil, fmt.Errorf("role %s model: %w", role, err)
+			return nil, fmt.Errorf("model của vai trò %s: %w", role, err)
 		}
 		ms.models[role] = NewSwappableModel(rc.Provider, rc.Model, m, cfg.ModelJSONSchema(rc.Provider, rc.Model))
-		slog.Info("角色模型分配", "module", "config", "role", role, "provider", rc.Provider, "model", rc.Model)
+		slog.Info("phân bổ mô hình theo vai trò", "module", "config", "role", role, "provider", rc.Provider, "model", rc.Model)
 		if len(rc.Fallbacks) == 0 {
 			continue
 		}
@@ -337,11 +337,11 @@ func NewModelSet(cfg Config) (*ModelSet, error) {
 		for _, fallback := range rc.Fallbacks {
 			fpc, ok := cfg.Providers[fallback.Provider]
 			if !ok {
-				return nil, fmt.Errorf("role %s fallback references unknown provider %q: %w", role, fallback.Provider, errs.ErrConfig)
+				return nil, fmt.Errorf("fallback của vai trò %s tham chiếu provider không xác định %q: %w", role, fallback.Provider, errs.ErrConfig)
 			}
 			fm, err := createModelFromConfig(fallback.Provider, fallback.Model, fpc, cache)
 			if err != nil {
-				return nil, fmt.Errorf("role %s fallback %s/%s: %w", role, fallback.Provider, fallback.Model, err)
+				return nil, fmt.Errorf("fallback của vai trò %s %s/%s: %w", role, fallback.Provider, fallback.Model, err)
 			}
 			targets = append(targets, modelTarget{
 				provider:   fallback.Provider,
@@ -356,7 +356,7 @@ func NewModelSet(cfg Config) (*ModelSet, error) {
 	return ms, nil
 }
 
-// createModelFromConfig 创建或复用 ChatModel 实例。
+// createModelFromConfig tạo hoặc tái sử dụng instance ChatModel.
 func createModelFromConfig(providerKey, model string, pc ProviderConfig, cache map[string]agentcore.ChatModel) (agentcore.ChatModel, error) {
 	cacheKey := providerKey + "|" + model
 	if m, ok := cache[cacheKey]; ok {
@@ -365,7 +365,7 @@ func createModelFromConfig(providerKey, model string, pc ProviderConfig, cache m
 
 	providerType, err := pc.ProviderType(providerKey)
 	if err != nil {
-		return nil, fmt.Errorf("解析 provider 类型失败: %w", err)
+		return nil, fmt.Errorf("phân tích kiểu provider thất bại: %w", err)
 	}
 	providerExtra := cloneMap(pc.Extra)
 	if pc.API != "" {
@@ -581,7 +581,7 @@ func (m *failoverModel) reportFailover(from, to modelTarget, reason string, err 
 
 func (m *failoverModel) startAttempt(ctx context.Context, target modelTarget, messages []agentcore.Message, tools []agentcore.ToolSpec, opts ...agentcore.CallOption) (<-chan agentcore.StreamEvent, *agentcore.LLMResponse, error) {
 	if target.model == nil {
-		return nil, nil, fmt.Errorf("no model configured")
+		return nil, nil, fmt.Errorf("chưa cấu hình model")
 	}
 
 	streamCh, err := target.model.GenerateStream(ctx, messages, tools, opts...)

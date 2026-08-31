@@ -18,23 +18,23 @@ func TestCommandInputHighlightsOnlyRegisteredCommands(t *testing.T) {
 	m := Model{textarea: textarea.New()}
 	m.textarea.Focus()
 
-	for _, input := range []string{"/config", "/model writer", "/plan"} { // /plan 是 /cocreate 别名
+	for _, input := range []string{"/config", "/model writer", "/plan"} { // /plan là bí danh của /cocreate
 		m.textarea.SetValue(input)
 		m.syncCommandInputHighlight()
 		if m.commandToken == "" {
-			t.Errorf("已注册命令 %q 应被识别", input)
+			t.Errorf("Lệnh đã đăng ký %q phải được nhận diện", input)
 		}
 		plain := m.textarea.View()
 		if colored := highlightCommandToken(plain, input, m.commandToken); colored == plain {
-			t.Errorf("已注册命令 %q 的实际渲染没有变色", input)
+			t.Errorf("Kết xuất thực tế của lệnh đã đăng ký %q không đổi màu", input)
 		}
 	}
 
-	for _, input := range []string{"普通输入", "/con", "/unknown"} {
+	for _, input := range []string{"Nhập thông thường", "/con", "/unknown"} {
 		m.textarea.SetValue(input)
 		m.syncCommandInputHighlight()
 		if m.commandToken != "" {
-			t.Errorf("非完整命令 %q 不应高亮，token=%q", input, m.commandToken)
+			t.Errorf("Lệnh chưa hoàn chỉnh %q không nên được tô sáng, token=%q", input, m.commandToken)
 		}
 	}
 }
@@ -46,16 +46,16 @@ func TestCommandInputDoesNotHighlightArguments(t *testing.T) {
 
 	m := Model{textarea: textarea.New()}
 	m.textarea.Focus()
-	m.textarea.SetValue("/reopen 继续创作")
+	m.textarea.SetValue("/reopen tiếp tục sáng tác")
 	m.textarea.CursorEnd()
 	m.syncCommandInputHighlight()
 
 	plainView := m.textarea.View()
 	view := highlightCommandToken(plainView, m.textarea.Value(), m.commandToken)
 	if stripped := ansi.Strip(view); stripped != ansi.Strip(plainView) {
-		t.Fatalf("高亮不应改变输入内容: %q", stripped)
+		t.Fatalf("Tô sáng không nên thay đổi nội dung Nhập: %q", stripped)
 	}
-	if !strings.Contains(view, "/reopen"+resetForeground+" 继续创作") {
-		t.Fatalf("命令后的参数没有恢复正文颜色: %q", view)
+	if !strings.Contains(view, "/reopen"+resetForeground+" tiếp tục sáng tác") {
+		t.Fatalf("Tham số sau lệnh không khôi phục màu văn bản chính: %q", view)
 	}
 }

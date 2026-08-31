@@ -15,24 +15,24 @@ func TestBookStorePersistsCanonicalDataAndReadableProjection(t *testing.T) {
 	if err := s.Init(); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.Book.Save(domain.BookMetadata{Title: " 长夜将明 ", Synopsis: " 少年守住最后一盏灯。 "}); err != nil {
+	if err := s.Book.Save(domain.BookMetadata{Title: " Đêm dài sắp sáng ", Synopsis: " Chàng thiếu niên giữ lấy ngọn đèn cuối cùng. "}); err != nil {
 		t.Fatal(err)
 	}
 	book, err := s.Book.Load()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if book.Title != "长夜将明" || book.Synopsis != "少年守住最后一盏灯。" {
-		t.Fatalf("unexpected book metadata: %+v", book)
+	if book.Title != "Đêm dài sắp sáng" || book.Synopsis != "Chàng thiếu niên giữ lấy ngọn đèn cuối cùng." {
+		t.Fatalf("metadata sách không như mong đợi: %+v", book)
 	}
 	projection, err := os.ReadFile(filepath.Join(dir, "book.md"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if text := string(projection); !strings.Contains(text, "《长夜将明》") || !strings.Contains(text, "少年守住最后一盏灯。") {
-		t.Fatalf("unexpected book projection: %s", text)
+	if text := string(projection); !strings.Contains(text, "《Đêm dài sắp sáng》") || !strings.Contains(text, "Chàng thiếu niên giữ lấy ngọn đèn cuối cùng.") {
+		t.Fatalf("projection sách không như mong đợi: %s", text)
 	}
-	if err := s.Book.Save(domain.BookMetadata{Title: "空简介"}); err == nil {
-		t.Fatal("empty synopsis must be rejected")
+	if err := s.Book.Save(domain.BookMetadata{Title: "Tóm tắt trống"}); err == nil {
+		t.Fatal("không được chấp nhận synopsis trống")
 	}
 }

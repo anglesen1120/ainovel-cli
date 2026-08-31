@@ -10,7 +10,7 @@ import (
 	"github.com/voocel/ainovel-cli/internal/host"
 )
 
-// renderStateContent 生成状态侧栏的纯内容(不含边框/外框)，供 stateVP.SetContent 使用。
+// renderStateContent sinh nội dung thuần của sidebar trạng thái(không gồm viền/khung ngoài), để stateVP.SetContent sử dụng.
 func renderStateContent(snap host.UISnapshot, contentW int) string {
 	contentW = max(12, contentW)
 	agents := sidebarAgents(snap.Agents)
@@ -23,46 +23,46 @@ func renderStateContent(snap host.UISnapshot, contentW int) string {
 	}
 
 	var overview strings.Builder
-	overview.WriteString(renderField("运行态", snapshotRuntimeStateLabel(snap.RuntimeState)))
-	overview.WriteString(renderField("阶段", snapshotPhaseLabel(snap.Phase)))
-	overview.WriteString(renderField("流程", snapshotFlowLabel(snap.Flow)))
+	overview.WriteString(renderField("Trạng thái", snapshotRuntimeStateLabel(snap.RuntimeState)))
+	overview.WriteString(renderField("Giai đoạn", snapshotPhaseLabel(snap.Phase)))
+	overview.WriteString(renderField("Luồng", snapshotFlowLabel(snap.Flow)))
 	if snap.AdvanceMode == "review" {
-		advance := "逐章验收"
+		advance := "Duyệt từng chương"
 		if snap.AdvancePermitChapter > 0 {
-			advance = fmt.Sprintf("已放行第 %d 章", snap.AdvancePermitChapter)
+			advance = fmt.Sprintf("Đã cho qua chương %d", snap.AdvancePermitChapter)
 		}
-		overview.WriteString(renderField("推进", advance))
+		overview.WriteString(renderField("Tiến trình", advance))
 	} else if snap.AdvanceMode == "auto" {
-		overview.WriteString(renderField("推进", "自动"))
+		overview.WriteString(renderField("Tiến trình", "Tự động"))
 	}
 	if snap.Layered {
-		overview.WriteString(renderField("已完成", fmt.Sprintf("%d 章", snap.CompletedCount)))
-		// 分层动态规划：右栏只展示当前弧已展开的章节，"已规划"也用同一个口径，
-		// 否则会把骨架弧 EstimatedChapters 的粗估算（如 92）混进来，与可见大纲对不上。
-		// progress.TotalChapters 那个值仅用于内部 ContextProfile 决策，不要泄漏到 UI。
+		overview.WriteString(renderField("Đã hoàn tất", fmt.Sprintf("%d chương", snap.CompletedCount)))
+		// quy hoạch động phân tầng: cột phải chỉ hiển thị các chương đã bung của arc hiện tại, "Đã lập kế hoạch" cũng dùng cùng một tiêu chí,
+		// nếu không sẽ trộn ước tính thô EstimatedChapters của arc khung (như 92) vào đây, không khớp dàn ý đang thấy.
+		// progress.TotalChapters giá trị đó chỉ dùng cho quyết định ContextProfile nội bộ, không để lộ ra UI。
 		if planned := len(snap.Outline); planned > 0 {
-			overview.WriteString(renderField("已规划", fmt.Sprintf("%d 章", planned)))
+			overview.WriteString(renderField("Đã lập kế hoạch", fmt.Sprintf("%d chương", planned)))
 		}
 	} else {
 		switch {
 		case snap.TotalChapters > 0:
-			overview.WriteString(renderField("进度", fmt.Sprintf("%d / %d 章", snap.CompletedCount, snap.TotalChapters)))
+			overview.WriteString(renderField("Tiến độ", fmt.Sprintf("%d / %d chương", snap.CompletedCount, snap.TotalChapters)))
 		default:
-			overview.WriteString(renderField("已完成", fmt.Sprintf("%d 章", snap.CompletedCount)))
+			overview.WriteString(renderField("Đã hoàn tất", fmt.Sprintf("%d chương", snap.CompletedCount)))
 		}
 	}
-	overview.WriteString(renderField("字数", formatNumber(snap.TotalWordCount)))
+	overview.WriteString(renderField("Số chữ", formatNumber(snap.TotalWordCount)))
 	if label, ch := inProgressDisplay(snap); label != "" {
-		overview.WriteString(renderField(label, fmt.Sprintf("第 %d 章", ch)))
+		overview.WriteString(renderField(label, fmt.Sprintf("Chương %d", ch)))
 	}
 	if headline := snapshotHeadline(snap); headline != "" {
-		label := "当前"
+		label := "Hiện tại"
 		if !snap.IsRunning {
-			label = "待恢复"
+			label = "Chờ khôi phục"
 		}
 		overview.WriteString(renderHighlightField(label, truncate(headline, contentW-10)))
 	}
-	sections = append(sections, renderSidebarSection("概览", overview.String(), contentW))
+	sections = append(sections, renderSidebarSection("Tổng quan", overview.String(), contentW))
 
 	if len(agents) > 0 {
 		var agentBody strings.Builder
@@ -71,36 +71,36 @@ func renderStateContent(snap host.UISnapshot, contentW int) string {
 			agentBody.WriteString("\n")
 		}
 		if len(idleAgents) > 0 {
-			agentBody.WriteString(lipgloss.NewStyle().Foreground(colorDim).Render("待命: " + truncate(strings.Join(idleAgents, " · "), max(8, contentW-2))))
+			agentBody.WriteString(lipgloss.NewStyle().Foreground(colorDim).Render("Chờ: " + truncate(strings.Join(idleAgents, " · "), max(8, contentW-2))))
 			agentBody.WriteString("\n")
 		}
-		sections = append(sections, renderSidebarSection("运行角色", agentBody.String(), contentW))
+		sections = append(sections, renderSidebarSection("Vai trò đang chạy", agentBody.String(), contentW))
 	}
 
 	if len(snap.PendingRewrites) > 0 {
 		var rewrite strings.Builder
-		rewrite.WriteString(renderHighlightField("队列", fmt.Sprintf("%v", snap.PendingRewrites)))
+		rewrite.WriteString(renderHighlightField("Hàng đợi", fmt.Sprintf("%v", snap.PendingRewrites)))
 		if snap.RewriteReason != "" {
-			rewrite.WriteString(renderField("原因", truncate(snap.RewriteReason, contentW-10)))
+			rewrite.WriteString(renderField("Lý do", truncate(snap.RewriteReason, contentW-10)))
 		}
-		sections = append(sections, renderSidebarSection("返工", rewrite.String(), contentW))
+		sections = append(sections, renderSidebarSection("Viết lại", rewrite.String(), contentW))
 	}
 
 	if snap.PendingSteer != "" {
-		sections = append(sections, renderSidebarSection("干预",
-			renderHighlightField("待处理", truncate(snap.PendingSteer, contentW-10)), contentW))
+		sections = append(sections, renderSidebarSection("Can thiệp",
+			renderHighlightField("Chờ xử lý", truncate(snap.PendingSteer, contentW-10)), contentW))
 	}
 	if snap.HasAdvanceHold {
-		sections = append(sections, renderSidebarSection("验收停靠",
-			renderHighlightField("等待", truncate(snap.AdvanceHoldReason, contentW-10)), contentW))
+		sections = append(sections, renderSidebarSection("Điểm dừng duyệt",
+			renderHighlightField("Đang chờ", truncate(snap.AdvanceHoldReason, contentW-10)), contentW))
 	}
 
 	if body := renderUsageSidebar(snap, contentW); body != "" {
-		sections = append(sections, renderSidebarSection("用量", body, contentW))
+		sections = append(sections, renderSidebarSection("Mức dùng", body, contentW))
 	}
 
 	if body := renderCacheSidebar(snap, contentW); body != "" {
-		sections = append(sections, renderSidebarSection("缓存", body, contentW))
+		sections = append(sections, renderSidebarSection("Bộ nhớ đệm", body, contentW))
 	}
 
 	return strings.Join(sections, "\n\n")
@@ -122,7 +122,7 @@ func renderAgentLine(agent host.AgentSnapshot, width int) string {
 	if agent.Tool != "" {
 		detail = agent.Tool
 	}
-	if agent.State == "idle" && detail == "待命" {
+	if agent.State == "idle" && detail == "Chờ" {
 		detail = ""
 	}
 	if detail != "" && detail != taskLine {
@@ -188,10 +188,10 @@ func sidebarIdleAgents(agents []host.AgentSnapshot) []string {
 	return names
 }
 
-// inProgressDisplay 计算"进行中"字段的标签和章节号。
-// 根据 flow 选择动词（打磨/重写/写作）；in_progress_chapter 与 flow 不匹配时视为 stale：
-//   - polishing/rewriting 模式下章节不在 pending_rewrites 中 → 回退到队列首章
-//   - 字段为 0 时不渲染
+// inProgressDisplay tính nhãn và số chương cho trường “đang chạy”。
+// chọn động từ theo flow (trau chuốt/viết lại/viết); in_progress_chapter và flow không khớp thì xem là stale:
+//   - ở chế độ polishing/rewriting, chương không nằm trong pending_rewrites -> quay về Hàng đợi chương đầu
+//   - không render khi trường là 0
 func inProgressDisplay(snap host.UISnapshot) (label string, chapter int) {
 	ch := snap.InProgressChapter
 	switch snap.Flow {
@@ -202,7 +202,7 @@ func inProgressDisplay(snap host.UISnapshot) (label string, chapter int) {
 			}
 			ch = snap.PendingRewrites[0]
 		}
-		return "打磨中", ch
+		return "trau chuốtTrung bình", ch
 	case "rewriting":
 		if ch <= 0 || !slices.Contains(snap.PendingRewrites, ch) {
 			if len(snap.PendingRewrites) == 0 {
@@ -210,30 +210,30 @@ func inProgressDisplay(snap host.UISnapshot) (label string, chapter int) {
 			}
 			ch = snap.PendingRewrites[0]
 		}
-		return "重写中", ch
+		return "viết lạiTrung bình", ch
 	default:
 		if ch <= 0 {
 			return "", 0
 		}
-		return "写作中", ch
+		return "viếtTrung bình", ch
 	}
 }
 
 func snapshotHeadline(snap host.UISnapshot) string {
 	if snap.PendingSteer != "" {
 		if !snap.IsRunning {
-			return "待恢复：处理用户干预"
+			return "Chờ khôi phục：Xử lý can thiệp của người dùng"
 		}
-		return "等待处理用户干预"
+		return "Đang chờ xử lý can thiệp của người dùng"
 	}
 	if len(snap.PendingRewrites) > 0 {
 		if !snap.IsRunning {
-			return "待恢复：返工处理"
+			return "Chờ khôi phục：Xử lý viết lại"
 		}
-		return "等待返工处理"
+		return "Đang chờ xử lý viết lại"
 	}
 	if snap.AdvanceMode == "review" && !snap.IsRunning && snap.Phase == "writing" {
-		return "逐章验收：等待放行下一章"
+		return "Duyệt từng chương：Đang chờ mở khóa chương tiếp theo"
 	}
 	return ""
 }
@@ -241,15 +241,15 @@ func snapshotHeadline(snap host.UISnapshot) string {
 func snapshotPhaseLabel(phase string) string {
 	switch phase {
 	case "premise":
-		return "前提"
+		return "Tiền đề"
 	case "outline":
-		return "大纲"
+		return "Dàn ý"
 	case "writing":
-		return "写作"
+		return "viết"
 	case "complete":
-		return "完成"
+		return "Hoàn tất"
 	case "init":
-		return "初始化"
+		return "Khởi tạo"
 	default:
 		if phase == "" {
 			return "-"
@@ -261,15 +261,15 @@ func snapshotPhaseLabel(phase string) string {
 func snapshotRuntimeStateLabel(state string) string {
 	switch state {
 	case "running":
-		return "运行中"
+		return "Đang chạy"
 	case "pausing":
-		return "暂停中"
+		return "Tạm dừng trung bình"
 	case "paused":
-		return "已暂停"
+		return "Đã tạm dừng"
 	case "completed":
-		return "已完成"
+		return "Đã hoàn tất"
 	default:
-		return "空闲"
+		return "Rảnh"
 	}
 }
 
@@ -278,15 +278,15 @@ func snapshotFlowLabel(flow string) string {
 	case "":
 		return "-"
 	case "writing":
-		return "写作"
+		return "viết"
 	case "reviewing":
-		return "评审"
+		return "Thẩm định"
 	case "rewriting":
-		return "重写"
+		return "viết lại"
 	case "polishing":
-		return "打磨"
+		return "trau chuốt"
 	case "steering":
-		return "干预"
+		return "Can thiệp"
 	default:
 		return flow
 	}
@@ -297,22 +297,22 @@ func renderUsageSidebar(snap host.UISnapshot, width int) string {
 		return ""
 	}
 	var b strings.Builder
-	b.WriteString(renderField("输入", formatTokensCompact(snap.TotalInputTokens)))
-	b.WriteString(renderField("输出", formatTokensCompact(snap.TotalOutputTokens)))
+	b.WriteString(renderField("Nhập", formatTokensCompact(snap.TotalInputTokens)))
+	b.WriteString(renderField("Xuất", formatTokensCompact(snap.TotalOutputTokens)))
 	if cost := formatCostUSD(snap.TotalCostUSD); cost != "" {
-		b.WriteString(renderField("费用", cost))
+		b.WriteString(renderField("Chi phí", cost))
 	}
 	if saved := formatCostUSD(snap.TotalSavedUSD); saved != "" {
-		b.WriteString(renderField("节省", saved))
+		b.WriteString(renderField("Tiết kiệm", saved))
 	}
 	if snap.BudgetLimitUSD > 0 {
 		pct := snap.TotalCostUSD / snap.BudgetLimitUSD * 100
-		b.WriteString(renderField("预算", fmt.Sprintf("$%.2f/$%.2f (%.0f%%)", snap.TotalCostUSD, snap.BudgetLimitUSD, pct)))
+		b.WriteString(renderField("Ngân sách", fmt.Sprintf("$%.2f/$%.2f (%.0f%%)", snap.TotalCostUSD, snap.BudgetLimitUSD, pct)))
 	}
 
 	agentStats := usageStatsByCost(snap.CachePerAgent)
 	if len(agentStats) > 0 {
-		b.WriteString(renderUsageGroupHeader("角色", width))
+		b.WriteString(renderUsageGroupHeader("Vai trò", width))
 		limit := min(len(agentStats), 4)
 		for i := 0; i < limit; i++ {
 			a := agentStats[i]
@@ -322,7 +322,7 @@ func renderUsageSidebar(snap host.UISnapshot, width int) string {
 	}
 	modelStats := usageStatsByCost(snap.CachePerModel)
 	if len(modelStats) > 0 {
-		b.WriteString(renderUsageGroupHeader("模型", width))
+		b.WriteString(renderUsageGroupHeader("Mô hình", width))
 		limit := min(len(modelStats), 4)
 		for i := 0; i < limit; i++ {
 			a := modelStats[i]
@@ -362,8 +362,8 @@ func renderUsageLine(name string, color lipgloss.TerminalColor, input, output in
 	if costStr := formatCostUSD(cost); costStr != "" {
 		right += " · " + costStr
 	}
-	// 名称恰好占满固定列宽时，padding 不会留下尾随空格；显式分隔，避免
-	// "gpt-5.6-sol5.3k" 这类模型名与用量粘连。
+	// khi tên vừa khít độ rộng cột cố định thì padding sẽ không để lại khoảng trắng cuối; thêm dấu phân cách rõ ràng để tránh
+	// "gpt-5.6-sol5.3k" kiểu tên mô hình dính với Mức dùng.
 	return fitInlineLine(nameCell+" "+lipgloss.NewStyle().Foreground(colorDim).Render(right), width)
 }
 
@@ -382,24 +382,24 @@ func modelDisplayName(model string) string {
 	return model
 }
 
-// renderCacheSidebar 渲染左栏"缓存"区块。
+// renderCacheSidebar hiển thị khối "Bộ nhớ đệm" ở cột trái.
 //
-// 三种态：
-//  1. 完全没消费 token：返回空，section 不渲染
-//  2. 当前会话所有 role 都跑的是不支持 prompt cache 的模型：仅渲染一行"未启用"提示
-//  3. 已启用：顶部"命中率累计/近10 · 节省 · 读/写"+ 分隔 + per-role 行
+// Ba trạng thái:
+//  1. Chưa tiêu thụ token nào: trả về rỗng, section không hiển thị
+//  2. Toàn bộ vai trò của phiên hiện tại đang dùng mô hình không hỗ trợ prompt cache: chỉ hiển thị một dòng nhắc "Chưa bật"
+//  3. Đã bật: chỉ số trên cùng "tỷ lệ trúng trung bình tích lũy/10 gần đây · tiết kiệm · đọc/ghi" + phân cách + các dòng theo vai trò
 //
-// per-role 行 capable 时显示"累计/近10%"双数字；不 capable 时显示"未启用"。
-// 通过累计 vs 近 N 次的对比可以识别"前期拖累"vs"稳态低命中"。
+// Các dòng theo vai trò khi có hỗ trợ sẽ hiển thị cặp số "tích lũy/10 gần đây%"; khi không hỗ trợ thì hiển thị "Chưa bật".
+// So sánh giữa tích lũy và N lần gần đây giúp nhận ra "giai đoạn đầu kéo xuống" so với "trạng thái ổn định trúng thấp".
 func renderCacheSidebar(snap host.UISnapshot, width int) string {
-	// 上游 streaming 没发 OpenAI 的 final usage chunk —— 累计数据全为 0，
-	// 但这不是"没启用 cache"也不是"用量太低被门控藏起来"，必须显式提示，
-	// 否则用户会一直以为左栏写了缓存代码却显示不出来。优先级最高。
+	// streaming phía trên không gửi chunk usage cuối của OpenAI — toàn bộ dữ liệu tích lũy đều bằng 0,
+	// nhưng đây không phải là "chưa bật cache" cũng không phải "mức dùng quá thấp bị chặn ẩn đi", phải báo rõ,
+	// nếu không người dùng sẽ cứ nghĩ là mã Bộ nhớ đệm đã có ở cột trái mà lại không hiện ra. Ưu tiên cao nhất.
 	if snap.MissingAssistantUsage > 0 && snap.TotalInputTokens <= 0 {
 		warn := lipgloss.NewStyle().Foreground(colorError).Bold(true).
-			Render(fmt.Sprintf("⚠ 上游未返 usage（%d 次）", snap.MissingAssistantUsage))
+			Render(fmt.Sprintf("⚠ upstream chưa trả usage (%d lần)", snap.MissingAssistantUsage))
 		hint := lipgloss.NewStyle().Foreground(colorDim).Italic(true).
-			Render(truncate("检查 provider stream_options.include_usage", max(8, width-2)))
+			Render(truncate("kiểm tra provider stream_options.include_usage", max(8, width-2)))
 		return warn + "\n" + hint + "\n"
 	}
 
@@ -407,49 +407,49 @@ func renderCacheSidebar(snap host.UISnapshot, width int) string {
 		return ""
 	}
 
-	// 全程未启用 → 显示一行解释，避免用户误判为"0% 命中需要排查"
+	// toàn bộ thời gian đều Chưa bật -> hiển thị một dòng giải thích, tránh người dùng hiểu sai là "0% trúng trung bình cần kiểm tra"
 	if !snap.OverallCacheCapable && snap.TotalCacheReadTokens == 0 && snap.TotalCacheWriteTokens == 0 {
 		return lipgloss.NewStyle().Foreground(colorDim).Italic(true).
-			Render(truncate("当前模型未启用 prompt cache", max(8, width-2))) + "\n"
+			Render(truncate("Hiện tạiMô hìnhChưa bật prompt cache", max(8, width-2))) + "\n"
 	}
 
 	var b strings.Builder
 
-	// 顶部综合指标：累计 + 近 N 各占一行，标签明示，避免 "X% · 近N Y%" 这种
-	// 三种分隔符（百分号 / 中点 / 文字）混杂导致语义不清。
+	// các chỉ số tổng hợp ở trên cùng: tích lũy + 10 gần đây mỗi thứ một dòng, nhãn ghi rõ để tránh
+	// ba kiểu dấu phân tách (phần trăm / chấm trúng trung bình / chữ) lẫn lộn làm mơ hồ ý nghĩa.
 	overallHit := cacheHitRate(snap.TotalCacheReadTokens, snap.TotalInputTokens)
-	b.WriteString(renderField("累计命中", colorPercent(overallHit)))
+	b.WriteString(renderField("Tỷ lệ trúng trung bình tích lũy", colorPercent(overallHit)))
 	if snap.OverallRecentSamples > 0 && snap.OverallRecentInput > 0 {
 		recent := cacheHitRate(snap.OverallRecentCacheRead, snap.OverallRecentInput)
-		b.WriteString(renderField(fmt.Sprintf("近%d命中", snap.OverallRecentSamples), colorPercent(recent)))
+		b.WriteString(renderField(fmt.Sprintf("Tỷ lệ trúng trung bình %d gần đây", snap.OverallRecentSamples), colorPercent(recent)))
 	}
 
 	if savedStr := formatCostUSD(snap.TotalSavedUSD); savedStr != "" {
-		b.WriteString(renderField("节省", savedStr))
+		b.WriteString(renderField("Tiết kiệm", savedStr))
 	}
 
-	// 读/写量分两行。写量为 0 在 OpenAI / Gemini 系协议是常态——
-	// 这两家是自动透明 caching，cache 写入完全免费（首次未命中按正常输入价，
-	// 建立 cache 不收任何溢价），所以协议本身不暴露 cache_creation 字段，没必要。
-	// 只有 Anthropic / Bedrock 系才报写量，因为他们写要加价（5m +25%/1h +100%），
-	// 必须把这个量给用户用于计费。
-	b.WriteString(renderField("缓存读量", formatTokensCompact(snap.TotalCacheReadTokens)))
+	// lượng đọc/ghi tách thành hai dòng. Lượng ghi bằng 0 trong các họ Giao thức OpenAI / Gemini là bình thường —
+	// hai bên này dùng caching tự động minh bạch, việc ghi cache hoàn toàn miễn phí (lần đầu chưa trúng tính theo giá nhập bình thường,
+	// dựng cache không thu thêm phụ phí nào), nên bản thân Giao thức không lộ trường cache_creation, không cần thiết.
+	// chỉ họ Anthropic / Bedrock mới báo lượng ghi, vì họ tính phí ghi thêm (5m +25%/1h +100%),
+	// cần đưa lượng này cho người dùng để tính phí.
+	b.WriteString(renderField("Lượng đọc Bộ nhớ đệm", formatTokensCompact(snap.TotalCacheReadTokens)))
 	if snap.TotalCacheWriteTokens > 0 {
-		b.WriteString(renderField("缓存写量", formatTokensCompact(snap.TotalCacheWriteTokens)))
+		b.WriteString(renderField("Lượng ghi Bộ nhớ đệm", formatTokensCompact(snap.TotalCacheWriteTokens)))
 	} else if snap.TotalCacheReadTokens > 0 {
-		hint := lipgloss.NewStyle().Foreground(colorDim).Italic(true).Render("(自动缓存无溢价)")
-		b.WriteString(renderField("缓存写量", "0 "+hint))
+		hint := lipgloss.NewStyle().Foreground(colorDim).Italic(true).Render("(Tự động bộ nhớ đệm không phụ trội)")
+		b.WriteString(renderField("Bộ nhớ đệm ghi", "0 "+hint))
 	}
 
-	// 断裂 = 前缀未缩短而命中骤降（合法下降如换章/压缩已豁免）。次数多通常
-	// 指向服务端逐出或中转轮询上游，详情看 tui.log 的"缓存链断裂"warn。
+	// Đứt gãy = tiền tố không được rút ngắn mà tỷ lệ trúng giảm mạnh (các đợt giảm hợp lệ như đổi chương/nén đã được miễn). Nhiều lần thường
+	// chỉ ra việc phía máy chủ đẩy ra hoặc tỷ lệ trúng chuyển sang lấy upstream theo vòng quay, chi tiết xem warn "đứt chuỗi bộ nhớ đệm" trong tui.log.
 	if snap.TotalCacheBreaks > 0 {
-		v := lipgloss.NewStyle().Foreground(colorReview).Render(fmt.Sprintf("%d 次", snap.TotalCacheBreaks))
-		b.WriteString(renderField("链路断裂", v))
+		v := lipgloss.NewStyle().Foreground(colorReview).Render(fmt.Sprintf("%d lần", snap.TotalCacheBreaks))
+		b.WriteString(renderField("Đứt liên kết", v))
 	}
 
-	// Arbiter 按设计不参与 prompt cache（KB 级一次性裁定，无稳定前缀可复用），
-	// 常驻"未启用"或"0%"只会引人排查；用量面板仍完整记它的账。
+	// Arbiter theo thiết kế không tham gia prompt cache (phân xử một lần cấp KB, không có tiền tố ổn định để tái sử dụng),
+	// Việc luôn hiển thị "Chưa bật" hoặc "0%" chỉ khiến người ta phải dò lỗi; bảng Mức dùng vẫn ghi nhận đầy đủ.
 	var roles []host.AgentCacheStat
 	for _, a := range snap.CachePerAgent {
 		if a.Role != "arbiter" {
@@ -468,56 +468,56 @@ func renderCacheSidebar(snap host.UISnapshot, width int) string {
 	return b.String()
 }
 
-// colorPercent 把百分比按命中率分档着色后转字符串，仅用于值列。
+// colorPercent tô màu phần trăm theo bậc dựa trên tỷ lệ trúng rồi chuyển thành chuỗi, chỉ dùng cho cột giá trị.
 func colorPercent(p float64) string {
 	return lipgloss.NewStyle().Foreground(cacheHitColor(p)).Bold(true).
 		Render(formatPercent(p))
 }
 
-// renderCacheAgentLine 渲染单个 role 行：role + 命中率 + 缓存读 / 总输入。
+// renderCacheAgentLine hiển thị một dòng role: role + tỷ lệ trúng + bộ nhớ đệm đọc / tổng nhập.
 //
-// 把分子分母都摆出来（cacheRead / input）让用户一眼就能验算命中率的来源，
-// 也能识别"高百分比但小样本"的侥幸数据（比如 100% / 1k 的可信度低于 80% / 300k）。
+// Đặt cả tử số lẫn mẫu số ra (cacheRead / input) để người dùng nhìn một cái là kiểm tra được nguồn gốc của tỷ lệ trúng,
+// cũng có thể nhận ra dữ liệu may rủi kiểu "phần trăm cao nhưng mẫu nhỏ" (ví dụ độ tin cậy của 100% / 1k thấp hơn 80% / 300k).
 //
-// 百分比优先用滑动窗稳态值；窗内无样本时回落到累计。整个左栏只有这一处用 "/"，
-// 语义专一（数学除号：cache 命中量 / 总输入量），不会与其它分隔符混淆。
+// Phần trăm ưu tiên dùng giá trị ổn định của cửa sổ trượt; khi trong cửa sổ không có mẫu thì quay về lũy tích. Toàn bộ cột trái chỉ dùng "/" ở chỗ này,
+// ngữ nghĩa chuyên một (dấu chia toán học: cache trúng lượng / tổng nhập lượng), sẽ không lẫn với các dấu phân tách khác.
 //
-// 三种态：
+// Ba trạng thái:
 //
-//	未启用     "WRITER        未启用"
-//	已启用     "WRITER        85%  · 323k / 394k"
-//	无 cache  显式"未启用"，不混进 0/0 干扰判读
+//	Chưa bật     "WRITER        Chưa bật"
+//	Đã bật     "WRITER        85%  · 323k / 394k"
+//	Không có cache  hiển thị rõ "Chưa bật", không lẫn vào 0/0 gây nhiễu khi đọc
 func renderCacheAgentLine(a host.AgentCacheStat, width int) string {
-	// role 名与"运行角色"区保持完全一致；Width 取 12 让最长的 ARCHITECT
-	// 仍能保留 1 列尾随空格做分隔，其它 role 自动右侧填充。
+	// Tên role phải hoàn toàn khớp với vùng "Vai trò đang chạy"; Width lấy 12 để ARCHITECT
+	// vẫn có thể giữ 1 cột khoảng trắng cuối để phân tách, các role khác tự động được đệm bên phải.
 	roleStyle := lipgloss.NewStyle().Foreground(eventAgentColor(a.Role)).Width(12)
 	role := roleStyle.Render(agentDisplayName(a.Role))
 
 	if !a.CacheCapable {
 		dim := lipgloss.NewStyle().Foreground(colorDim).Italic(true)
 		_ = width
-		return role + dim.Render("未启用")
+		return role + dim.Render("Chưa bật")
 	}
 
-	// 稳态命中率优先；窗内无样本时回落到累计。
+	// Ưu tiên tỷ lệ trúng ổn định; khi trong cửa sổ không có mẫu thì quay về lũy tích.
 	hit := cacheHitRate(a.RecentCacheRead, a.RecentInput)
 	if a.RecentSamples == 0 || a.RecentInput == 0 {
 		hit = cacheHitRate(a.CacheRead, a.Input)
 	}
-	// 百分比固定 4 列宽（"100%"），避免读量列在 "5%" 与 "85%" 之间左右跳。
+	// Phần trăm cố định rộng 4 cột ("100%"), để cột số lượng đọc không nhảy qua lại giữa "5%" và "85%".
 	pctCell := lipgloss.NewStyle().Width(4).
 		Render(colorPercent(hit))
 
-	// 累计读 / 累计输入 — 即便上方百分比是滑动窗值，分子分母都用累计，因为
-	// "看出规模"才是这一列的主诉求；百分比单独提供稳态信号即可。
+	// Lũy tích đọc / lũy tích nhập — dù phần trăm phía trên là giá trị cửa sổ trượt, tử số và mẫu số đều dùng lũy tích vì
+	// "nhìn ra quy mô" mới là mục tiêu chính của cột này; phần trăm chỉ cần cung cấp tín hiệu ổn định là đủ.
 	tokens := lipgloss.NewStyle().Foreground(colorDim).Render(
 		" · " + formatTokensCompact(a.CacheRead) + " / " + formatTokensCompact(a.Input))
 	_ = width
 	return role + pctCell + tokens
 }
 
-// cacheHitRate 在 input 已含 cacheRead 的语义下直接除得百分比。
-// input == 0 时返回 0，避免出现假命中。
+// cacheHitRate trong ngữ nghĩa input đã bao gồm cacheRead thì chia trực tiếp ra phần trăm.
+// khi input == 0 thì trả về 0, tránh xuất hiện tỷ lệ trúng giả.
 func cacheHitRate(cacheRead, input int) float64 {
 	if input <= 0 {
 		return 0
@@ -525,8 +525,8 @@ func cacheHitRate(cacheRead, input int) float64 {
 	return float64(cacheRead) / float64(input) * 100
 }
 
-// cacheHitColor 命中率染色：≥50% 绿 / 20–50% 黄 / <20% 红。
-// 用与上下文使用率相反的方向：缓存命中率越高越健康。
+// cacheHitColor tô màu tỷ lệ trúng: ≥50% xanh lá / 20–50% vàng / <20% đỏ.
+// Dùng hướng ngược với tỷ lệ sử dụng ngữ cảnh: tỷ lệ trúng bộ nhớ đệm càng cao càng khỏe.
 func cacheHitColor(percent float64) lipgloss.AdaptiveColor {
 	switch {
 	case percent >= 50:
@@ -548,8 +548,8 @@ func formatPercent(p float64) string {
 	return fmt.Sprintf("%.0f%%", p)
 }
 
-// formatTokensCompact 把 token 数渲染成 "8.2k" / "1.4M" 这种紧凑形式。
-// 用于狭窄的 per-role 行，避免和 formatNumber 的逗号风格挤出去。
+// formatTokensCompact hiển thị số token theo dạng gọn như "8.2k" / "1.4M".
+// Dùng cho các dòng per-role hẹp, tránh bị kiểu dấu phẩy của formatNumber lấn chỗ.
 func formatTokensCompact(n int) string {
 	if n <= 0 {
 		return "0"
@@ -566,15 +566,15 @@ func formatTokensCompact(n int) string {
 func contextScopeLabel(scope string) string {
 	switch scope {
 	case "baseline":
-		return "基线"
+		return "Cơ sở"
 	case "projected":
-		return "投影"
+		return "Dự báo"
 	case "recovered":
-		return "恢复"
+		return "Khôi phục"
 	case "committed":
-		return "已提交"
+		return "Đã gửi"
 	case "skipped":
-		return "熔断跳过"
+		return "Bỏ qua do ngắt mạch"
 	default:
 		return scope
 	}
@@ -585,11 +585,11 @@ func contextStrategyLabel(strategy string) string {
 	case "":
 		return ""
 	case "tool_result_microcompact":
-		return "工具结果微压缩"
+		return "Nén nhẹ kết quả công cụ"
 	case "light_trim":
-		return "轻裁剪"
+		return "Cắt nhẹ"
 	case "full_summary":
-		return "完整摘要"
+		return "Tóm tắt đầy đủ"
 	default:
 		return strategy
 	}
@@ -653,11 +653,11 @@ func agentOrder(name string) int {
 func agentStateLabel(state string) string {
 	switch state {
 	case "running":
-		return "运行中"
+		return "Đang chạy"
 	case "failed":
-		return "异常"
+		return "Bất thường"
 	case "idle":
-		return "待命"
+		return "Chờ"
 	default:
 		return state
 	}
@@ -692,21 +692,21 @@ func taskStatusColor(status string) lipgloss.AdaptiveColor {
 func taskKindLabel(kind string) string {
 	switch kind {
 	case "foundation_plan":
-		return "基础规划"
+		return "Lập nền tảng"
 	case "chapter_write":
-		return "章节写作"
+		return "Viết chương"
 	case "chapter_review":
-		return "章节评审"
+		return "Duyệt chương"
 	case "chapter_rewrite":
-		return "章节重写"
+		return "Viết lại chương"
 	case "chapter_polish":
-		return "章节打磨"
+		return "Hoàn thiện chương"
 	case "arc_expand":
-		return "弧展开"
+		return "Mở rộng cung"
 	case "volume_append":
-		return "下一卷规划"
+		return "Lên quyển tiếp"
 	case "steer_apply":
-		return "处理干预"
+		return "xử lý can thiệp"
 	default:
 		return kind
 	}

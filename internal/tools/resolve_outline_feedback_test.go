@@ -14,14 +14,14 @@ func TestResolveOutlineFeedbackClearsReviewedFeedback(t *testing.T) {
 	if err := st.Init(); err != nil {
 		t.Fatal(err)
 	}
-	if err := st.Outline.AppendOutlineFeedback(store.ChapterFeedback{Chapter: 1, StoryChanged: true, ChangeSummary: "主角提前离城"}); err != nil {
+	if err := st.Outline.AppendOutlineFeedback(store.ChapterFeedback{Chapter: 1, StoryChanged: true, ChangeSummary: "nhân vật chính rời thành sớm"}); err != nil {
 		t.Fatal(err)
 	}
 	tool := NewResolveOutlineFeedbackTool(st)
 	if err := llmcontract.ValidateStrictReady(tool.Schema()); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := tool.Execute(context.Background(), []byte(`{"reason":"后续计划不依赖主角所在城市"}`)); err != nil {
+	if _, err := tool.Execute(context.Background(), []byte(`{"reason":"kế hoạch tiếp theo không phụ thuộc thành phố nơi nhân vật chính đang ở"}`)); err != nil {
 		t.Fatal(err)
 	}
 	feedback, err := st.Outline.LoadPendingOutlineFeedback()
@@ -29,6 +29,6 @@ func TestResolveOutlineFeedbackClearsReviewedFeedback(t *testing.T) {
 		t.Fatalf("feedback=%+v err=%v", feedback, err)
 	}
 	if checkpoint := st.Checkpoints.LatestByStep(domain.GlobalScope(), "resolve_outline_feedback"); checkpoint == nil {
-		t.Fatal("缺少反馈处理 checkpoint")
+		t.Fatal("thiếu checkpoint xử lý phản hồi")
 	}
 }

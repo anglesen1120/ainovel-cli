@@ -1,147 +1,147 @@
-# 文风层(Voice Layer)设计
+# Thiết kế lớp văn phong
 
-> 状态:设计定稿 v2(2026-07-12 吸收外部评审:补覆盖语义、路径语义、拼装顺序、eval 入口、评测统计协议),**可实施**。
-> 优先级:先于控制面演进(docs/engine-arbiter.md)——AI 味是活跃的用户痛点。
+> Trạng thái: thiết kế chốt v2 (2026-07-12 tiếp thu đánh giá bên ngoài: bổ sung ngữ nghĩa phủ, ngữ nghĩa đường dẫn, thứ tự lắp ghép, lối vào eval, giao thức thống kê đánh giá), **có thể triển khai**.
+> Ưu tiên: làm trước phần tiến hóa mặt điều khiển (docs/engine-arbiter.md) —— “mùi AI” là điểm đau hiện hữu của người dùng.
 
-## 一、背景与问题定义
+## Một, bối cảnh và định nghĩa vấn đề
 
-用户反馈生成内容"AI 味重"。排查后结论:**问题不是文风知识与流程耦合过深,而是迭代回路断在两处**:
+Người dùng phản hồi rằng nội dung sinh ra “nặng mùi AI”. Sau khi rà soát, kết luận là: **vấn đề không nằm ở việc tri thức văn phong và quy trình bị ghép quá sâu, mà nằm ở việc vòng lặp cải tiến bị đứt ở hai chỗ**:
 
-1. **改一次要重编译**——文风语义资产(anti-ai-tone.md、writer.md 写作标准、styles/*.md)全部 `go:embed`,调一个措辞就要重新构建发版;
-2. **没有文风专用的度量回路**——改完只能靠人读感觉,无客观前后对照,优化变成玄学。
+1. **Sửa một lần là phải biên dịch lại** —— toàn bộ tài sản ngữ nghĩa văn phong (anti-ai-tone.md, chuẩn viết writer.md, styles/*.md) đều dùng `go:embed`; chỉ chỉnh một cách diễn đạt cũng phải build lại và phát hành;
+2. **Không có vòng đo lường chuyên dụng cho văn phong** —— sửa xong chỉ có thể dựa vào cảm giác đọc của con người, không có đối chiếu trước/sau khách quan, khiến việc tối ưu hóa trở thành cảm tính.
 
-## 二、现状盘点(文风相关资产共五层)
+## Hai, kiểm kê hiện trạng (tổng cộng năm lớp tài sản liên quan đến văn phong)
 
-| 层 | 位置 | 现状 | 用户可调 |
+| Lớp | Vị trí | Hiện trạng | Người dùng có thể chỉnh |
 |----|------|------|---------|
-| 语义判据 | `assets/references/anti-ai-tone.md` | writer 规避 + editor 举证共用,结构/用词/描写/对话/节奏五类 | ❌ 内嵌 |
-| 写作标准 | `assets/prompts/writer.md` §写作标准 | 与执行协议混在同一内嵌文件 | ❌ |
-| 风格预设 | `assets/styles/*.md`(4 个) | cfg.Style 单点选择,追加到 writer prompt | ❌ 且不能新增 |
-| 机械规则 | `internal/rules` | 疲劳词/禁用语/字数,commit 强制检查 | ✅ 已有三层覆盖(注意:其"项目级"绑定 **cwd**,见 3.4) |
-| 运行时偏好 | Arbiter `rules` 动作 | 自然语言 → 结构化,跨重启生效 | ✅ |
+| Tiêu chí ngữ nghĩa | `assets/references/anti-ai-tone.md` | writer né tránh + editor đưa chứng cứ dùng chung, năm loại: cấu trúc/từ ngữ/miêu tả/đối thoại/nhịp | ❌ Nhúng sẵn |
+| Chuẩn viết | `assets/prompts/writer.md` §Chuẩn viết | Trộn cùng giao thức thực thi trong một file nhúng | ❌ |
+| Preset phong cách | `assets/styles/*.md` (4 cái) | cfg.Style chọn một preset, nối thêm vào writer prompt | ❌ và không thể thêm mới |
+| Quy tắc cơ học | `internal/rules` | Từ gây mệt/cụm cấm/số chữ, commit bắt buộc kiểm tra | ✅ Đã có phủ ba tầng (lưu ý: “cấp dự án” của nó gắn với **cwd**, xem 3.4) |
+| Thiết lập ưu tiên runtime | Hành động `rules` của Arbiter | Ngôn ngữ tự nhiên → có cấu trúc, có hiệu lực sau khi khởi động lại | ✅ |
 
-另有两件关键基建:**stylestat**(全书级句式 tic 统计,喂回 writer 作"口头禅镜像",纯代码零幻觉)和 **eval 的 `OverridePrompt`**(prompt A/B 基建已存在)。
+Ngoài ra còn hai hạ tầng then chốt: **stylestat** (thống kê tic câu cú cấp toàn sách, đưa ngược cho writer làm “gương thói quen diễn đạt”, thuần code, không ảo giác) và **`OverridePrompt` của eval** (hạ tầng prompt A/B đã tồn tại).
 
-结论:机械层的可调性和度量原料已就绪,缺口集中在**语义层不可覆盖**与**度量回路未对准文风**。
+Kết luận: khả năng tùy chỉnh và nguyên liệu đo lường của lớp cơ học đã sẵn sàng; khoảng trống tập trung ở **lớp ngữ nghĩa chưa thể phủ** và **vòng đo lường chưa căn đúng vào văn phong**.
 
-## 三、设计
+## Ba, thiết kế
 
-### 3.1 核心原则
+### 3.1 Nguyên tắc cốt lõi
 
-**把"怎么写"(文风)从"怎么协作"(协议)里拆出来:前者数据化、可覆盖;后者保持编译内嵌。**
+**Tách “viết như thế nào” (văn phong) khỏi “phối hợp như thế nào” (giao thức): phần trước dữ liệu hóa và có thể phủ; phần sau tiếp tục nhúng khi biên dịch.**
 
-### 3.2 writer.md 拆分:占位符原位回填
+### 3.2 Tách writer.md: điền lại tại chỗ bằng placeholder
 
-writer.md 的写作标准节位于文件**中部**(执行协议之后、配角连续性之前),不能简单尾接。采用占位符方案:
+Mục chuẩn viết của writer.md nằm ở **giữa** file (sau giao thức thực thi, trước tính liên tục của nhân vật phụ), nên không thể đơn giản nối vào cuối. Dùng phương án placeholder:
 
-- `writer.md`(协议,内嵌):保留执行协议 / 断点续跑 / 重写与打磨 / 章节契约 / 用户偏好机制说明 / **字数节全部(含写法建议)** / 配角连续性 / commit 参数;原写作标准节位置替换为**单一** `{{VOICE}}` 占位符
-- `voice.md`(文风,可覆盖):写作标准全节(去 AI 味 / 句式多样性 / 前情不复述)
+- `writer.md` (giao thức, nhúng): giữ giao thức thực thi / tiếp tục từ điểm ngắt / viết lại và đánh bóng / hợp đồng chương / mô tả cơ chế ưu tiên người dùng / **toàn bộ mục số chữ (bao gồm gợi ý cách viết)** / tính liên tục của nhân vật phụ / tham số commit; vị trí mục chuẩn viết ban đầu được thay bằng placeholder **duy nhất** `{{VOICE}}`
+- `voice.md` (văn phong, có thể phủ): toàn bộ mục chuẩn viết (khử mùi AI / đa dạng câu cú / không kể lại phần trước)
 
-字数写法建议留在协议文件(2026-07-12 评审采纳):它与字数契约的执行强耦合,拆出去需要第二个占位符,把 Voice 变成多片段格式——为一段极少有人想覆盖的技巧文本不值得;用户对字数的偏好走 user_rules。文件名保持 `writer.md` 不改(eval `OverridePrompt` 以文件名为键,改名徒增接线)。
+Gợi ý cách viết về số chữ được giữ trong file giao thức (tiếp thu đánh giá 2026-07-12): nó gắn chặt với việc thực thi hợp đồng số chữ; nếu tách ra sẽ cần placeholder thứ hai, biến Voice thành định dạng nhiều mảnh —— không đáng chỉ vì một đoạn mẹo rất ít người muốn phủ; ưu tiên của người dùng về số chữ đi qua user_rules. Giữ nguyên tên file `writer.md` không đổi (`OverridePrompt` của eval lấy tên file làm khóa, đổi tên chỉ làm tăng công việc nối dây).
 
-**拼装顺序必须与现状逐字节兼容**。现状为 `writer.md → simulationGuidance → style`(assets/load.go:84 + agents/build.go:247),故唯一组装函数为:
+**Thứ tự lắp ghép phải tương thích từng byte với hiện trạng**. Hiện trạng là `writer.md → simulationGuidance → style` (assets/load.go:84 + agents/build.go:247), nên hàm lắp ghép duy nhất là:
 
 ```go
-// 生产、eval、测试唯一入口;{{VOICE}} 原位回填保证拆分无损
+// Lối vào duy nhất cho production, eval, test; {{VOICE}} điền lại tại chỗ để bảo đảm tách không hao hụt
 func BuildWriterPrompt(protocolTemplate, voice, simulationGuidance, style string) string
 // = replace(protocolTemplate, "{{VOICE}}", voice) + simulationGuidance + style
 ```
 
-先例教训:`WithSimulationGuidance` 注释记录过"baseline 带包装、variant 不带 → A/B 不等价"的坑;组装路径分叉是同类事故的温床,故收敛为单函数。
+Bài học từ tiền lệ: chú thích của `WithSimulationGuidance` từng ghi lại cái bẫy “baseline có bọc, variant không bọc → A/B không tương đương”; đường lắp ghép phân nhánh là nơi dễ sinh ra cùng loại sự cố, nên thu về một hàm duy nhất.
 
-### 3.3 覆盖模型:逐资产语义(不含糊)
+### 3.3 Mô hình phủ: ngữ nghĩa theo từng tài sản (không mơ hồ)
 
-| 资产 | 覆盖语义 | 理由 |
+| Tài sản | Ngữ nghĩa phủ | Lý do |
 |------|---------|------|
-| `voice.md` | **追加**:内置保留,全局/本书作为标记段追加 | 整文件替换会让用户永久停留在旧版内置;常见诉求是微调而非重写 |
-| `anti-ai-tone.md` | **追加**(同上) | 常见诉求是补判据;想推翻内置判据的用户属极少数,不为其设计 |
-| `styles/<name>.md` | **同名整文件替换**;新文件名即新增风格 | 风格是整体声音,两个风格合并无意义 |
-| `genres/<name>/style-references.md` | 同名整文件替换;自定义 style 无 reference 时**允许缺省,不回退 default**(错误参照比没有更糟) | 同上 |
-| user_rules | 运行时最高优先级(现状不动) | — |
+| `voice.md` | **Nối thêm**: giữ bản tích hợp, toàn cục/quyển hiện tại được nối thêm như các đoạn có đánh dấu | Thay toàn file sẽ khiến người dùng mãi kẹt ở bản tích hợp cũ; nhu cầu phổ biến là tinh chỉnh chứ không phải viết lại |
+| `anti-ai-tone.md` | **Nối thêm** (như trên) | Nhu cầu phổ biến là bổ sung tiêu chí; người dùng muốn lật đổ tiêu chí tích hợp là cực thiểu số, không thiết kế riêng cho họ |
+| `styles/<name>.md` | **Thay toàn file cùng tên**; tên file mới đồng nghĩa với thêm phong cách mới | Phong cách là tiếng nói tổng thể, gộp hai phong cách không có ý nghĩa |
+| `genres/<name>/style-references.md` | Thay toàn file cùng tên; khi style tùy chỉnh không có reference thì **cho phép thiếu, không fallback về default** (tham chiếu sai còn tệ hơn không có) | Như trên |
+| user_rules | Ưu tiên cao nhất ở runtime (không đổi hiện trạng) | — |
 
-追加语义的组装带显式边界标记:
+Lắp ghép ngữ nghĩa nối thêm có đánh dấu ranh giới rõ ràng:
 
 ```
-## 项目默认文风
+## Văn phong mặc định của dự án
 ...
-## 用户全局文风覆盖(以下要求优先于项目默认)
+## Phủ văn phong toàn cục của người dùng (các yêu cầu dưới đây ưu tiên hơn mặc định dự án)
 ...
-## 本书文风覆盖(以下要求优先于以上全部)
+## Phủ văn phong của quyển hiện tại (các yêu cầu dưới đây ưu tiên hơn toàn bộ phía trên)
 ...
 ```
 
-**诚实边界**:追加语义下"后者胜"是给 LLM 的优先级指示,不是机械保证——文风是建议性内容,可接受;需要机械保证的约束走 rules 层(那里是真覆盖)。此边界写入用户文档。
+**Ranh giới trung thực**: dưới ngữ nghĩa nối thêm, “cái sau thắng” là chỉ dẫn ưu tiên cho LLM, không phải bảo đảm cơ học —— văn phong là nội dung mang tính gợi ý, có thể chấp nhận; các ràng buộc cần bảo đảm cơ học phải đi qua lớp rules (ở đó mới là phủ thật). Ranh giới này được ghi vào tài liệu người dùng.
 
-`arc-templates.md` 属规划平面(塑造故事结构而非声音),**不入 v1 白名单**,记录待议。
+`arc-templates.md` thuộc mặt phẳng quy hoạch (định hình cấu trúc câu chuyện chứ không phải giọng văn), **không vào whitelist v1**, ghi nhận để bàn sau.
 
-### 3.4 路径语义:本书级绑定 outputDir,不绑 cwd
-
-```
-本书级   <outputDir>/style/     >   全局   ~/.ainovel/style/   >   内置默认(embed 兜底)
-```
-
-- 绑定 outputDir 使 Voice **随书走**:换目录恢复同一本书加载同一份文风;Docker/headless/TUI 路径解析一致;多书共享 cwd 时互不串扰
-- `assets.Load` 签名显式接收解析根(outputDir),**内部不读 cwd**
-- 注意与 rules 层的差异:rules 的 `./.ainovel/rules` 绑定 cwd(internal/rules/loader.go 既有约定,本设计不动它);用户文档明确两者语义不同——rules 是"项目级",voice 是"本书级"
-
-用户目录完整结构:
+### 3.4 Ngữ nghĩa đường dẫn: cấp quyển hiện tại gắn với outputDir, không gắn cwd
 
 ```
-<outputDir>/style/            (~/.ainovel/style/ 同构)
-  voice.md                    追加段
-  anti-ai-tone.md             追加段
+Cấp quyển hiện tại   <outputDir>/style/     >   Toàn cục   ~/.ainovel/style/   >   Mặc định tích hợp (embed dự phòng)
+```
+
+- Gắn với outputDir khiến Voice **đi theo sách**: đổi thư mục vẫn khôi phục cùng một quyển sách và nạp cùng một văn phong; phân giải đường dẫn nhất quán giữa Docker/headless/TUI; khi nhiều sách dùng chung cwd thì không nhiễu nhau
+- Chữ ký `assets.Load` nhận rõ root phân giải (outputDir), **bên trong không đọc cwd**
+- Lưu ý khác biệt với lớp rules: `./.ainovel/rules` của rules gắn với cwd (quy ước sẵn có trong internal/rules/loader.go, thiết kế này không động vào); tài liệu người dùng nói rõ ngữ nghĩa hai bên khác nhau —— rules là “cấp dự án”, voice là “cấp quyển hiện tại”
+
+Cấu trúc thư mục người dùng đầy đủ:
+
+```
+<outputDir>/style/            (đồng cấu với ~/.ainovel/style/)
+  voice.md                    Đoạn nối thêm
+  anti-ai-tone.md             Đoạn nối thêm
   styles/
-    xianxia.md                新增或同名替换
+    xianxia.md                Thêm mới hoặc thay cùng tên
   genres/
     xianxia/
-      style-references.md     可选
+      style-references.md     Tùy chọn
 ```
 
-style 名即文件名,校验 `[a-z0-9-]+`,拒绝路径字符。
+Tên style chính là tên file, kiểm tra `[a-z0-9-]+`, từ chối ký tự đường dẫn.
 
-### 3.5 为什么开放给用户是安全的
+### 3.5 Vì sao mở cho người dùng là an toàn
 
-协议不变量全部住在**事实层**:draft 先于 check、commit 强制机械规则检查、字数越界拦截、checkpoint 幂等——不住提示词里。用户把 voice.md 改得再离谱,守卫与工具前置条件照常生效,最坏结果是文笔难看,状态机坏不了。
+Toàn bộ bất biến giao thức đều nằm ở **lớp sự kiện**: draft trước check, commit bắt buộc kiểm tra quy tắc cơ học, chặn vượt biên số chữ, checkpoint idempotent —— không nằm trong prompt. Dù người dùng sửa voice.md vô lý đến đâu, guard và tiền điều kiện của tool vẫn có hiệu lực như thường; kết quả xấu nhất là văn tệ, máy trạng thái không hỏng.
 
-### 3.6 生效时机与 eval 入口
+### 3.6 Thời điểm có hiệu lực và lối vào eval
 
-- v1 启动时解析,**重启生效**(断点恢复精确到步骤,重启成本近乎零;热重载不做)
-- eval 增加 **voice 独立 variant 入口**(如 `Bundle.OverrideVoice(raw)`),内部走 `BuildWriterPrompt` 同一路径——禁止通过覆盖完整 writer.md 做文风 A/B(会连带协议,且 baseline/variant 协议可能不等)
+- v1 phân giải khi khởi động, **khởi động lại để có hiệu lực** (khôi phục điểm ngắt chính xác đến bước, chi phí khởi động lại gần như bằng không; không làm tải lại nóng)
+- eval thêm **lối vào variant độc lập cho voice** (như `Bundle.OverrideVoice(raw)`), bên trong đi cùng đường `BuildWriterPrompt` —— cấm làm A/B văn phong bằng cách phủ toàn bộ writer.md (sẽ kéo theo giao thức, và giao thức baseline/variant có thể không bằng nhau)
 
-## 四、度量回路:文风评测集
+## Bốn, vòng đo lường: bộ đánh giá văn phong
 
 ```
-改 voice/anti-ai-tone
-  → 文风评测集(固定用例,eval voice-variant A/B)      ← 唯一新增
-  → stylestat 指标对比(确定性硬指标)
-  + LLM judge 按 anti-ai-tone 判据逐项举证打分(初期仅报告,不作 hard gate)
+Sửa voice/anti-ai-tone
+  → Bộ đánh giá văn phong (case cố định, eval voice-variant A/B)      ← Phần thêm mới duy nhất
+  → Đối chiếu chỉ số stylestat (chỉ số cứng xác định)
+  + LLM judge chấm điểm và đưa chứng cứ từng mục theo tiêu chí anti-ai-tone (giai đoạn đầu chỉ báo cáo, không làm hard gate)
 ```
 
-统计协议(固定输入只保证**可比较**,不保证可复现):
+Giao thức thống kê (đầu vào cố định chỉ bảo đảm **có thể so sánh**, không bảo đảm tái lập):
 
-- baseline/variant 锁定同一模型与推理参数
-- 每用例重复 N≥3 次,报告均值、方差与原始样本
-- judge 盲评(不暴露 baseline/variant 身份)
-- 用例覆盖题材 × 章型(开篇/日常推进/高潮/收束)
+- baseline/variant khóa cùng một model và tham số suy luận
+- Mỗi case lặp N≥3 lần, báo cáo trung bình, phương sai và mẫu thô
+- judge đánh giá mù (không lộ danh tính baseline/variant)
+- case phủ thể loại × kiểu chương (mở đầu/đẩy tiến đời thường/cao trào/khép lại)
 
-## 五、明确不做(防过度设计)
+## Năm, nêu rõ không làm (chống thiết kế quá mức)
 
-- 不开放协议提示词给最终用户(`OverridePrompt` 保留为 eval 内部能力)
-- 不做运行中热重载
-- 不把 stylestat 正则模式开放为用户配置(机械层扩展入口已有:rules 的 fatigue_words/forbidden_phrases)
-- 不做风格市场/分享机制(拷贝 style 目录即天然可分享)
-- arc-templates 不入 v1 白名单
+- Không mở prompt giao thức cho người dùng cuối (`OverridePrompt` giữ làm năng lực nội bộ của eval)
+- Không tải lại nóng trong lúc chạy
+- Không mở pattern regex của stylestat thành cấu hình người dùng (lớp cơ học đã có lối mở rộng: fatigue_words/forbidden_phrases của rules)
+- Không làm chợ phong cách/cơ chế chia sẻ (copy thư mục style là tự nhiên có thể chia sẻ)
+- arc-templates không vào whitelist v1
 
-## 六、实施步骤与验收
+## Sáu, bước triển khai và nghiệm thu
 
-1. writer.md 拆分(`{{VOICE}}` 占位)+ `BuildWriterPrompt` 唯一组装函数
-2. 三层解析器:`assets.Load(outputDir, style)` + 逐资产语义(3.3 表)+ styles 枚举合并;单测覆盖优先级/缺省兜底/追加边界标记
-3. eval `OverrideVoice` 入口
-4. 用户文档:目录结构、逐资产语义、rules 与 voice 的路径语义差异、示例
-5. 文风评测集(可后置为独立任务)
+1. Tách writer.md (placeholder `{{VOICE}}`) + hàm lắp ghép duy nhất `BuildWriterPrompt`
+2. Bộ phân giải ba tầng: `assets.Load(outputDir, style)` + ngữ nghĩa theo từng tài sản (bảng 3.3) + hợp nhất danh sách styles; unit test phủ ưu tiên/fallback khi thiếu/đánh dấu ranh giới nối thêm
+3. Lối vào eval `OverrideVoice`
+4. Tài liệu người dùng: cấu trúc thư mục, ngữ nghĩa theo từng tài sản, khác biệt ngữ nghĩa đường dẫn của rules và voice, ví dụ
+5. Bộ đánh giá văn phong (có thể để sau thành tác vụ độc lập)
 
-**验收标准**:① 无任何覆盖文件时,`BuildWriterPrompt` 产出与拆分前**逐字节一致**;② 三层优先级与追加/替换语义有表驱动单测;③ 新增 `styles/xianxia.md` 后 `style: xianxia` 即放即用;④ eval voice A/B 与生产同组装路径(有测试证明);⑤ 全量测试与 sim 回归绿。
+**Tiêu chuẩn nghiệm thu**: ① Khi không có bất kỳ file phủ nào, kết quả của `BuildWriterPrompt` **giống từng byte** với trước khi tách; ② Ưu tiên ba tầng và ngữ nghĩa nối thêm/thay thế có unit test table-driven; ③ Sau khi thêm `styles/xianxia.md`, `style: xianxia` đặt vào là dùng được; ④ eval voice A/B và production dùng cùng đường lắp ghép (có test chứng minh); ⑤ Toàn bộ test và hồi quy sim xanh.
 
-## 七、与控制面演进的关系
+## Bảy, quan hệ với tiến hóa mặt điều khiển
 
-完全正交(内容平面 vs 控制平面),无实施依赖。约定顺序:**文风层 → 文风评测集 → Engine/Arbiter(按其文档 §八 决议推进)**。
+Hoàn toàn trực giao (mặt phẳng nội dung vs mặt phẳng điều khiển), không có phụ thuộc triển khai. Thứ tự quy ước: **lớp văn phong → bộ đánh giá văn phong → Engine/Arbiter (thúc đẩy theo nghị quyết §Tám trong tài liệu của nó)**.

@@ -14,20 +14,22 @@ import (
 	"github.com/voocel/litellm"
 )
 
-// callModel 是内核对模型的最小依赖，便于测试注入 mock。
+// callModel là phụ thuộc tối thiểu của lõi vào model, thuận tiện để tiêm mock khi kiểm thử.
 type callModel interface {
 	Generate(ctx context.Context, messages []agentcore.Message, tools []agentcore.ToolSpec, opts ...agentcore.CallOption) (*agentcore.LLMResponse, error)
 }
 
-// errTruncated 表示模型因长度停止（容量错误）。携带原始文本供调用方决定失败或前缀打捞（§9.5）。
+// errTruncated biểu thị model dừng vì độ dài (lỗi dung lượng). Mang văn bản gốc để bên gọi quyết định thất bại hay cứu vớt tiền tố (§9.5).
 type errTruncated struct {
 	Raw string
 }
 
-func (e *errTruncated) Error() string { return "模型输出被长度截断（stop=length）" }
+func (e *errTruncated) Error() string {
+	return "đầu ra của model bị cắt ngắn do độ dài (stop=length)"
+}
 
-// errSemantic 表示无法通过重问修复的输出层失败，携带原始响应，
-// 供 runner 统一落 failures/ 失败工件（§14.2），所有语义函数共用。
+// errSemantic biểu thị lỗi ở tầng đầu ra không thể sửa bằng hỏi lại, mang phản hồi gốc,
+// để runner thống nhất ghi artifact thất bại vào failures/ (§14.2), dùng chung cho mọi hàm ngữ nghĩa.
 type errSemantic struct {
 	Raw string
 	Err error
@@ -36,17 +38,17 @@ type errSemantic struct {
 func (e *errSemantic) Error() string { return e.Err.Error() }
 func (e *errSemantic) Unwrap() error { return e.Err }
 
-// callProfile 承载 thinking 与可观测性选项，由 Host 探测的 ModelRuntime 派生。
-// 结构化协议由 callStructured 依据模型事实和静态 Contract 独立选择。
+// callProfile chứa thinking và các tùy chọn quan sát được, được suy ra từ ModelRuntime do Host thăm dò.
+// Giao thức có cấu trúc do callStructured lựa chọn độc lập dựa trên sự thật của model và Contract tĩnh.
 type callProfile struct {
 	thinking agentcore.ThinkingLevel
-	// notify 可选：把请求退避重试/校验重问回显给界面；nil 时静默（§14.1）。
-	// retryAt 非零 = 下次重试的截止时刻，UI 据此渲染逐秒倒计时（事件只带截止点，剩余时间渲染时算）。
+	// notify tùy chọn: phản hồi việc retry lùi thời gian của request / hỏi lại khi kiểm tra cho giao diện; nil thì im lặng (§14.1).
+	// retryAt khác zero = thời điểm hạn chót của lần retry tiếp theo, UI dựa vào đó để render đếm ngược từng giây (event chỉ mang mốc hạn chót, thời gian còn lại tính khi render).
 	notify func(msg string, retryAt time.Time)
-	// progress 可选：回显长时阶段的内部推进（切分第 N/M 块、区间摘要 N/M）；nil 时静默。
-	// 切分/综合在函数内部逐块/逐区间调用模型，单块可达数分钟，没有它面板整段静默像卡死（§14.1）。
+	// progress tùy chọn: phản hồi tiến trình nội bộ của giai đoạn kéo dài (chia khối thứ N/M, tóm tắt khoảng N/M); nil thì im lặng.
+	// Việc chia/tổng hợp gọi model theo từng khối/từng khoảng ở bên trong hàm, một khối có thể kéo dài vài phút; không có nó thì panel im lặng cả đoạn trông như bị treo (§14.1).
 	progress func(current, total int, msg string)
-	// log 可选：导入专属日志（logs/import.log）；nil 回退默认 logger。
+	// log tùy chọn: nhật ký riêng cho import (logs/import.log); nil thì quay về logger mặc định.
 	log *slog.Logger
 }
 
@@ -57,27 +59,27 @@ func (p callProfile) logger() *slog.Logger {
 	return slog.Default()
 }
 
-// step 回显一条普通进度（长时阶段的内部推进）。
+// step phản hồi một dòng tiến trình thông thường (tiến trình nội bộ của giai đoạn kéo dài).
 func (p callProfile) step(current, total int, format string, args ...any) {
 	if p.progress != nil {
 		p.progress(current, total, fmt.Sprintf(format, args...))
 	}
 }
 
-// say 回显一条长时调用状态。重试可能静默数分钟（指数退避累计 2 分钟以上），
-// 不回显用户会误以为卡死。
+// say phản hồi một trạng thái gọi kéo dài. Retry có thể im lặng vài phút (lùi thời gian theo cấp số nhân cộng dồn hơn 2 phút),
+// nếu không phản hồi thì người dùng sẽ tưởng nhầm là bị treo.
 func (p callProfile) say(format string, args ...any) {
 	p.sayRetry(time.Time{}, format, args...)
 }
 
-// sayRetry 回显一条带重试截止时刻的状态，供 UI 倒计时。
+// sayRetry phản hồi một trạng thái kèm thời điểm hạn chót retry, để UI đếm ngược.
 func (p callProfile) sayRetry(retryAt time.Time, format string, args ...any) {
 	if p.notify != nil {
 		p.notify(fmt.Sprintf(format, args...), retryAt)
 	}
 }
 
-// snippet 把多行文本压成单行短摘要供界面回显：合并空白、截到 max 个 rune。
+// snippet nén văn bản nhiều dòng thành tóm tắt ngắn một dòng để phản hồi trên giao diện: gộp khoảng trắng, cắt tới max rune.
 func snippet(s string, max int) string {
 	s = strings.Join(strings.Fields(s), " ")
 	if r := []rune(s); len(r) > max {
@@ -86,36 +88,36 @@ func snippet(s string, max int) string {
 	return s
 }
 
-// briefErr 把错误压成单行短文本供界面回显（完整错误链仍走日志与失败工件）。
-// 适配器结构化事实放前面：截断时优先保住"哪类错、什么状态码"，网关 message 可牺牲。
+// briefErr nén lỗi thành văn bản ngắn một dòng để phản hồi trên giao diện (chuỗi lỗi đầy đủ vẫn đi vào log và artifact thất bại).
+// Đưa sự thật có cấu trúc của adapter lên trước: khi cắt ngắn thì ưu tiên giữ lại "loại lỗi nào, mã trạng thái gì", message của gateway có thể hy sinh.
 func briefErr(err error) string {
 	s := err.Error()
 	if d := modelErrDetail(err); d != "" {
-		s = d + "：" + s
+		s = d + ": " + s
 	}
 	return snippet(s, 100)
 }
 
-// errTypeLabels 把 litellm 错误分类翻成一眼可读的中文短标签。
+// errTypeLabels dịch phân loại lỗi litellm thành nhãn ngắn tiếng Việt dễ đọc ngay.
 var errTypeLabels = map[litellm.ErrorType]string{
-	litellm.ErrorTypeAuth:            "鉴权失败",
-	litellm.ErrorTypeRateLimit:       "限流",
-	litellm.ErrorTypeNetwork:         "网络错误",
-	litellm.ErrorTypeValidation:      "请求参数非法",
-	litellm.ErrorTypeProvider:        "上游服务错误",
-	litellm.ErrorTypeTimeout:         "超时",
-	litellm.ErrorTypeQuota:           "配额不足",
-	litellm.ErrorTypeModel:           "模型不可用",
-	litellm.ErrorTypeInternal:        "内部错误",
-	litellm.ErrorTypeContextOverflow: "上下文超限",
-	litellm.ErrorTypeOverloaded:      "上游过载",
-	litellm.ErrorTypeContentFilter:   "内容过滤拦截",
+	litellm.ErrorTypeAuth:            "xác thực thất bại",
+	litellm.ErrorTypeRateLimit:       "bị giới hạn tốc độ",
+	litellm.ErrorTypeNetwork:         "lỗi mạng",
+	litellm.ErrorTypeValidation:      "tham số request không hợp lệ",
+	litellm.ErrorTypeProvider:        "lỗi dịch vụ upstream",
+	litellm.ErrorTypeTimeout:         "hết thời gian chờ",
+	litellm.ErrorTypeQuota:           "không đủ hạn ngạch",
+	litellm.ErrorTypeModel:           "model không khả dụng",
+	litellm.ErrorTypeInternal:        "lỗi nội bộ",
+	litellm.ErrorTypeContextOverflow: "vượt giới hạn context",
+	litellm.ErrorTypeOverloaded:      "upstream quá tải",
+	litellm.ErrorTypeContentFilter:   "bị bộ lọc nội dung chặn",
 }
 
-// modelErrDetail 从错误链提取适配器的结构化事实（错误分类、HTTP 状态、provider、模型）。
-// 网关的 message 常常只有一句空泛的 "Provider returned error"，单靠它无法判断是配置错、
-// 上游故障还是限流；这些事实 litellm 一直带着，只是不进 Error() 文案。agentcore 适配器的
-// Unwrap 明确允许知道 litellm 的调用方 errors.As 取原始错误。非模型调用错误返回空串。
+// modelErrDetail trích xuất sự thật có cấu trúc của adapter từ chuỗi lỗi (phân loại lỗi, trạng thái HTTP, provider, model).
+// message của gateway thường chỉ có một câu chung chung "Provider returned error"; chỉ dựa vào nó thì không thể biết là sai cấu hình,
+// lỗi upstream hay bị giới hạn tốc độ; các sự thật này litellm luôn mang theo, chỉ là không đi vào văn bản Error(). adapter agentcore
+// Unwrap cho phép bên gọi biết rõ litellm dùng errors.As để lấy lỗi gốc. Lỗi không phải do gọi model thì trả chuỗi rỗng.
 func modelErrDetail(err error) string {
 	var le *litellm.LiteLLMError
 	if !errors.As(err, &le) {
@@ -134,11 +136,11 @@ func modelErrDetail(err error) string {
 	if le.Model != "" {
 		parts = append(parts, le.Model)
 	}
-	return strings.Join(parts, "，")
+	return strings.Join(parts, ", ")
 }
 
-// callOptions 组装本次调用的 CallOption：始终带输出上限；按能力可选 thinking。
-// thinking 仅在非 Auto 时发送——对不支持 thinking 的模型发任何等级（含 off）都是非法参数（与 arbiter 同策略）。
+// callOptions lắp ráp CallOption cho lần gọi này: luôn mang giới hạn đầu ra; tùy theo khả năng mà thêm thinking.
+// thinking chỉ được gửi khi không phải Auto -- với model không hỗ trợ thinking, gửi bất kỳ mức nào (kể cả off) đều là tham số bất hợp lệ (cùng chiến lược với arbiter).
 func (p callProfile) callOptions(maxTokens int) []agentcore.CallOption {
 	opts := []agentcore.CallOption{agentcore.WithMaxTokens(maxTokens)}
 	if p.thinking != agentcore.ThinkingAuto {
@@ -147,7 +149,7 @@ func (p callProfile) callOptions(maxTokens int) []agentcore.CallOption {
 	return opts
 }
 
-// callStructured 为导入层适配统一结构化执行器，并把通用失败映射为导入工件语义。
+// callStructured điều chỉnh executor có cấu trúc thống nhất cho tầng import, đồng thời ánh xạ lỗi phổ dụng thành ngữ nghĩa artifact import.
 func callStructured[T any](ctx context.Context, m callModel, contract llmcontract.Contract, systemPrompt, payload string, maxTokens int, prof callProfile, validate func(*T) error) (T, error) {
 	out, err := llmcontract.Execute(ctx, m, llmcontract.Request[T]{
 		Contract:     contract,
@@ -158,18 +160,18 @@ func callStructured[T any](ctx context.Context, m callModel, contract llmcontrac
 		Agent:        "import",
 		Hooks: llmcontract.Hooks{
 			Resolved: func(res llmcontract.Resolution) {
-				prof.logger().Debug("imp 结构化协议选择",
+				prof.logger().Debug("imp chọn giao thức có cấu trúc",
 					"contract", contract.Name, "structured_mode", res.Mode,
 					"capability_source", res.Source, "provider", res.Provider,
 					"model", res.Model, "schema_fingerprint", contract.Fingerprint())
 			},
 			RequestRetry: func(ev llmretry.Event) {
-				prof.sayRetry(time.Now().Add(ev.Delay), "模型请求失败（%s），进行第 %d 次重试", briefErr(ev.Err), ev.Attempt)
-				prof.logger().Warn("imp 模型请求重试", "attempt", ev.Attempt, "delay", ev.Delay, "err", ev.Err)
+				prof.sayRetry(time.Now().Add(ev.Delay), "request model thất bại (%s), tiến hành retry lần thứ %d", briefErr(ev.Err), ev.Attempt)
+				prof.logger().Warn("imp retry request model", "attempt", ev.Attempt, "delay", ev.Delay, "err", ev.Err)
 			},
 			Correction: func(ev llmcontract.Correction) {
-				prof.say("输出校验未通过（%s），带错误反馈进行第 %d 次重问", briefErr(ev.Err), ev.Attempt+1)
-				prof.logger().Warn("imp 结构化输出自愈", "attempt", ev.Attempt,
+				prof.say("kiểm tra đầu ra không đạt (%s), hỏi lại lần thứ %d kèm phản hồi lỗi", briefErr(ev.Err), ev.Attempt+1)
+				prof.logger().Warn("imp tự phục hồi đầu ra có cấu trúc", "attempt", ev.Attempt,
 					"layer", ev.Layer, "structured_mode", ev.Mode, "err", ev.Err)
 			},
 		},
@@ -193,7 +195,7 @@ func callStructured[T any](ctx context.Context, m callModel, contract llmcontrac
 		}
 	case llmcontract.FailureRequest:
 		if detail := modelErrDetail(failure); detail != "" {
-			return out, fmt.Errorf("imp: 模型调用失败（%s）：%w", detail, failure)
+			return out, fmt.Errorf("imp: gọi model thất bại (%s): %w", detail, failure)
 		}
 	}
 	return out, fmt.Errorf("imp: %w", failure)

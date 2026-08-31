@@ -1,15 +1,15 @@
 package agents
 
-// 端到端验证 save_review 硬停 + 任务感知 StopGuard 的组合行为（build.go editor
-// 配置的真实接线：StopAfterToolResult 命中 save_review/save_*_summary、
-// StopGuardFactory 用真 guard、工具落真 checkpoint）。
+// Xác minh end-to-end hành vi kết hợp giữa hard stop save_review và StopGuard nhận biết nhiệm vụ (dây nối thật của editor trong build.go
+// cấu hình: StopAfterToolResult khớp save_review/save_*_summary,
+// StopGuardFactory dùng guard thật, tool ghi checkpoint thật).
 //
-// 场景一（摘要任务先复核）：editor 被派生成弧摘要，却先调了 save_review——
-// 硬停触发但 guard 否决，注入催促后 editor 走到 save_arc_summary 才真正退出。
-// 这是恢复 save_review 硬停的安全前提，防止弧摘要永不落盘的死循环回归。
+// Kịch bản một (nhiệm vụ tóm tắt nhưng rà soát trước): editor được giao tạo tóm tắt arc, nhưng lại gọi save_review trước —
+// hard stop kích hoạt nhưng guard từ chối; sau khi inject nhắc nhở, editor tới save_arc_summary mới thật sự thoát.
+// Đây là tiền đề an toàn để khôi phục hard stop save_review, ngăn hồi quy vòng lặp vô hạn khiến tóm tắt arc không bao giờ ghi xuống.
 //
-// 场景二（评审任务一步收尾）：editor 被派评审，save_review 落盘即硬停放行，
-// 不再多跑一轮 LLM 收尾。
+// Kịch bản hai (nhiệm vụ rà soát kết thúc một bước): editor được giao rà soát, save_review ghi xuống là hard stop được cho qua,
+// không chạy thêm một lượt LLM để kết thúc.
 
 import (
 	"context"
@@ -24,7 +24,7 @@ import (
 	"github.com/voocel/ainovel-cli/internal/store"
 )
 
-// editorStopAfterToolResult 与 build.go 中 editor 的配置保持同一判据。
+// editorStopAfterToolResult giữ cùng tiêu chí với cấu hình editor trong build.go.
 func editorStopAfterToolResult(toolName string, _ json.RawMessage) bool {
 	return toolName == "save_review" || toolName == "save_arc_summary" || toolName == "save_volume_summary"
 }
@@ -71,22 +71,22 @@ func TestEditorFlow_SummaryTaskSurvivesEarlyReview(t *testing.T) {
 	model := &contractModel{fn: func(i int, _ []agentcore.Message) (*agentcore.LLMResponse, error) {
 		switch i {
 		case 0:
-			// 跑偏：摘要任务却先复核。
+			// Lệch hướng: nhiệm vụ tóm tắt nhưng lại rà soát trước.
 			return &agentcore.LLMResponse{Message: assistantToolCall("save_review", `{}`)}, nil
 		default:
-			// guard 否决硬停并注入催促后，本轮才产出摘要。
+			// Sau khi guard từ chối hard stop và inject nhắc nhở, lượt này mới sinh tóm tắt.
 			calls.Add(1)
 			return &agentcore.LLMResponse{Message: assistantToolCall("save_arc_summary", `{}`)}, nil
 		}
 	}}
 
-	runEditorLike(t, st, "生成第 1 卷第 1 弧摘要（save_arc_summary）", model, []agentcore.Tool{
+	runEditorLike(t, st, "Tạo tóm tắt arc 1 quyển 1 (save_arc_summary)", model, []agentcore.Tool{
 		checkpointTool(t, st, "save_review", "review"),
 		checkpointTool(t, st, "save_arc_summary", "arc_summary"),
 	})
 
 	if calls.Load() == 0 {
-		t.Fatal("save_review 硬停被 guard 否决后，editor 应继续走到 save_arc_summary——若 run 在复核后直接结束，说明终态退出绕过了 guard，弧摘要死循环会回归")
+		t.Fatal("Sau khi hard stop save_review bị guard từ chối, editor phải tiếp tục tới save_arc_summary — nếu run kết thúc ngay sau rà soát, nghĩa là thoát trạng thái cuối đã đi vòng qua guard và vòng lặp vô hạn của tóm tắt arc sẽ hồi quy")
 	}
 	all := st.Checkpoints.All()
 	var hasSummary bool
@@ -96,7 +96,7 @@ func TestEditorFlow_SummaryTaskSurvivesEarlyReview(t *testing.T) {
 		}
 	}
 	if !hasSummary {
-		t.Fatal("弧摘要必须最终落盘")
+		t.Fatal("Tóm tắt arc cuối cùng phải được ghi xuống")
 	}
 }
 
@@ -110,15 +110,15 @@ func TestEditorFlow_ReviewTaskStopsAtSaveReview(t *testing.T) {
 		if i == 0 {
 			return &agentcore.LLMResponse{Message: assistantToolCall("save_review", `{}`)}, nil
 		}
-		t.Fatal("评审任务 save_review 落盘后应硬停，模型不应获得额外轮次")
+		t.Fatal("Nhiệm vụ rà soát phải hard stop sau khi save_review ghi xuống; mô hình không được nhận lượt bổ sung")
 		return nil, nil
 	}}
 
-	runEditorLike(t, st, "对第 1 卷第 1 弧做弧级评审（scope=arc）", model, []agentcore.Tool{
+	runEditorLike(t, st, "Rà soát cấp arc cho arc 1 quyển 1 (scope=arc)", model, []agentcore.Tool{
 		checkpointTool(t, st, "save_review", "review"),
 	})
 
 	if got := model.calls(); got != 1 {
-		t.Fatalf("评审任务应恰好一次模型调用后收尾，got %d", got)
+		t.Fatalf("Nhiệm vụ rà soát phải kết thúc sau đúng một lần gọi mô hình, got %d", got)
 	}
 }

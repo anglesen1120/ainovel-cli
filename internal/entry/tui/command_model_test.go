@@ -12,7 +12,7 @@ type fakeModelRuntime struct {
 	models      map[string][]host.ConfiguredModel
 	curProvider string
 	curModel    string
-	thinking    map[string]string // role -> 存储的原始意图
+	thinking    map[string]string // role -> ý định gốc đã lưu
 	available   []agentcore.ThinkingLevel
 	setCalls    []struct{ role, level string }
 	switchCalls int
@@ -43,32 +43,32 @@ func (f *fakeModelRuntime) SetRoleThinking(role, level string) error {
 	return nil
 }
 
-// 存储的强度意图高于当前模型能力、面板无法呈现时，用户不动强度字段直接应用，
-// 不应把意图误抹成初始默认值。
+// Khi ý định về mức độ đã lưu cao hơn năng lực Mô hình hiện tại và bảng điều khiển không thể hiển thị, nếu người dùng không chỉnh trường mức độ mà áp dụng trực tiếp,
+// thì không được xóa nhầm ý định thành giá trị mặc định ban đầu.
 func TestModelSwitchKeepsUnrepresentableThinkingIntent(t *testing.T) {
 	rt := &fakeModelRuntime{
 		providers:   []string{"proxy"},
 		models:      map[string][]host.ConfiguredModel{"proxy": {{Name: "chat-only"}}},
 		curProvider: "proxy", curModel: "chat-only",
 		thinking:  map[string]string{"writer": "high"},
-		available: nil, // 当前模型只有“继承”一档
+		available: nil, // Mô hình hiện tại chỉ có một mức “kế thừa”
 	}
 	st := newModelSwitchState(rt, "writer")
 	if st.thinkingKey() != "" {
-		t.Fatalf("high 无法呈现时面板应落在继承档，得到 %q", st.thinkingKey())
+		t.Fatalf("khi không thể hiển thị high, bảng điều khiển phải rơi vào mức kế thừa, nhận được %q", st.thinkingKey())
 	}
 	if err := st.apply(rt); err != nil {
 		t.Fatalf("apply: %v", err)
 	}
 	if len(rt.setCalls) != 0 {
-		t.Fatalf("未改动强度不应回写：%+v", rt.setCalls)
+		t.Fatalf("không chỉnh mức độ thì không được ghi ngược: %+v", rt.setCalls)
 	}
 	if rt.thinking["writer"] != "high" {
-		t.Fatalf("意图被抹成 %q，应保留 high", rt.thinking["writer"])
+		t.Fatalf("ý định bị xóa thành %q, phải giữ lại high", rt.thinking["writer"])
 	}
 }
 
-// 用户在面板里显式改动强度，则应回写为新值。
+// Nếu người dùng chỉnh rõ ràng mức độ trong bảng điều khiển, thì phải ghi ngược thành giá trị mới.
 func TestModelSwitchAppliesExplicitThinkingChange(t *testing.T) {
 	rt := &fakeModelRuntime{
 		providers:   []string{"proxy"},
@@ -79,15 +79,15 @@ func TestModelSwitchAppliesExplicitThinkingChange(t *testing.T) {
 	}
 	st := newModelSwitchState(rt, "writer")
 	st.focus = modelFocusThinking
-	st.cycle(1, rt) // 移动强度字段
+	st.cycle(1, rt) // di chuyển trường mức độ
 	want := st.thinkingKey()
 	if want == "" {
-		t.Fatal("测试前置：应已移动到某个非空强度档")
+		t.Fatal("điều kiện trước của kiểm thử: phải đã di chuyển tới một mức độ không rỗng nào đó")
 	}
 	if err := st.apply(rt); err != nil {
 		t.Fatalf("apply: %v", err)
 	}
 	if len(rt.setCalls) != 1 || rt.setCalls[0].level != want {
-		t.Fatalf("显式改动应回写 %q，得到 %+v", want, rt.setCalls)
+		t.Fatalf("chỉnh rõ ràng thì phải ghi ngược %q, nhận được %+v", want, rt.setCalls)
 	}
 }

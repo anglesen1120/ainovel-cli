@@ -34,15 +34,15 @@ func (s *RevisionStore) ClearPending() error {
 	return s.io.RemoveFile(pendingRevisionPath)
 }
 
-// InvalidateChapterAggregates 删除输入范围包含修订章节的模型派生工件。
-// 章节级投影由 revision.Projector 单独重建。
+// InvalidateChapterAggregates xóa các hiện vật dẫn xuất của mô hình trong phạm vi đầu vào bao gồm các chương đã sửa đổi.
+// Projection cấp chương được revision.Projector tái tạo riêng.
 func (s *Store) InvalidateChapterAggregates(fromChapter int) error {
 	if fromChapter <= 0 {
 		return fmt.Errorf("from chapter must be > 0")
 	}
 	volumes, err := s.Outline.LoadLayeredOutline()
 	if err != nil {
-		return fmt.Errorf("读取分层大纲: %w", err)
+		return fmt.Errorf("đọc dàn ý phân tầng: %w", err)
 	}
 	chapter := 1
 	arcEnds := make(map[[2]int]int)
@@ -72,11 +72,11 @@ func (s *Store) InvalidateChapterAggregates(fromChapter int) error {
 		}
 	}
 	if style, err := s.World.LoadStyleRules(); err != nil {
-		return fmt.Errorf("读取写作规则: %w", err)
+		return fmt.Errorf("đọc quy tắc viết: %w", err)
 	} else if style != nil {
 		end, ok := arcEnds[[2]int{style.Volume, style.Arc}]
 		if !ok {
-			return fmt.Errorf("写作规则引用未知弧 V%dA%d", style.Volume, style.Arc)
+			return fmt.Errorf("quy tắc viết tham chiếu đến cung chưa biết V%dA%d", style.Volume, style.Arc)
 		}
 		if end >= fromChapter {
 			if err := s.World.io.RemoveFile("meta/style_rules.json"); err != nil {
@@ -106,7 +106,7 @@ func (s *Store) invalidateReviewsFrom(fromChapter int) error {
 		}
 		var review domain.ReviewEntry
 		if err := json.Unmarshal(data, &review); err != nil {
-			return fmt.Errorf("parse %s: %w", rel, err)
+			return fmt.Errorf("phân tích %s: %w", rel, err)
 		}
 		if review.Chapter >= fromChapter {
 			if err := s.World.io.RemoveFile(rel); err != nil {

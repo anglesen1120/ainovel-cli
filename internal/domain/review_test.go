@@ -13,50 +13,50 @@ func TestRestoreOwnPlants(t *testing.T) {
 		want []ForeshadowUpdate
 	}{
 		{
-			name: "重写把本章 plant 写成 advance：plant 补回队首",
-			prev: []ForeshadowUpdate{{ID: "f_photo", Action: "plant", Description: "泄洪道旧照"}},
+			name: "Việc viết lại biến plant của chương này thành advance: plant được bổ sung trở lại đầu hàng đợi",
+			prev: []ForeshadowUpdate{{ID: "f_photo", Action: "plant", Description: "ảnh cũ của kênh xả lũ"}},
 			next: []ForeshadowUpdate{{ID: "f_photo", Action: "advance"}},
 			want: []ForeshadowUpdate{
-				{ID: "f_photo", Action: "plant", Description: "泄洪道旧照"},
+				{ID: "f_photo", Action: "plant", Description: "ảnh cũ của kênh xả lũ"},
 				{ID: "f_photo", Action: "advance"},
 			},
 		},
 		{
-			name: "重写把本章 plant 整条丢了：仍补回",
-			prev: []ForeshadowUpdate{{ID: "f_photo", Action: "plant", Description: "泄洪道旧照"}},
+			name: "Việc viết lại làm mất toàn bộ plant của chương này: vẫn bổ sung trở lại",
+			prev: []ForeshadowUpdate{{ID: "f_photo", Action: "plant", Description: "ảnh cũ của kênh xả lũ"}},
 			next: nil,
-			want: []ForeshadowUpdate{{ID: "f_photo", Action: "plant", Description: "泄洪道旧照"}},
+			want: []ForeshadowUpdate{{ID: "f_photo", Action: "plant", Description: "ảnh cũ của kênh xả lũ"}},
 		},
 		{
-			name: "新记录已自行声明 plant：不重复补",
-			prev: []ForeshadowUpdate{{ID: "f_photo", Action: "plant", Description: "旧描述"}},
-			next: []ForeshadowUpdate{{ID: "f_photo", Action: "plant", Description: "新描述"}},
-			want: []ForeshadowUpdate{{ID: "f_photo", Action: "plant", Description: "新描述"}},
+			name: "Bản ghi mới đã tự khai báo plant: không bổ sung trùng lặp",
+			prev: []ForeshadowUpdate{{ID: "f_photo", Action: "plant", Description: "mô tả cũ"}},
+			next: []ForeshadowUpdate{{ID: "f_photo", Action: "plant", Description: "mô tả mới"}},
+			want: []ForeshadowUpdate{{ID: "f_photo", Action: "plant", Description: "mô tả mới"}},
 		},
 		{
-			name: "旧记录只有 advance/resolve：无 plant 可补",
+			name: "Bản ghi cũ chỉ có advance/resolve: không có plant để bổ sung",
 			prev: []ForeshadowUpdate{{ID: "f_photo", Action: "advance"}, {ID: "f_key", Action: "resolve"}},
 			next: []ForeshadowUpdate{{ID: "f_photo", Action: "resolve"}},
 			want: []ForeshadowUpdate{{ID: "f_photo", Action: "resolve"}},
 		},
 		{
-			name: "多条 plant 按原序补回，且都排在 advance 之前",
+			name: "Nhiều plant được bổ sung lại theo thứ tự gốc, và đều đứng trước advance",
 			prev: []ForeshadowUpdate{
-				{ID: "f_a", Action: "plant", Description: "甲"},
-				{ID: "f_b", Action: "plant", Description: "乙"},
+				{ID: "f_a", Action: "plant", Description: "A"},
+				{ID: "f_b", Action: "plant", Description: "B"},
 			},
 			next: []ForeshadowUpdate{{ID: "f_a", Action: "advance"}},
 			want: []ForeshadowUpdate{
-				{ID: "f_a", Action: "plant", Description: "甲"},
-				{ID: "f_b", Action: "plant", Description: "乙"},
+				{ID: "f_a", Action: "plant", Description: "A"},
+				{ID: "f_b", Action: "plant", Description: "B"},
 				{ID: "f_a", Action: "advance"},
 			},
 		},
 		{
-			name: "首次提交无旧记录：原样返回",
+			name: "Lần commit đầu tiên không có bản ghi cũ: trả về nguyên bản",
 			prev: nil,
-			next: []ForeshadowUpdate{{ID: "f_photo", Action: "plant", Description: "泄洪道旧照"}},
-			want: []ForeshadowUpdate{{ID: "f_photo", Action: "plant", Description: "泄洪道旧照"}},
+			next: []ForeshadowUpdate{{ID: "f_photo", Action: "plant", Description: "ảnh cũ của kênh xả lũ"}},
+			want: []ForeshadowUpdate{{ID: "f_photo", Action: "plant", Description: "ảnh cũ của kênh xả lũ"}},
 		},
 	}
 
@@ -64,7 +64,7 @@ func TestRestoreOwnPlants(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			got := RestoreOwnPlants(tc.prev, tc.next)
 			if !reflect.DeepEqual(got, tc.want) {
-				t.Fatalf("RestoreOwnPlants() = %+v, want %+v", got, tc.want)
+				t.Fatalf("RestoreOwnPlants() = %+v, muốn %+v", got, tc.want)
 			}
 		})
 	}

@@ -10,17 +10,17 @@ import (
 
 func TestSummaryTitleCacheTracksSave(t *testing.T) {
 	st := NewStore(t.TempDir())
-	if err := st.Summaries.SaveSummary(domain.ChapterSummary{Chapter: 1, Title: "旧标题"}); err != nil {
+	if err := st.Summaries.SaveSummary(domain.ChapterSummary{Chapter: 1, Title: "Tiêu đề cũ"}); err != nil {
 		t.Fatal(err)
 	}
-	if title, err := st.Summaries.LoadSummaryTitle(1); err != nil || title != "旧标题" {
-		t.Fatalf("首次读取标题: title=%q err=%v", title, err)
+	if title, err := st.Summaries.LoadSummaryTitle(1); err != nil || title != "Tiêu đề cũ" {
+		t.Fatalf("đọc tiêu đề lần đầu: title=%q err=%v", title, err)
 	}
-	if err := st.Summaries.SaveSummary(domain.ChapterSummary{Chapter: 1, Title: "新标题"}); err != nil {
+	if err := st.Summaries.SaveSummary(domain.ChapterSummary{Chapter: 1, Title: "Tiêu đề mới"}); err != nil {
 		t.Fatal(err)
 	}
-	if title, err := st.Summaries.LoadSummaryTitle(1); err != nil || title != "新标题" {
-		t.Fatalf("保存后缓存未更新: title=%q err=%v", title, err)
+	if title, err := st.Summaries.LoadSummaryTitle(1); err != nil || title != "Tiêu đề mới" {
+		t.Fatalf("cache không cập nhật sau khi lưu: title=%q err=%v", title, err)
 	}
 }
 
@@ -30,13 +30,13 @@ func TestProjectFormatDefaultsToLegacyAndPersistsUpgrade(t *testing.T) {
 		t.Fatal(err)
 	}
 	if version, err := st.LoadProjectFormatVersion(); err != nil || version != LegacyProjectFormatVersion {
-		t.Fatalf("无版本文件应识别为旧格式: version=%d err=%v", version, err)
+		t.Fatalf("thiếu file version phải được nhận diện là định dạng cũ: version=%d err=%v", version, err)
 	}
 	if err := st.SaveProjectFormatVersion(CurrentProjectFormatVersion); err != nil {
 		t.Fatal(err)
 	}
 	if version, err := st.LoadProjectFormatVersion(); err != nil || version != CurrentProjectFormatVersion {
-		t.Fatalf("格式版本未持久化: version=%d err=%v", version, err)
+		t.Fatalf("version định dạng chưa được lưu bền vững: version=%d err=%v", version, err)
 	}
 }
 
@@ -50,7 +50,7 @@ func TestFoundationMissingReturnsReadError(t *testing.T) {
 		t.Fatal(err)
 	}
 	if _, err := st.FoundationMissing(); err == nil {
-		t.Fatal("损坏的大纲必须返回读取错误，不能降级成缺失项")
+		t.Fatal("dàn ý hỏng phải trả lỗi đọc, không được hạ cấp thành mục bị thiếu")
 	}
 }
 
@@ -63,7 +63,7 @@ func TestClearHandledSteerKeepsIntentWhenProgressReadFails(t *testing.T) {
 	if err := st.RunMeta.Init("default", "test", "model"); err != nil {
 		t.Fatalf("RunMeta.Init: %v", err)
 	}
-	if err := st.RunMeta.SetPendingSteer("保留这条干预"); err != nil {
+	if err := st.RunMeta.SetPendingSteer("giữ lại can thiệp này"); err != nil {
 		t.Fatalf("SetPendingSteer: %v", err)
 	}
 	if err := os.WriteFile(filepath.Join(dir, "meta", "progress.json"), []byte("{"), 0o644); err != nil {
@@ -76,7 +76,7 @@ func TestClearHandledSteerKeepsIntentWhenProgressReadFails(t *testing.T) {
 	if err != nil {
 		t.Fatalf("RunMeta.Load: %v", err)
 	}
-	if meta == nil || meta.PendingSteer != "保留这条干预" {
+	if meta == nil || meta.PendingSteer != "giữ lại can thiệp này" {
 		t.Fatalf("recovery intent was lost after partial clear: %+v", meta)
 	}
 }

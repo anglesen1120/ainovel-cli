@@ -77,8 +77,8 @@ func (m *Model) clearCommandPalette() {
 	m.compActive = false
 }
 
-// syncCommandInputHighlight 复用命令注册表识别第一个 token。只记录完整、已注册的
-// 命令；最终渲染时仅给这个 token 着色，参数保持普通正文色。
+// syncCommandInputHighlight tái sử dụng registry Lệnh để nhận diện token đầu tiên. Chỉ ghi nhận các
+// Lệnh hoàn chỉnh, đã được đăng ký; khi render cuối cùng chỉ tô màu token này, tham số giữ màu văn bản thường.
 func (m *Model) syncCommandInputHighlight() {
 	m.commandToken = ""
 	fields := strings.Fields(m.textarea.Value())
@@ -179,8 +179,8 @@ func renderCommandPalette(width int, items []commandPaletteItem, cursor int) str
 		}
 
 		name := nameRenderer.Render(item.Name)
-		// truncateWidth 按视觉宽度截断（中文字符算 2 列）；用 truncate 会按 rune 数算，
-		// 中文场景实际宽度 = 期望的 2 倍，导致弹窗溢出。
+		// truncateWidth cắt ngắn theo độ rộng hiển thị (ký tự Trung bình tính là 2 cột); dùng truncate sẽ tính theo số rune,
+		// trong ngữ cảnh văn bản Trung bình, độ rộng thực tế = 2 lần mong muốn, khiến popup bị tràn.
 		desc := truncateWidth(item.Description, max(12, contentW-18))
 		descText := descRenderer.Render(desc)
 		line := prefix + name
@@ -194,16 +194,16 @@ func renderCommandPalette(width int, items []commandPaletteItem, cursor int) str
 	if selectedIdx < 0 || selectedIdx >= len(visible) {
 		selectedIdx = 0
 	}
-	hint := mutedStyle.Render("↑↓ 选择 · Tab/Enter 接受 · Esc 关闭")
-	usage := "Usage: " + visible[selectedIdx].Usage
+	hint := mutedStyle.Render("↑↓ Chọn · Tab/Enter nhận · Esc đóng")
+	usage := "Cách dùng: " + visible[selectedIdx].Usage
 	if remaining > 0 {
-		usage = usage + " · 还有 " + strconv.Itoa(remaining) + " 个命令"
+		usage = usage + " · Còn " + strconv.Itoa(remaining) + " lệnh"
 	}
 	usageLine := mutedStyle.Render(truncateWidth(usage, contentW))
 	body = append(body, usageLine+strings.Repeat(" ", max(0, contentW-lipgloss.Width(usageLine))))
 	body = append(body, hint+strings.Repeat(" ", max(0, contentW-lipgloss.Width(hint))))
 
-	return renderPaddedModalFrame(boxW, len(body)+2, "命令", "", body)
+	return renderPaddedModalFrame(boxW, len(body)+2, "Lệnh", "", body)
 }
 
 func commandPaletteWindow(total, cursor, limit int) (start, end int) {

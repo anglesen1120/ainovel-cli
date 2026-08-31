@@ -18,27 +18,27 @@ import (
 	"github.com/voocel/ainovel-cli/internal/stylestat"
 )
 
-// Collected 是一次运行产出的只读采集结果。全部来自已有评测器与事实层，eval 不自己重算。
+// Collected kết quả thu thập。bộ đánh giá，eval 。
 type Collected struct {
 	Dir         string
-	Report      diag.Report // diag.Diagnose：工件 + 运行时 Findings + Stats
+	Report      diag.Report // diag.Diagnose： +  Findings + Stats
 	Progress    *domain.Progress
 	Checkpoints []domain.Checkpoint
-	Pending     map[string]bool // 残留信号：pending_commit/pending_steer/last_commit/last_review
-	LoadErrors  []string        // 契约依赖工件的真实读取失败（非"不存在"）；Grade 据此 hard fail
-	RuntimeErr  string          // runner 捕获的运行时错误（hard fail），空=无
+	Pending     map[string]bool // ：pending_commit/pending_steer/last_commit/last_review
+	LoadErrors  []string        // hợp đồngthất bại（"đã tồn tại"）；Grade  hard fail
+	RuntimeErr  string          // runner lỗi（hard fail），=
 	Style       StyleCollection
 	Usage       UsageMetrics
 	ToolCalls   int
 }
 
-// StyleCollection 是从章节终稿中采集的全书文体事实。
+// StyleCollection 。
 type StyleCollection struct {
 	Status string           `json:"status"` // ok / insufficient_sample
 	Stats  *stylestat.Stats `json:"stats,omitempty"`
 }
 
-// UsageMetrics 是 meta/usage.json 中已有的可靠成本/token 事实。
+// UsageMetrics  meta/usage.json chi phí/token 。
 type UsageMetrics struct {
 	Input         int     `json:"input,omitempty"`
 	Output        int     `json:"output,omitempty"`
@@ -49,9 +49,9 @@ type UsageMetrics struct {
 	UsageRecorded bool    `json:"usage_recorded"`
 }
 
-// Collect 对一个已完成的输出目录做离线采集。runtimeErr 是 runner 驱动期间的错误（如有）。
-// 工件读取错误不静默吞：文件不存在视为"无数据"，其余（损坏/无权限）记入 LoadErrors，
-// 避免"读不到 pending 文件"被误判成"没有 pending"而 false pass（fail-loud）。
+// Collect đầu ra。runtimeErr  runner điều khiểnlỗi（）。
+// lỗi：đã tồn tại""，（/） LoadErrors，
+// " pending "" pending" false pass（fail-loud）。
 func Collect(dir string, runtimeErr error) Collected {
 	s := store.NewStore(dir)
 	rep, _ := diag.Diagnose(s)
@@ -119,7 +119,7 @@ func collectStyle(s *store.Store, prog *domain.Progress, check func(string, erro
 			text, err := s.Drafts.LoadChapterText(ch)
 			check(fmt.Sprintf("chapter:%d", ch), err)
 			if strings.TrimSpace(text) == "" {
-				check(fmt.Sprintf("chapter:%d", ch), fmt.Errorf("progress 标记已完成但终稿为空"))
+				check(fmt.Sprintf("chapter:%d", ch), fmt.Errorf("progress "))
 				continue
 			}
 			input.Chapters = append(input.Chapters, text)
@@ -247,8 +247,8 @@ func countToolCallsInFile(path string) (int, error) {
 	return total, nil
 }
 
-// HasCheckpoint 判断采集到的 checkpoint 中是否存在匹配 spec 的记录。
-// spec 形如 "chapter:1:commit" / "arc:1:1:arc_summary" / "volume:1:volume_summary" / "global:layered_outline"。
+// HasCheckpoint  checkpoint đã tồn tại spec 。
+// spec  "chapter:1:commit" / "arc:1:1:arc_summary" / "volume:1:volume_summary" / "global:layered_outline"。
 func (c Collected) HasCheckpoint(spec string) (bool, error) {
 	scope, step, err := parseCheckpointSpec(spec)
 	if err != nil {
@@ -262,11 +262,11 @@ func (c Collected) HasCheckpoint(spec string) (bool, error) {
 	return false, nil
 }
 
-// parseCheckpointSpec 把契约串解析成 (Scope, step)。
+// parseCheckpointSpec hợp đồng (Scope, step)。
 func parseCheckpointSpec(spec string) (domain.Scope, string, error) {
 	parts := strings.Split(spec, ":")
 	bad := func() (domain.Scope, string, error) {
-		return domain.Scope{}, "", fmt.Errorf("非法 checkpoint 契约: %q", spec)
+		return domain.Scope{}, "", fmt.Errorf("không hợp lệ checkpoint hợp đồng: %q", spec)
 	}
 	if len(parts) < 2 {
 		return bad()

@@ -1,144 +1,144 @@
-# 外部小说语义导入管线
+# Pipeline nhập ngữ nghĩa tiểu thuyết bên ngoài
 
-> 状态：已实现（v1，`internal/host/imp`；截断前缀打捞含阶段三·补）
-> 日期：2026-07-15
-> 目标：让外部小说导入既能持续获得模型能力升级的收益，又具备全文不丢失、失败可诊断、崩溃可恢复和发布可验证的工程保证。
-> 修订：SourceUnit 顺序按 `(Line, Part)` 数值序（§7.3/§8.3）；截断前缀打捞降级为可后置的效率优化并要求可观测（§9.5/§13.3/§19）；语义函数模型档位开放为旋钮（§13.1/§17）。
-> 修订 2026-07-16：模型档位旋钮落地为 roles 配置 `import_segment/import_analyze/import_synthesize`（§13.1）；自然语言重切分落地为 `--guide` 与工作区 `guidance.txt` 语义输入（§18.3）；语义失败统一保存原始响应到 failures/（§14.2）；切分确认支持面板内 `y` 一次性放行（§8.4）；未完成导入在启动时主动提示（§18.2）。JSON Schema 模式（§13.2 第 1 级）暂未实现，标记 TODO 待与全仓其它模型调用点统一改造。
+> Trạng thái: đã triển khai (v1, `internal/host/imp`; cứu vớt tiền tố bị cắt ngắn kèm giai đoạn ba · bổ sung)
+> Ngày: 2026-07-15
+> Mục tiêu: để việc nhập tiểu thuyết bên ngoài vừa có thể liên tục hưởng lợi từ nâng cấp năng lực mô hình, vừa có bảo đảm kỹ thuật rằng toàn văn không mất, lỗi có thể chẩn đoán, sự cố có thể khôi phục và phát hành có thể xác minh.
+> Sửa đổi: thứ tự SourceUnit theo thứ tự số `(Line, Part)` (§7.3/§8.3); cứu vớt tiền tố bị cắt ngắn được hạ xuống thành tối ưu hiệu suất có thể để sau và phải quan sát được (§9.5/§13.3/§19); mô hình chức năng ngữ nghĩa mở thành núm điều chỉnh (§13.1/§17).
+> Sửa đổi 2026-07-16: núm điều chỉnh cấp mô hình được hiện thực hóa thành cấu hình roles `import_segment/import_analyze/import_synthesize` (§13.1); tái phân đoạn bằng ngôn ngữ tự nhiên được hiện thực hóa thành `--guide` và đầu vào ngữ nghĩa `guidance.txt` của workspace (§18.3); thất bại ngữ nghĩa thống nhất lưu phản hồi gốc vào failures/ (§14.2); xác nhận phân đoạn hỗ trợ phím `y` trong panel để cho qua một lần (§8.4); nhập chưa hoàn tất sẽ chủ động nhắc khi khởi động (§18.2). Chế độ JSON Schema (§13.2 cấp 1) tạm thời chưa triển khai, đánh dấu TODO để cải tạo thống nhất với các điểm gọi mô hình khác trong toàn kho.
 
-## 1. 一句话
+## 1. Một câu
 
-导入不是“用正则切文本，再让模型一次吐出整本书 JSON”，也不是一个自由运行的 Import Agent；它是一条**分阶段语义编译管线**：
+Nhập không phải là “dùng regex cắt văn bản, rồi để mô hình một lần nhả ra JSON cả quyển sách”, cũng không phải một Import Agent chạy tự do; nó là một **pipeline biên dịch ngữ nghĩa theo giai đoạn**:
 
-> 模型负责理解开放语义，代码负责坐标、覆盖、类型、哈希、顺序和幂等；全部语义产物在独立工作区验证完成后，才发布到正式书籍状态。
-
-```text
-外部文本
-  → 确定性读取与归一化
-  → LLM 识别章节/卷/附属文本边界
-  → 代码验证全文覆盖
-  → 用户确认切分（可显式授权自动接受）
-  → LLM 按连续章节批次提取逐章事实
-  → LLM 分层聚合全书语义
-  → 代码组装并验证 Foundation
-  → 幂等发布 Foundation 与章节
-  → 默认一次性暂停；显式 --continue 才按正常门禁接力
-```
-
-## 2. 为什么必须重构
-
-当前实现是：
+> Mô hình chịu trách nhiệm hiểu ngữ nghĩa mở, code chịu trách nhiệm tọa độ, phủ, kiểu, hash, thứ tự và tính idempotent; tất cả sản phẩm ngữ nghĩa chỉ sau khi đã xác minh xong trong workspace độc lập mới được phát hành sang trạng thái sách chính thức.
 
 ```text
-正则切章
-  → 全部章节正文一次性送入 ReverseFoundation
-  → 模型一次输出 premise / characters / world_rules / 全量章节大纲 / compass
-  → 立即写入正式 Foundation
-  → 再逐章读取同一正文、分析并 commit
+Văn bản bên ngoài
+  → Đọc và chuẩn hóa xác định
+  → LLM nhận diện ranh giới chương/ quyển/ văn bản phụ trợ
+  → Code xác minh toàn văn được phủ hết
+  → Người dùng xác nhận phân đoạn (có thể ủy quyền chấp nhận tự động rõ ràng)
+  → LLM trích xuất sự thật theo từng lô chương liên tiếp
+  → LLM tổng hợp ngữ nghĩa toàn sách theo tầng
+  → Code ghép và xác minh Foundation
+  → Phát hành Foundation và chương theo kiểu idempotent
+  → Mặc định tạm dừng một lần; chỉ khi có --continue rõ ràng mới nối tiếp theo cổng kiểm chuẩn bình thường
 ```
 
-它有四个结构性问题。
+## 2. Vì sao bắt buộc phải tái cấu trúc
 
-### 2.1 切章在枚举开放语义
+Triển khai hiện tại là:
 
-章节标题没有封闭语法。继续添加“第 N 章”“卷 N”“Chapter N”等正则，只能覆盖已经见过的格式，无法覆盖作者自定义标题、混合排版、卷章层级和未来格式。
+```text
+Cắt chương bằng regex
+  → Toàn bộ chính văn chương được đưa một lần vào ReverseFoundation
+  → Mô hình xuất một lần premise / characters / world_rules / toàn bộ dàn ý chương / compass
+  → Ghi ngay vào Foundation chính thức
+  → Sau đó lần lượt đọc lại cùng một chính văn, phân tích và commit từng chương
+```
 
-更严重的是，当前切分会让未命中的边界直接消失在结果里，并可能静默丢弃首个标题前文本、空章和被判断为尾部噪声的内容。代码无法证明这些内容应该被丢弃。
+Nó có bốn vấn đề mang tính cấu trúc.
 
-### 2.2 Foundation 调用输入和输出都随章数线性增长
+### 2.1 Cắt chương đang enumerate ngữ nghĩa mở
 
-`ReverseFoundation` 同时承担整书理解和全量章节大纲生成：输入包含全部正文，输出包含每一章的详细结构。54 章已经可能截断 JSON；提高 `max_tokens` 只会把失败点推迟到更长的书。
+Tiêu đề chương không có ngữ pháp đóng. Tiếp tục thêm regex “Chương N”, “Quyển N”, “Chapter N” chỉ có thể bao phủ những dạng đã thấy, không thể bao phủ tiêu đề do tác giả tự đặt, bố cục trộn lẫn, cấp bậc quyển/chương và định dạng tương lai.
 
-### 2.3 失败前已经修改正式状态
+Nghiêm trọng hơn, hiện tại việc cắt sẽ khiến các ranh giới không khớp bị biến mất ngay trong kết quả, và có thể âm thầm loại bỏ đoạn văn trước tiêu đề đầu tiên, chương rỗng và nội dung bị đánh giá là nhiễu cuối. Code không thể chứng minh những nội dung này đáng bị loại bỏ.
 
-Foundation 和章节边分析边发布。后续步骤失败时，用户得到的是一半导入完成、一半尚未分析的正式书籍状态。当前 `from=N` 只是假设用户知道从哪里恢复，无法证明源文件、切分结果和既有章节仍然一致。
+### 2.2 Input và output của lời gọi Foundation đều tăng tuyến tính theo số chương
 
-### 2.4 多处语义结论被硬编码
+`ReverseFoundation` đồng thời đảm nhiệm hiểu toàn bộ sách và sinh dàn ý đầy đủ cho tất cả chương: input chứa toàn bộ chính văn, output chứa cấu trúc chi tiết của từng chương. 54 chương đã có thể làm JSON bị cắt ngắn; tăng `max_tokens` chỉ đẩy điểm lỗi sang những cuốn dài hơn.
 
-当前方案还固定了：
+### 2.3 Trước khi thất bại đã sửa trạng thái chính thức
 
-- 导入正文只能是一卷；
-- 只能划分为 1～3 个弧；
-- 按已导入章数的 25/80 阈值选择 short/mid/long；
-- 为了允许续写而倾向强行制造 `open_threads`；
-- 每章必须有角色、固定数量事件和固定类型钩子。
+Foundation và từng chương được phân tích rồi phát hành song song. Khi bước sau thất bại, người dùng nhận được một trạng thái sách chính thức đã nhập một nửa, một nửa còn chưa phân tích. `from=N` hiện tại chỉ là giả định người dùng biết nên khôi phục từ đâu, không thể chứng minh file nguồn, kết quả phân đoạn và các chương sẵn có vẫn nhất quán.
 
-这些都不是可以从文件格式机械证明的事实，应由模型依据正文判断，或由用户明确表达意图。
+### 2.4 Nhiều kết luận ngữ nghĩa bị hard-code
 
-## 3. 目标与非目标
+Phương án hiện tại còn cố định:
 
-### 3.1 目标
+- phần chính văn nhập chỉ có thể là một quyển;
+- chỉ có thể chia thành 1～3 arc;
+- dùng ngưỡng 25/80 theo số chương đã nhập để chọn short/mid/long;
+- để cho phép tiếp viết mà thiên về ép sinh `open_threads`;
+- mỗi chương bắt buộc phải có nhân vật, số lượng sự kiện cố định và loại hook cố định.
 
-1. **开放格式可理解**：不要求用户把小说改成内置标题格式，也不要求用户编写正则。
-2. **全文可交代**：每段非空源文本都必须属于明确的章节或附属区域，禁止静默丢失。
-3. **规模可控**：不再有一次调用读取全书正文并输出全部章节对象；分段、双预算章节批次和区间综合都有局部输入输出边界，全局输出只随人物、卷弧等真实语义复杂度增长。
-4. **失败不污染**：语义分析和 Foundation 校验完成前，不写正式创作状态。
-5. **精确恢复**：恢复依据源快照和工件 `InputDigest`，不依赖 `from=N` 或用户记忆。
-6. **模型红利直达**：更强的模型直接改善边界识别、事实提取、卷弧划分和续写判断，无需增加 Go 规则。
-7. **复用正式提交语义**：发布章节继续使用 `commit_chapter` 的 PendingCommit、checkpoint 和 digest 幂等能力。
-8. **完整可观测**：进度、模型身份、用量、原始失败响应和最终错误都有明确落点。
-9. **交互与自动化并存**：默认让用户确认高风险语义边界，同时提供显式无人值守授权；自动路径不依赖静默猜测。
+Tất cả những điều này không phải là факт có thể chứng minh cơ học từ định dạng file; chúng phải do mô hình phán đoán dựa trên chính văn, hoặc do người dùng biểu đạt rõ ý định.
 
-### 3.2 非目标
+## 3. Mục tiêu và ngoài phạm vi
 
-- 不构建 Coordinator 或通用 Agent 长循环。
-- 不构建通用 Workflow/PolicyEngine/任务图框架。
-- 不自动修复或改写用户原文。
-- 不为导入实现数据库、向量检索或分布式并行。
-- 不支持把另一部小说模糊合并进已有书籍。
-- 不实现旧 `from=N` 状态迁移或双轨兼容。
-- 不在本 RFC 中扩展 EPUB/PDF；第一版仍只接收 txt/md，读取层保持局部，未来可替换而不改变后续契约。
+### 3.1 Mục tiêu
 
-## 4. 职责边界
+1. **Định dạng mở có thể hiểu**: không yêu cầu người dùng đổi tiểu thuyết sang định dạng tiêu đề tích hợp, cũng không yêu cầu người dùng tự viết regex.
+2. **Toàn văn có thể bàn giao**: mỗi đoạn nguồn không rỗng đều phải thuộc về một chương hoặc vùng phụ trợ rõ ràng, cấm mất mát âm thầm.
+3. **Quy mô có thể kiểm soát**: không còn một lần gọi đọc toàn bộ chính văn và xuất toàn bộ đối tượng chương; phân đoạn, batch chương hai ngân sách và tổng hợp theo khoảng đều có ranh giới input/output cục bộ, output toàn cục chỉ tăng theo độ phức tạp ngữ nghĩa thực như nhân vật, quyển, arc.
+4. **Thất bại không làm ô nhiễm**: trước khi phân tích ngữ nghĩa và xác minh Foundation hoàn tất, không ghi trạng thái sáng tác chính thức.
+5. **Khôi phục chính xác**: khôi phục dựa trên snapshot nguồn và `InputDigest` của artifact, không phụ thuộc `from=N` hay trí nhớ của người dùng.
+6. **Hưởng lợi trực tiếp từ mô hình**: mô hình mạnh hơn cải thiện trực tiếp nhận diện ranh giới, trích xuất факт, chia arc của quyển và phán đoán tiếp viết, không cần thêm quy tắc Go.
+7. **Tái sử dụng ngữ nghĩa commit chính thức**: phát hành chương tiếp tục dùng năng lực idempotent của `PendingCommit`, checkpoint và digest trong `commit_chapter`.
+8. **Quan sát đầy đủ**: tiến độ, danh tính mô hình, mức dùng, phản hồi gốc khi thất bại và lỗi cuối cùng đều có điểm ghi nhận rõ ràng.
+9. **Tương tác và tự động hóa song hành**: mặc định để người dùng xác nhận các ranh giới ngữ nghĩa có rủi ro cao, đồng thời cung cấp ủy quyền rõ ràng không người giám sát; đường tự động không dựa vào đoán ngầm im lặng.
 
-| 问题 | 归属 | 原因 |
+### 3.2 Ngoài phạm vi
+
+- Không xây Coordinator hay vòng lặp dài của agent tổng quát.
+- Không xây framework Workflow/PolicyEngine/đồ thị tác vụ tổng quát.
+- Không tự sửa hay viết lại nguyên văn của người dùng.
+- Không hiện thực database, truy hồi vector hay song song phân tán cho nhập.
+- Không hỗ trợ nhập mơ hồ và gộp tiểu thuyết khác vào sách hiện có.
+- Không hiện thực di trú trạng thái kiểu cũ `from=N` hay tương thích hai luồng.
+- Không mở rộng EPUB/PDF trong RFC này; bản đầu vẫn chỉ nhận txt/md, lớp đọc vẫn cục bộ, tương lai có thể thay thế mà không đổi hợp đồng phía sau.
+
+## 4. Ranh giới trách nhiệm
+
+| Vấn đề | Thuộc về | Lý do |
 |---|---|---|
-| 字节解码、换行归一化 | Go | 文件格式和确定性转换 |
-| 哪个源位置是章标题、卷标题或附属文本 | LLM | 开放语义，不可穷举 |
-| 标题对应哪个稳定源位置 | Go | SourceUnit、原文锚点和字节范围可机械验证 |
-| 某章发生了什么 | LLM | 文学语义理解 |
-| 人物、世界规则、伏笔和关系如何归纳 | LLM | 跨章语义归纳 |
-| 卷弧边界、故事是否收束、规划级别 | LLM | 取决于叙事形状，不取决于固定阈值 |
-| 章节范围是否递增、不重叠、全覆盖 | Go | 可证明不变量 |
-| JSON 类型、闭集枚举、引用章号是否合法 | Go | 类型化契约 |
-| 是否可以复用已有分析 | Host/Workspace | 真实语义输入能重建相同 `InputDigest` 才可复用 |
-| 何时写正式书籍状态 | Host/Store | 发布协议和崩溃恢复 |
-| 是否授权按当前切分继续 | 用户/Intent | 交互确认或显式 `--yes`，不由代码偷偷代答 |
+| Giải mã byte, chuẩn hóa xuống dòng | Go | Định dạng file và chuyển đổi xác định |
+| Vị trí nguồn nào là tiêu đề chương, tiêu đề quyển hay văn bản phụ trợ | LLM | Ngữ nghĩa mở, không thể liệt kê hết |
+| Tiêu đề tương ứng với vị trí nguồn ổn định nào | Go | Có thể xác minh cơ học SourceUnit, neo nguyên văn và phạm vi byte |
+| Một chương nói về điều gì | LLM | Hiểu ngữ nghĩa văn học |
+| Nhân vật, quy tắc thế giới, mồi câu và quan hệ được khái quát thế nào | LLM | Khái quát ngữ nghĩa xuyên chương |
+| Ranh giới arc, câu chuyện đã khép hay chưa, mức độ lập kế hoạch | LLM | Phụ thuộc hình thái tự sự, không phụ thuộc ngưỡng cố định |
+| Phạm vi chương có tăng dần, không chồng lấn, phủ hết hay không | Go | Bất biến có thể chứng minh |
+| Kiểu JSON, enum đóng, số chương được tham chiếu có hợp lệ không | Go | Hợp đồng được kiểu hóa |
+| Có thể tái sử dụng phân tích sẵn có hay không | Host/Workspace | Chỉ khi input ngữ nghĩa thực có thể tái tạo cùng `InputDigest` |
+| Khi nào ghi trạng thái sách chính thức | Host/Store | Giao thức phát hành và khôi phục sau sự cố |
+| Có cho phép tiếp tục theo cách phân đoạn hiện tại hay không | Người dùng/Intent | Xác nhận tương tác hoặc `--yes` rõ ràng, không để code âm thầm trả lời thay |
 
-这里的 LLM 调用不是 Arbiter 控制面，也不是 Worker 创作循环。它们是边界明确的**语义函数**：类型化事实进，类型化语义结果出，Host 校验后执行。
+Các lời gọi LLM ở đây không phải control plane của Arbiter, cũng không phải vòng sáng tạo của Worker. Chúng là **hàm ngữ nghĩa** với ranh giới rõ ràng: input là факты đã kiểu hóa, output là kết quả ngữ nghĩa đã kiểu hóa, Host kiểm tra rồi mới thực thi.
 
-## 5. 总体架构
+## 5. Kiến trúc tổng thể
 
 ```text
 [TUI / Headless]
-       │ /import <path> / 自动授权 / 确认 / 取消
+       │ /import <path> / ủy quyền tự động / xác nhận / hủy
 [Host]
-       │ 独占导入生命周期、事件、模型运行时
+       │ vòng đời nhập, sự kiện, runtime mô hình độc quyền
 [imp.Runner]
-       ├── LoadState → NextAction（只从工作区事实推导）
-       ├── Source     读取、解码、归一化、快照
-       ├── Segment    结构投影 → LLM 边界识别 → 覆盖校验
-       ├── Analyze    双预算连续批次 → 逐章事实暂存
-       ├── Synthesize 分层归纳 → BookSynthesis
-       ├── Validate   组装并验证完整 Foundation
-       └── Publish    正式 Foundation → commit_chapter
+       ├── LoadState → NextAction (chỉ suy ra từ факт workspace)
+       ├── Source     đọc, giải mã, chuẩn hóa, snapshot
+       ├── Segment    projection cấu trúc → LLM nhận diện ranh giới → kiểm tra phủ
+       ├── Analyze    batch liên tiếp với hai ngân sách → tạm lưu факт từng chương
+       ├── Synthesize tổng hợp theo tầng → BookSynthesis
+       ├── Validate   ghép và xác minh Foundation đầy đủ
+       └── Publish    Foundation chính thức → commit_chapter
                │
-[meta/import 工作区]          [正式 Store]
-源快照/切分/分析/综合结果      Progress/Checkpoint/Artifact/PendingCommit
+[workspace meta/import]          [Store chính thức]
+snapshot nguồn/phân đoạn/phân tích/tổng hợp      Progress/Checkpoint/Artifact/PendingCommit
 ```
 
-Runner 是普通的确定性阶段编排，不拥有自由决策能力。它每次只执行 `NextAction` 推导出的一个动作，动作完成后重新读取事实。
+Runner là một bộ điều phối giai đoạn xác định bình thường, không có năng lực quyết định tự do. Mỗi lần nó chỉ thực thi một hành động được suy ra từ `NextAction`, xong hành động lại đọc факт.
 
-## 6. 工作区与状态推导
+## 6. Workspace và suy diễn trạng thái
 
-导入中的事实存放在书目录下：
+Các факт trong quá trình nhập được lưu dưới thư mục sách:
 
 ```text
 meta/import/
 ├── manifest.json
 ├── intent.json
 ├── source.txt
-├── guidance.txt          # 存在时：用户自然语言切分指导（--guide），是 segmentation 的语义输入
+├── guidance.txt          # nếu tồn tại: chỉ dẫn phân đoạn bằng ngôn ngữ tự nhiên của người dùng (--guide), là input ngữ nghĩa của segmentation
 ├── segmentation.json
 ├── confirmation.json
 ├── analyses/
@@ -155,9 +155,9 @@ meta/import/
     └── last-response.txt
 ```
 
-第一版保留工作区。它既是恢复依据，也是导入审计记录；不增加自动清理和历史归档机制。
+Bản đầu giữ lại workspace. Nó vừa là căn cứ khôi phục, vừa là hồ sơ kiểm toán nhập; không thêm cơ chế dọn dẹp tự động hay lưu trữ lịch sử.
 
-`intent.json` 保存用户启动导入时的显式授权（自动确认、uncertain 故事状态预选、是否跳过完成 Hold）。这些是恢复后仍必须遵守的用户意图，不是可由工件猜出的阶段状态；创建后不被 Runner 静默改写。
+`intent.json` lưu ủy quyền rõ ràng của người dùng khi khởi động nhập (tự xác nhận, preselect trạng thái câu chuyện uncertain, có bỏ qua Hold hoàn tất hay không). Đây là ý định người dùng vẫn phải tuân theo sau khi khôi phục, không phải trạng thái giai đoạn có thể suy từ artifact; sau khi tạo xong, Runner không được âm thầm ghi đè.
 
 ### 6.1 Manifest
 
@@ -180,33 +180,33 @@ type ImportIntent struct {
 }
 ```
 
-- `source.txt` 是归一化后的本地快照，恢复不再依赖原路径仍然存在；
-- Manifest 不保存绝对源路径，避免泄露机器目录并消除移动文件带来的恢复问题；
-- Intent 只接受闭集值，精确保存启动命令中的用户授权；恢复时不从当前 advance mode 反推旧意图；
-- schema 版本不匹配时显式要求使用匹配版本继续或重新导入，不猜测迁移。
+- `source.txt` là snapshot cục bộ đã chuẩn hóa, khi khôi phục không còn phụ thuộc vào việc đường dẫn gốc có còn tồn tại hay không;
+- Manifest không lưu đường dẫn nguồn tuyệt đối, tránh lộ thư mục máy và loại bỏ vấn đề khôi phục do file bị di chuyển;
+- Intent chỉ nhận giá trị đóng, lưu chính xác ủy quyền của người dùng trong lệnh khởi động; khi khôi phục không suy ngược ý định cũ từ advance mode hiện tại;
+- Khi schema version không khớp thì yêu cầu rõ ràng dùng phiên bản khớp để tiếp tục hoặc nhập lại, không đoán di trú.
 
-首次创建时先在同级临时目录写齐并校验 manifest、intent、source，再以目录 rename 发布为 `meta/import/`；`meta/import/` 不存在就不算活动工作区。这样初始三件套不会以半初始化形态进入 `NextAction`，也不需要为创建过程增加 `stage=initializing`。启动时发现残留初始化目录要显式提示并保留诊断信息，不自动当作成功工作区，也不静默删除。
+Lúc tạo lần đầu, hãy ghi đủ và kiểm tra manifest, intent, source trong thư mục tạm cùng cấp trước, rồi rename thư mục để phát hành thành `meta/import/`; không có `meta/import/` thì chưa tính là workspace hoạt động. Như vậy bộ ba khởi đầu sẽ không vào `NextAction` dưới trạng thái khởi tạo nửa chừng, và cũng không cần thêm `stage=initializing` cho quá trình tạo. Khi khởi động phát hiện thư mục khởi tạo còn sót lại thì phải nhắc rõ và giữ thông tin chẩn đoán, không tự động coi là workspace thành công, cũng không âm thầm xóa.
 
-### 6.2 不保存可漂移的阶段枚举
+### 6.2 Không lưu enum giai đoạn có thể trôi
 
-持久状态不写 `stage=analyzing`、`current=37` 之类控制字段。下一动作由工件推导：
+Trạng thái bền không ghi các trường điều khiển kiểu `stage=analyzing`, `current=37`. Hành động tiếp theo được suy từ artifact:
 
 ```text
-无 manifest/intent/source   → ingest
-无 segmentation            → segment
-无匹配 segmentation 输入摘要的 confirmation → await_confirmation / auto_confirm
-存在缺失或输入摘要不符的章节分析             → analyze_first_missing
-缺少输入匹配的 RangeDigest 或 synthesis      → synthesize_first_missing
-story_status=uncertain 且无匹配的用户选择     → await_story_resolution
-正式工件与 synthesis 不一致                 → publish
-全部正式工件一致                            → done
+không có manifest/intent/source   → ingest
+không có segmentation            → segment
+không có confirmation khớp với digest input của segmentation → await_confirmation / auto_confirm
+có phân tích chương thiếu hoặc không khớp digest input             → analyze_first_missing
+thiếu RangeDigest hoặc synthesis khớp input                         → synthesize_first_missing
+story_status=uncertain và không có lựa chọn người dùng khớp         → await_story_resolution
+artifact chính thức và synthesis không nhất quán                 → publish
+tất cả artifact chính thức đều nhất quán                          → done
 ```
 
-事件中的 `Stage` 只用于 UI 展示，不是恢复事实源。
+`Stage` trong sự kiện chỉ dùng để hiển thị UI, không phải nguồn sự thật để khôi phục.
 
-### 6.3 统一工件身份
+### 6.3 Định danh artifact thống nhất
 
-不实现依赖图。工作区中的每份语义工件统一采用同一个身份规则：
+Không hiện thực dependency graph. Mọi artifact ngữ nghĩa trong workspace đều dùng cùng một quy tắc định danh:
 
 ```go
 type Artifact[T any] struct {
@@ -216,50 +216,50 @@ type Artifact[T any] struct {
 }
 ```
 
-`InputDigest` 覆盖该动作实际消费的全部**语义输入**，按固定顺序编码后计算：
+`InputDigest` bao trùm toàn bộ **input ngữ nghĩa** mà hành động thực sự tiêu thụ, được mã hóa theo thứ tự cố định rồi tính toán:
 
-- segmentation：归一化源内容、SourceUnit 投影、用户指导和分段 prompt/schema 版本；
-- confirmation：segmentation 内容和确认方式；
-- 章节分析：批次章节范围及正文、进入批次前的连续性 ledger、prompt/schema 版本和用户指导；
-- RangeDigest/BookSynthesis：各自消费的有序分析或下层 digest 内容、综合 prompt/schema 版本；
-- story resolution：synthesis 内容和用户选择；
-- 发布：待发布领域对象的规范化内容。
+- segmentation: nội dung nguồn đã chuẩn hóa, projection SourceUnit, hướng dẫn của người dùng và prompt/schema version của phân đoạn;
+- confirmation: nội dung segmentation và cách xác nhận;
+- phân tích chương: phạm vi batch chương và chính văn, ledger tính liên tục trước khi vào batch, prompt/schema version và hướng dẫn của người dùng;
+- RangeDigest/BookSynthesis: nội dung phân tích đã có thứ tự hoặc digest tầng dưới mà mỗi bên tiêu thụ, prompt/schema version của tổng hợp;
+- story resolution: nội dung synthesis và lựa chọn người dùng;
+- phát hành: nội dung chuẩn hóa của đối tượng miền sắp phát hành.
 
-provider/model、usage、thinking 等执行事实写入 provenance/session，不因模型配置变化自动使已成功分析失效；用户要求重新分析时显式删除对应工件。缓存复用判断只看当前动作能否重建出相同 `InputDigest`。
+provider/model, usage, thinking và các факт thực thi được ghi vào provenance/session, không làm mất hiệu lực tự động của phân tích đã thành công chỉ vì cấu hình mô hình thay đổi; nếu người dùng yêu cầu phân tích lại thì phải xóa rõ artifact tương ứng. Quyết định tái sử dụng cache chỉ nhìn xem hành động hiện tại có thể tái tạo cùng một `InputDigest` hay không.
 
-`NextAction` 沿固定线性管线寻找第一份缺失、解析失败或 `InputDigest` 不匹配的工件。重新切分、修改用户指导或改变上游事实时，下游自然失配；不编写“切分变化时手工删除哪些文件”的失效规则。
+`NextAction` đi theo pipeline tuyến tính cố định để tìm artifact đầu tiên bị thiếu, lỗi phân tích hoặc không khớp `InputDigest`. Khi phân đoạn lại, sửa hướng dẫn người dùng hoặc thay đổi факты đầu vào, các tầng sau sẽ tự lệch khớp; không viết quy tắc mất hiệu lực kiểu “khi phân đoạn đổi thì phải xóa tay những file nào”.
 
-发布时正式工件与综合结果逐项比对；相同则幂等跳过，不同则报告冲突，不覆盖猜测。因此删除 `ResumeFrom`。恢复只需要再次执行 `/import`；Runner 会从第一份缺失事实继续。
+Khi phát hành, so sánh từng mục giữa artifact chính thức và kết quả tổng hợp; nếu giống thì bỏ qua idempotent, nếu khác thì báo xung đột, không ghi đè đoán mò. Vì vậy loại bỏ `ResumeFrom`. Khôi phục chỉ cần chạy lại `/import`; Runner sẽ tiếp tục từ факт đầu tiên còn thiếu.
 
-## 7. 源文件读取
+## 7. Đọc file nguồn
 
-### 7.1 解码
+### 7.1 Giải mã
 
-第一版支持：
+Bản đầu hỗ trợ:
 
-- UTF-8 / UTF-8 BOM；
-- GB18030（覆盖常见 GBK 小说文本）。
+- UTF-8 / UTF-8 BOM;
+- GB18030 (bao phủ các văn bản tiểu thuyết GBK phổ biến).
 
-解码结果必须返回所选 encoding，并写入 Manifest 和进度事件。不能把“尝试 GB18030”藏成无声兜底。无法可靠解码或出现不可接受替换字符时直接失败，错误包含检测结果。
+Kết quả giải mã phải trả về encoding đã chọn, và ghi vào Manifest cùng event tiến độ. Không được giấu “thử GB18030” thành fallback im lặng. Nếu không giải mã đáng tin cậy hoặc xuất hiện ký tự thay thế không chấp nhận được thì thất bại ngay, lỗi phải bao gồm kết quả phát hiện.
 
-### 7.2 归一化
+### 7.2 Chuẩn hóa
 
-只做不会改变文学内容的转换：
+Chỉ làm các chuyển đổi không thay đổi nội dung văn học:
 
-- 移除 BOM；
-- CRLF/CR 统一为 LF；
-- 保留空行、缩进、标题行和正文字符；
-- 不删除首部文本、空章、广告、版权信息或所谓尾部噪声。
+- loại bỏ BOM;
+- CRLF/CR thống nhất thành LF;
+- giữ nguyên dòng trống, thụt đầu dòng, dòng tiêu đề và ký tự chính văn;
+- không xóa văn bản đầu file, chương rỗng, quảng cáo, thông tin bản quyền hay cái gọi là nhiễu cuối.
 
-所有排除决定留给分段语义结果并在预览中显示。
+Mọi quyết định loại trừ đều để lại cho kết quả ngữ nghĩa của phân đoạn và hiển thị trong bản xem trước.
 
-### 7.3 稳定坐标
+### 7.3 Tọa độ ổn định
 
-归一化文本建立统一的 `SourceUnit` 表：
+Văn bản đã chuẩn hóa dựng một bảng `SourceUnit` thống nhất:
 
 ```go
 type SourceUnit struct {
-	ID        string // L1257；超预算行拆为 L1257.1、L1257.2
+	ID        string // L1257; line vượt ngân sách sẽ tách thành L1257.1, L1257.2
 	Line      int
 	Part      int
 	StartByte int
@@ -268,40 +268,38 @@ type SourceUnit struct {
 }
 ```
 
-- `ID` 仅用于展示与模型引用；所有顺序、包含与递增判断一律按 `(Line, Part)` 数值元组比较，禁止对 ID 字符串做字典序比较（`"L900"` 字典序会大于 `"L1000"`）；投影 JSON 保留字符串 id，Go 侧解析成 `(Line, Part)` 后再比；
-- 正常行对应一个 unit，常见路径仍然是直观的行号坐标；
-- 单行超过结构投影预算时，Go 只在 UTF-8 字符边界生成多个**虚拟 unit**；
-- 虚拟分片不写回 `source.txt`，不插入软换行，不改变任何源字符；
-- 同一 unit 内存在边界时，模型返回 unit ID 和一段逐字复制的原文锚点；Go 要求锚点在该 unit 内唯一，再映射为精确字节位置；
-- 锚点不存在或不唯一时，把具体错误反馈给模型，禁止猜 offset、截断文本或要求用户先修改原稿。
+- `ID` chỉ dùng để hiển thị và mô hình tham chiếu; mọi quyết định về thứ tự, bao hàm và tăng dần đều phải so sánh theo tuple số `(Line, Part)`, cấm so sánh thứ tự từ điển trên chuỗi ID (`"L900"` theo thứ tự từ điển sẽ lớn hơn `"L1000"`); JSON projection giữ id dạng chuỗi, phía Go phân tích thành `(Line, Part)` rồi mới so sánh;
+- line bình thường tương ứng một unit, đường đi thường gặp vẫn là tọa độ theo số dòng trực quan;
+- khi một line dài vượt ngân sách projection cấu trúc, Go chỉ tạo nhiều **virtual unit** tại ranh giới ký tự UTF-8;
+- các mảnh ảo không ghi ngược vào `source.txt`, không chèn soft newline, không thay đổi bất kỳ ký tự nguồn nào;
+- khi có ranh giới bên trong cùng một unit, mô hình trả về unit ID và một neo nguyên văn được sao chép từng chữ; Go yêu cầu neo phải duy nhất trong unit đó rồi mới ánh xạ thành vị trí byte chính xác;
+- nếu neo không tồn tại hoặc không duy nhất, trả lỗi cụ thể về cho mô hình, cấm đoán offset, cắt ngắn văn bản hoặc yêu cầu người dùng sửa nguyên tác trước.
 
-因此普通分章文本保持行号模型，整段无换行、同一行包含多个章节或异常长行也使用同一套坐标类型处理。
+Vì vậy văn bản phân chương bình thường vẫn giữ mô hình số dòng, đoạn dài không có xuống dòng, một dòng chứa nhiều chương hoặc line quá dài cũng xử lý bằng cùng một kiểu tọa độ.
 
-## 8. 语义切分
+## 8. Phân đoạn ngữ nghĩa
 
-### 8.1 结构投影
+### 8.1 Projection cấu trúc
 
-模型看到按上下文预算分块的结构投影：
+Mô hình nhìn thấy projection cấu trúc được chia theo ngân sách ngữ cảnh:
 
 ```json
 {
   "owned_units": {"start": "L1200", "end": "L1800"},
   "context_units": {"start": "L1180", "end": "L1820"},
   "units": [
-    {"id": "L1200", "line": 1200, "text": "风从城门外吹来。", "blank_before": true},
-    {"id": "L1257", "line": 1257, "text": "卷二·北境", "blank_before": true, "blank_after": true}
+    {"id": "L1200", "line": 1200, "text": "Gió từ ngoài cổng thành thổi tới.", "blank_before": true},
+    {"id": "L1257", "line": 1257, "text": "Quyển hai·Bắc cảnh", "blank_before": true, "blank_after": true}
   ],
   "user_guidance": ""
 }
 ```
 
-上下文区可以重叠，但每次调用只能为 `owned_units` 返回结果，因此不存在重叠块投票或冲突合并。坐标纪律由 Go 执行（2026-07-16 修订）：模型在上下文区返回的边界不触发语义重问——该边界归相邻块管辖（它会在自己的 owned 区间再报告一次），代码直接裁掉并回显说明；语义重试只留给真正的语义失败（投影外的幻觉 ID、非法 kind 等）。旧行为对越界反馈重问，弱模型常把 3 次尝试全部耗尽拖垮整块。
+Vùng ngữ cảnh có thể chồng lấn, nhưng mỗi lần gọi chỉ được trả kết quả cho `owned_units`, vì vậy không tồn tại bỏ phiếu giữa các khối chồng lấn hay hợp nhất xung đột. Kỷ luật tọa độ do Go thực thi (sửa đổi 2026-07-16): ranh giới do mô hình trả về trong vùng ngữ cảnh sẽ không kích hoạt hỏi lại ngữ nghĩa — ranh giới đó thuộc quyền quản của khối kề bên (nó sẽ báo lại trong khoảng owned của nó), code cắt bỏ trực tiếp và trả mô tả; retry ngữ nghĩa chỉ dành cho lỗi ngữ nghĩa thật sự (ID ảo nằm ngoài projection, kind không hợp lệ, v.v.). Hành vi cũ hỏi lại khi nhận phản hồi vượt biên khiến mô hình yếu thường tiêu hết cả 3 lần thử và kéo sập cả khối.
 
-分块大小由当前 architect 模型的 context window 和保留预算计算，不按固定行数或固定章节数切块。模型上下文扩大后，调用次数自然下降。规划预算并非满额使用（2026-07-16 修订）：owned 正文只是请求的一部分，规划时扣除系统提示与指导的实际长度、再按 3/4 折算投影 JSON 包装的暴涨；上下文区另有字节上限（chunkBytes/8，下限 4096），拦截超长行虚拟分片吞掉输入预算。输出侧对称兜底：单块边界 JSON 被长度截断（大量短章节）时对半缩块递归重试——半块有独立缓存路径，重试成果不重付；单元级仍截断才是真容量不足。
+Kích thước khối được tính theo context window và ngân sách giữ lại của architect model hiện tại, không chia khối theo số dòng hay số chương cố định. Khi ngữ cảnh mô hình lớn hơn, số lần gọi tự nhiên giảm. Ngân sách lập kế hoạch không dùng hết toàn bộ (sửa đổi 2026-07-16): chính văn owned chỉ là một phần của yêu cầu, khi lập kế hoạch phải trừ chiều dài thực của system prompt và hướng dẫn, rồi lại nhân 3/4 để bù phần phình của bao JSON projection; vùng ngữ cảnh còn có giới hạn byte riêng (chunkBytes/8, tối thiểu 4096), chặn mảnh ảo của line quá dài nuốt ngân sách input. Phía output có cơ chế dự phòng đối xứng: khi JSON ranh giới của một khối bị cắt theo độ dài (nhiều chương ngắn) thì sẽ đệ quy thử lại với khối nửa nhỏ hơn — khối nửa có đường cache riêng, kết quả thử lại không phải trả phí lại; nếu đến cấp unit vẫn bị cắt thì mới là thiếu dung lượng thật sự. Quyết định biên giới của từng khối được ghi xuống đĩa dưới dạng artifact (`segment-chunks/chunk-*.json`, danh tính = danh tính cắt + MaxUnitBytes + phạm vi owned của khối — bảng unit được xác định duy nhất bởi “nguồn đã chuẩn hóa + MaxUnitBytes”; khi đổi mức và tái tạo phân mảnh cho dòng siêu dài, cache tự nhiên không khớp, không thể tái sử dụng nhầm biên giới cũ bị lệch), bất kỳ khối nào thất bại hoặc bị gián đoạn thì khi chạy lại, các khối đã hoàn thành sẽ được tái sử dụng không gọi lại — cùng một triết lý với analyze theo từng chương và synthesize theo từng khoảng; sau khi segmentation cuối cùng được ghi xuống đĩa thì cache cấp khối bị xóa. Khi hợp nhất cuối (resolve) thất bại cũng xóa cache khối và ghi snapshot quyết định vào `failures/`: lúc này digest của cache luôn khớp, giữ lại nó sẽ khiến chạy lại không gọi nào nhưng đọc lại đúng cùng một nhóm biên giới, tái hiện quyết định cùng một thất bại một cách xác định. Biên giới chương có chính văn rỗng (thường gặp ở nguồn tiểu thuyết mạng thật với tiêu đề giữ chỗ kiểu "đã khóa/chương trả phí") không thất bại toàn cục: được gộp vào đoạn trước (không mất một chữ nào), ghi vào `Segmentation.Notes` để hiển thị trong bản xem trước xác nhận, nếu người dùng không chấp nhận có thể dùng `--guide` để phân xử.
 
-每块的边界决策以工件形式落盘（`segment-chunks/chunk-*.json`，身份 = 切分身份 + MaxUnitBytes + 块 owned 范围——unit 表由「归一化源 + MaxUnitBytes」唯一确定，换档位重塑超长行分片时缓存自然失配，不会复用错位的旧边界），任何一块失败或中断，重跑时已完成块零调用复用——与 analyze 逐章、synthesize 逐区间同一哲学；最终 segmentation 落盘后块级缓存删除。终局整合（resolve）失败时同样清除块缓存并把决策快照落 `failures/`：此时缓存 digest 恒匹配，保留它会让重跑零调用复读同一批边界、确定性复现同一失败。空正文的章节边界（真实网络小说源常见"已锁定/付费章节"占位标题）不整体失败：并入前段（文本一字不丢），记入 `Segmentation.Notes` 由确认预览呈现，人工不认可可用 `--guide` 裁定。
-
-### 8.2 模型输出
+### 8.2 Đầu ra của mô hình
 
 ```go
 type BoundaryDecision struct {
@@ -314,59 +312,59 @@ type BoundaryDecision struct {
 }
 ```
 
-- `chapter` 是可提交正文单元，包括序章、楔子、番外等是否算章的语义判断；
-- `group` 是卷、部、篇等上层结构证据，不直接当作章节；
-- `front_matter` / `back_matter` 标记明确不进入章节正文的附属区域；
-- `anchor` 必须逐字来自对应 unit；边界位于 unit 起点时可以省略；
-- `uncertain` 只用于预览提示，不由代码设置置信度阈值。
+- `chapter` là đơn vị chính văn có thể nộp, bao gồm cả quyết định ngữ nghĩa về việc có tính phần mở đầu, mồi câu, truyện ngoài hay không;
+- `group` là bằng chứng cấu trúc cấp trên như quyển, bộ, thiên, không trực tiếp tính là chương;
+- `front_matter` / `back_matter` đánh dấu các vùng phụ trợ rõ ràng không đi vào chính văn chương;
+- `anchor` bắt buộc phải từng chữ lấy từ unit tương ứng; nếu biên giới nằm ngay ở đầu unit thì có thể lược bỏ;
+- `uncertain` chỉ dùng để nhắc nhở trong bản xem trước, không phải do mã đặt ngưỡng tin cậy.
 
-不让模型生成正则。正则仍然会把开放语义压回有限语法，并引入转义、局部匹配和统一格式假设。
+Không cho mô hình sinh regex. Regex vẫn sẽ ép ngữ nghĩa mở về cú pháp hữu hạn, đồng thời đưa vào giả định về escape, khớp cục bộ và định dạng thống nhất.
 
-### 8.3 代码校验
+### 8.3 Kiểm tra bằng code
 
-Go 只校验：
+Go chỉ kiểm tra:
 
-1. 所有 unit ID 存在且落在调用的投影内（owned + 上下文区；投影外是幻觉，带反馈重问）；
-2. owned 区边界的 kind 属闭集、非空 anchor 在对应 unit 内唯一并映射到 UTF-8 字节边界、同位不语义冲突（kind/标题不同时保留哪个不由 Go 裁定，重问交模型；完全相同的重复是机械冗余，放行后静默去重）、首块须有边界兜住文本起点（开头是不是前言由模型判断，不由 Go 代答）——都在调用期校验（2026-07-16 修订）：坏值放进块缓存后终局才发现，digest 恒匹配会让失败确定性复现；上下文区边界注定被裁掉，不为其重问；
-2a. **标题回显**（2026-07-16 修订，seg-v2）：chapter/group 边界的 title 归一化（去空白）后必须真实存在于边界单元原文，否则调用期重问——实测某分页抓取源 157 章里 67 章是模型在章中续文上编造的边界与标题（覆盖纪律歧义迫使每块块首设边界），全部能被此项事实核对拦下。语义裁量仍归模型：真无标题规约的源置 `uncertain=true` 可保留归纳标题（预览呈现存疑标记）；front/back matter 的描述性标题低风险，不核对。prompt 同步收紧：边界只落真实结构分隔处，块首为上一章延续正文时返回空 boundaries 是正确输出（首块头部覆盖除外）；
-3. 边界次序与重复由 Go 确定性修复而非否决（2026-07-16 修订）：按解析后的字节稳定排序恢复真实顺序——块间顺序由 owned 区间不重叠保证，乱序只可能发生在块内，排序零信息损失；同字节重复保留先出现者并记入 `Notes`。旧行为要求严格递增否则整体失败，实测 319 个边界败于 1 处块内倒序，且块缓存会让该失败确定性复现。顺序判断一律按 `(Line, Part)` 数值序，不对 ID 做字典序比较；
-4. 每个产出章节正文范围非空（空正文占位标题并入前段，见 §8.1）；
-5. 所有非空源文本恰好属于一个章节、一个 group 标题或明确的 front/back matter（起始未归属的非空文本——书首简介/广告被漏报边界——由 Go 确定性收为 front_matter 并记 `Notes` 交确认预览，不终局否决）；
-5a. 同名章节（标题去空白后相同）记入 `Notes` 交人工核对（2026-07-16 修订）——有标题规约的源里章名不该重复，重复是"同章被误切"的确定性信号；是否合并不由 Go 裁定，Notes 非空即阻断 `--yes`；
-6. 没有重叠、越界或未归属范围；
-7. group 不被错误计入章节总数。
+1. Tất cả unit ID đều tồn tại và nằm trong phép chiếu của lần gọi (owned + vùng ngữ cảnh; ngoài phép chiếu là ảo giác, kèm phản hồi để hỏi lại)；
+2. Biên giới của vùng owned có `kind` thuộc tập đóng, `anchor` không rỗng phải duy nhất trong unit tương ứng và ánh xạ tới biên giới byte UTF-8, không xung đột ngữ nghĩa ở cùng vị trí (nếu `kind`/tiêu đề khác nhau thì không do Go quyết định giữ cái nào, sẽ hỏi lại mô hình; các bản trùng lặp hoàn toàn giống hệt chỉ là dư thừa cơ học, cho qua rồi khử trùng lặp im lặng), khối đầu tiên phải có biên giới che được điểm bắt đầu văn bản (đầu sách có phải phần mở đầu hay không do mô hình quyết định, Go không trả lời thay) — đều được kiểm tra ngay trong thời điểm gọi (sửa ngày 2026-07-16): giá trị lỗi bị đưa vào cache khối rồi đến tận cuối mới phát hiện thì digest luôn khớp, khiến lỗi được tái hiện một cách xác định; biên giới vùng ngữ cảnh vốn sẽ bị cắt bỏ, không cần hỏi lại vì chúng；
+2a. **Nhắc lại tiêu đề** (sửa ngày 2026-07-16, seg-v2): `title` của biên giới chapter/group sau khi chuẩn hóa (xóa khoảng trắng) bắt buộc phải thật sự tồn tại trong văn bản gốc của đơn vị biên giới, nếu không sẽ hỏi lại ngay lúc gọi — thực nghiệm trên một nguồn bắt trang có 157 chương cho thấy 67 chương là biên giới và tiêu đề do mô hình bịa ra trên phần văn bản nối tiếp trong chương (kỷ luật phủ định phạm vi buộc mỗi khối phải đặt biên giới ở đầu khối), tất cả đều bị mục này chặn bằng kiểm tra sự thật. Quyền quyết định ngữ nghĩa vẫn thuộc về mô hình: những nguồn thật sự không có quy ước tiêu đề có thể đặt `uncertain=true` để giữ tiêu đề quy nạp (bản xem trước hiển thị dấu hiệu đáng ngờ); tiêu đề mô tả của front/back matter có rủi ro thấp nên không kiểm tra. prompt cũng được siết lại: biên giới chỉ đặt ở chỗ phân tách cấu trúc thật, khi đầu khối là phần nội dung nối tiếp của chương trước thì trả về boundaries rỗng là đầu ra đúng (ngoại trừ phần đầu của khối đầu tiên)；
+3. Trật tự biên giới và bản sao được Go sửa xác định thay vì bác bỏ (sửa ngày 2026-07-16): khôi phục trật tự thật bằng cách sắp xếp ổn định theo byte sau khi phân tích — trật tự giữa các khối được bảo đảm bởi các khoảng owned không chồng lấn, lộn xộn chỉ có thể xảy ra trong nội bộ khối, sắp xếp không mất thông tin; các byte trùng nhau giữ mục xuất hiện trước và ghi vào `Notes`. Hành vi cũ yêu cầu tăng nghiêm ngặt nếu không là thất bại toàn cục, thực nghiệm 319 biên giới đã gục trước 1 chỗ đảo thứ tự trong khối, và cache khối sẽ khiến thất bại này tái hiện xác định. Việc xác định thứ tự luôn theo số của `(Line, Part)`, không so sánh ID theo thứ tự từ điển；
+4. Mỗi phạm vi chính văn chương được tạo ra phải không rỗng (tiêu đề giữ chỗ cho chính văn rỗng sẽ nhập vào đoạn trước, xem §8.1)；
+5. Tất cả văn bản nguồn không rỗng phải thuộc đúng một chương, một tiêu đề group hoặc một front/back matter rõ ràng (văn bản không được quy thuộc ở đầu sách — như giới thiệu/quảng cáo bị bỏ sót biên giới — sẽ được Go thu về `front_matter` một cách xác định và ghi `Notes` để chuyển sang bản xem trước xác nhận, không bác bỏ ở cuối)；
+5a. Những chương trùng tên (sau khi xóa khoảng trắng ở tiêu đề thì giống nhau) được ghi vào `Notes` để người dùng kiểm tra thủ công (sửa ngày 2026-07-16) — với nguồn có quy ước tiêu đề, tên chương không nên lặp; lặp là tín hiệu xác định của “cùng chương bị cắt nhầm”; việc có gộp hay không không do Go quyết định, hễ `Notes` không rỗng là chặn `--yes`；
+6. Không có chồng lấn, vượt biên hoặc phạm vi chưa được quy thuộc；
+7. group không bị tính nhầm vào tổng số chương.
 
-“L1257 语义上是不是章标题”不由 Go 复判。
+“L1257 về mặt ngữ nghĩa có phải là tiêu đề chương hay không” không do Go phán xét lại.
 
-### 8.4 用户确认
+### 8.4 Xác nhận của người dùng
 
-交互模式下，确认前不调用章节分析，也不写正式 Store。预览至少显示：
+Trong chế độ tương tác, trước khi xác nhận sẽ không gọi phân tích chương, cũng không ghi Store chính thức. Bản xem trước tối thiểu hiển thị:
 
-- 卷/group 数和章节数；
-- 全部章节标题，可滚动查看；
-- 首尾附属文本的范围与摘要；
-- 空章、异常长章和模型标记 uncertain 的边界；
-- 每章起止行，方便用户对照原稿。
+- số lượng quyển/group và số chương；
+- toàn bộ tiêu đề chương, có thể cuộn để xem；
+- phạm vi và tóm tắt của văn bản phụ trợ đầu/cuối；
+- biên giới của chương rỗng, chương quá dài bất thường và các biên giới mà mô hình đánh dấu `uncertain`；
+- dòng bắt đầu và kết thúc của từng chương để người dùng đối chiếu với bản gốc.
 
-用户可以：
+Người dùng có thể:
 
-- 确认（TUI 预览面板按 `y`，内部以 AcceptSegmentation 重跑；一次性放行当前切分，不写入 intent，confirmation 记 `method=user_confirmed`）；
-- 输入自然语言说明后重新识别，例如 `/import --guide=幕间·X 也是独立章节`；
-- 取消并保留工作区（Esc）。
+- xác nhận (trong bảng xem trước TUI nhấn `y`, nội bộ sẽ chạy lại bằng AcceptSegmentation; cho qua lần cắt hiện tại một lần, không ghi intent, confirmation ghi `method=user_confirmed`)；
+- nhập mô tả ngôn ngữ tự nhiên rồi nhận diện lại, ví dụ `/import --guide=Ngoại truyện X cũng là chương độc lập`；
+- hủy và giữ nguyên workspace (Esc).
 
-`/import <path> --yes` 是显式无人值守授权：Runner 在覆盖校验通过后写入同样的 confirmation 工件，记录 `method=auto_authorized`，随后继续分析。`--yes` 即使存在 uncertain 边界也表示用户选择信任本次切分，但 uncertain 仍保留在工件和日志中。**例外（2026-07-16 修订）**：切分带容错说明（`Notes` 非空——空章吸收、起始兜底、重合去重发生过）时 `--yes` 不自动放行，仍停在确认预览——结构被确定性改写过，未看预览的盲授权不该吞掉它；看过预览的 `y`（AcceptSegmentation）不受此限。
+`/import <path> --yes` là quyền ủy quyền không giám sát rõ ràng: Runner sau khi vượt qua kiểm tra ghi đè sẽ ghi cùng artifact confirmation đó, ghi nhận `method=auto_authorized`, rồi tiếp tục phân tích. `--yes` ngay cả khi có biên giới `uncertain` vẫn có nghĩa là người dùng chọn tin vào lần cắt này, nhưng `uncertain` vẫn được giữ trong artifact và log. **Ngoại lệ (sửa ngày 2026-07-16)**: khi segmentation có ghi chú chịu lỗi (`Notes` không rỗng — đã xảy ra hấp thụ chương rỗng, phương án dự phòng ở đầu, khử trùng lặp chồng lặp), `--yes` không tự động cho qua mà vẫn dừng ở bản xem trước xác nhận — cấu trúc đã bị viết lại theo cách xác định, ủy quyền mù mà chưa xem preview không nên nuốt mất nó; `y` (AcceptSegmentation) sau khi đã xem preview không bị giới hạn này.
 
-`--yes` 只跳过切分确认，不替用户决定 `story_status=uncertain`，也不跳过导入完成 Hold。用户不需要编写正则或手工填写 `from=N`。
+`--yes` chỉ bỏ qua xác nhận segmentation, không tự quyết `story_status=uncertain`, cũng không bỏ qua Hold khi import hoàn tất. Người dùng không cần viết regex hay nhập tay `from=N`.
 
-## 9. 连续批次的逐章事实提取
+## 9. Trích xuất sự thật theo từng chương của các batch liên tiếp
 
-确认后从第一份缺失分析开始，把连续章节按当前模型的**输入和输出双预算**组成批次。第一版批次间串行，不做窗口间并发：伏笔 ID、人物别名和状态变化具有时间顺序，前一批次产生的紧凑 ledger 是后一批次的输入。
+Sau khi xác nhận, từ phân tích thiếu đầu tiên, gom các chương liên tiếp thành batch theo **ngân sách nhập và xuất kép** của mô hình hiện tại. Phiên bản đầu tiên chạy tuần tự giữa các batch, không làm song song giữa các cửa sổ: ID của foreshadow, biệt danh nhân vật và biến đổi trạng thái có tính thứ tự thời gian, ledger gọn do batch trước tạo ra là đầu vào của batch sau.
 
-串行只约束第一版执行策略，不是永久架构限制；分析工件仍按章独立落盘，未来有证据证明并行归并能保持语义质量时，可以只替换批次调度。
+Tuần tự chỉ ràng buộc chiến lược thực thi của phiên bản đầu tiên, không phải giới hạn kiến trúc vĩnh viễn; artifact phân tích vẫn được ghi xuống đĩa độc lập theo từng chương, về sau nếu có chứng cứ cho thấy hợp nhất song song vẫn giữ được chất lượng ngữ nghĩa thì chỉ cần thay bộ lập lịch batch.
 
-### 9.1 批次输出、逐章工件
+### 9.1 Đầu ra batch, artifact theo từng chương
 
-废除 `=== TAG ===` 混合 envelope。每次调用返回一个结构化批次对象，每个数组元素仍是一章事实：
+Bãi bỏ envelope hỗn hợp `=== TAG ===`. Mỗi lần gọi trả về một đối tượng batch có cấu trúc, mỗi phần tử mảng vẫn là sự thật của một chương:
 
 ```go
 type ImportedChapterFacts struct {
@@ -399,103 +397,103 @@ type ChapterAnalysisPayload struct {
 }
 ```
 
-每个 `analyses/NNNNNN.json` 都是 `Artifact[ChapterAnalysisPayload]`。同一批次落盘的章节记录相同 `BatchStart/BatchEnd`；其 `InputDigest` 采用**逐章绑定**：切分身份（segmentation 工件的 `InputDigest`）+ prompt/schema 版本 + 章号 + 单章正文。之所以逐章而非按批次划分绑定，是因为批次边界随模型输入/输出能力变化（换更强模型批次自然变大）；若把批次划分写进身份，换模型后已成功的分析会整体失配、被迫重算重复收费。绑定切分身份则保证「重新切分、改 prompt/schema 版本、改源」时下游分析自然失配，而单纯换模型不误伤——这才是恢复真正需要的失效语义。
+Mỗi `analyses/NNNNNN.json` đều là `Artifact[ChapterAnalysisPayload]`. Các bản ghi chương được ghi ra trong cùng một batch có cùng `BatchStart/BatchEnd`; `InputDigest` của chúng dùng **ràng buộc theo từng chương**: danh tính cắt (InputDigest của artifact segmentation) + phiên bản prompt/schema + số chương + chính văn của riêng chương đó. Sở dĩ dùng ràng buộc theo từng chương thay vì theo batch là vì ranh giới batch thay đổi theo năng lực đầu vào/đầu ra của mô hình (đổi sang mô hình mạnh hơn thì batch tự nhiên lớn hơn); nếu ghi cả cách chia batch vào danh tính thì sau khi đổi mô hình, các phân tích đã thành công sẽ bị lệch khớp toàn bộ, buộc phải tính lại và trả phí lặp lại. Ràng buộc theo danh tính cắt đảm bảo rằng khi “cắt lại”, “đổi prompt/schema version”, “đổi nguồn” thì phân tích phía sau tự nhiên không khớp, còn chỉ đổi mô hình thì không làm hỏng — đó mới là ngữ nghĩa hỏng đúng mà phục hồi thực sự cần.
 
-`ImportedCharacterFact` 和 `ImportedWorldFact` 是用于全书综合的紧凑观察，不直接写正式角色或世界规则。它们至少携带章节号，使综合结果有稳定来源。
+`ImportedCharacterFact` và `ImportedWorldFact` là quan sát cô đọng dùng cho tổng hợp toàn sách, không trực tiếp ghi thành nhân vật hay quy tắc thế giới chính thức. Chúng ít nhất phải mang số chương để kết quả tổng hợp có nguồn gốc ổn định.
 
-### 9.2 双预算组批
+### 9.2 Gom batch theo ngân sách kép
 
-批次规划同时满足：
+Lập kế hoạch batch đồng thời thỏa:
 
 ```text
-预计输入 + system/prompt/ledger + 推理预留 + 预计可见输出 ≤ context window
-预计可见输出 ≤ provider/model 可用 completion 上限
+ước tính input + system/prompt/ledger + chừa chỗ suy luận + ước tính output nhìn thấy ≤ context window
+ước tính output nhìn thấy ≤ giới hạn completion khả dụng của provider/model
 ```
 
-- 输入估算覆盖每章标题、正文和批次前 ledger；
-- 输出估算由 analyzer schema 的固定结构开销和每章保守事实预留组成，只决定本次装入多少章，不截断任何字段；
-- reasoning token 与可见 JSON 共享 completion 预算的模型，必须先扣除推理预留；
-- provider/model 输出能力越强，批次自然变大；不能写固定“每批 10/20 章”规则；
-- 单章输入本身无法进入 context，或单章最小结构输出也无法进入 completion 时，显式报告该章和模型容量，不截断正文或伪造精简成功。
+- Ước tính input bao gồm tiêu đề, chính văn mỗi chương và ledger trước batch；
+- Ước tính output được tạo từ chi phí cấu trúc cố định của analyzer schema và phần dự trữ sự thật bảo thủ cho từng chương, chỉ quyết định lần này nhét được bao nhiêu chương, không cắt bất kỳ trường nào；
+- với mô hình mà reasoning token và JSON nhìn thấy cùng dùng chung ngân sách completion, phải trừ phần dự trữ suy luận trước；
+- provider/model càng mạnh thì batch tự nhiên càng lớn; không thể viết quy tắc cố định “mỗi batch 10/20 chương”；
+- nếu bản thân input của một chương không thể vào context, hoặc cấu trúc output tối thiểu của một chương cũng không thể vào completion, thì phải báo rõ chương đó và dung lượng mô hình, không cắt chính văn hay bịa ra thành công tinh giản.
 
-因此总章数增长只增加批次数，不再让任意一次响应随全书规模无限增长；同时不会把 #83 从整书粒度搬到一个不受输出约束的批次粒度。
+Vì vậy khi tổng số chương tăng lên chỉ tăng số batch, không còn để một phản hồi bất kỳ phình vô hạn theo quy mô cả cuốn; đồng thời cũng không kéo #83 từ cấp độ toàn sách sang một cấp độ batch không bị ràng buộc bởi output.
 
-### 9.3 批次上下文
+### 9.3 Context của batch
 
-单个批次调用只包含：
+Một lần gọi batch đơn lẻ chỉ bao gồm:
 
-- 当前连续章节范围的原文和标题；
-- 之前章节派生的紧凑人物别名表；
-- 活跃伏笔 ID 与一句话状态；
-- 必要的最近状态摘要。
+- văn bản gốc và tiêu đề của phạm vi chương liên tiếp hiện tại；
+- bảng biệt danh nhân vật cô đọng suy ra từ các chương trước；
+- ID foreshadow đang hoạt động và trạng thái một câu；
+- phần tóm tắt ngắn về trạng thái gần nhất khi cần thiết.
 
-模型按数组顺序处理批次内章节，可以在批次内部延续别名、伏笔和状态；批次结束后，Go 按已验证事实顺序更新紧凑 ledger。它不依赖尚未生成的全书 Premise，也不重复读取全部前文。章节事实是 Foundation 的输入，而不是反过来形成循环依赖。
+Mô hình xử lý các chương trong batch theo thứ tự mảng, có thể tiếp nối biệt danh, foreshadow và trạng thái bên trong batch; sau khi batch kết thúc, Go cập nhật ledger cô đọng theo thứ tự các sự thật đã được xác minh. Nó không phụ thuộc vào Premise toàn sách chưa sinh ra, cũng không đọc lại toàn bộ phần trước. Sự thật chương là đầu vào của Foundation, chứ không phải ngược lại để tạo thành phụ thuộc vòng.
 
-### 9.4 完整响应校验
+### 9.4 Kiểm tra phản hồi đầy đủ
 
-代码分两层校验结构、值域和引用，不硬编码文学质量：
+Mã kiểm tra hai lớp: cấu trúc, miền giá trị và tham chiếu, không mã hóa cứng chất lượng văn học:
 
-- 批次级：chapters 数组按预期章节号连续、无重复、无缺口，批次范围、`InputDigest` 和 schema version 匹配；
-- 逐章级：chapter/title 与源分段一致，summary/core_event 非空，hook type、strand 等正式 domain 闭集字段合法，时间线、伏笔和状态变化字段类型合法。
+- cấp batch: mảng chapters liên tục theo số chương dự kiến, không trùng, không thiếu, phạm vi batch, `InputDigest` và version schema khớp；
+- cấp từng chương: `chapter`/`title` khớp với phân đoạn nguồn, `summary`/`core_event` không rỗng, `hook type`, `strand` và các trường domain đóng chính thức hợp lệ, các trường timeline, foreshadow và biến đổi trạng thái có kiểu hợp lệ.
 
-代码不要求“必须 3～6 个事件”“必须有出场角色”“必须有三个场景”。安静章节、书信、环境章或无名人物章节都是合法文学形状。
+Mã không yêu cầu “phải có 3～6 sự kiện”, “phải có nhân vật xuất hiện”, “phải có ba cảnh”. Chương yên ắng, thư tín, chương tả cảnh hay chương không có nhân vật tên riêng đều là hình thái văn học hợp lệ.
 
-完整响应出现 JSON 或语义校验错误时，不提交其中任何新章节；把具体错误反馈给同一模型，走 §13.3 的输出层重试。模型可能在修正后改写前面的对象，因此普通校验失败不能擅自保存部分数组。
+Khi phản hồi đầy đủ gặp lỗi JSON hoặc lỗi kiểm tra ngữ nghĩa, không gửi bất kỳ chương mới nào trong đó; phản hồi lỗi cụ thể cho cùng mô hình, đi theo thử lại tầng đầu ra ở §13.3. Mô hình có thể sửa rồi viết lại cả các đối tượng phía trước, vì vậy khi kiểm tra thất bại không được tự ý lưu một phần mảng.
 
-### 9.5 长度截断时的连续前缀
+### 9.5 Prefix liên tục khi bị cắt độ dài
 
-> 实施定位：本节是**错误路径上的 token 优化**，不是恢复正确性依赖。v1（阶段三）截断即「失败 + 缩小重组批」，本身正确且可恢复；连续前缀打捞在独立子阶段（阶段三·补）实现，可单独开关、单独验收。
+> Định vị triển khai: phần này là **tối ưu token trên đường lỗi**, không phải phụ thuộc cho tính đúng đắn khi khôi phục. v1 (giai đoạn ba) khi bị cắt nghĩa là “thất bại + thu nhỏ batch tái tổ chức”, bản thân nó đã đúng và có thể khôi phục; cứu prefix liên tục được triển khai ở phân giai đoạn riêng (giai đoạn ba · bổ sung), có thể bật/tắt và nghiệm thu riêng.
 
-只有响应明确标记 `StopReasonLength` 且返回了可解析的部分文本时，允许从失败响应中保存**最大连续合法前缀**：
+Chỉ khi phản hồi được gắn rõ `StopReasonLength` và trả về được một phần văn bản có thể phân tích, mới cho phép lưu **tiền tố hợp lệ liên tục lớn nhất** từ phản hồi lỗi:
 
-1. 使用流式 JSON decoder 进入顶层 `chapters` 数组；
-2. 从批次首章开始逐个读取已经完整闭合的 JSON 对象；
-3. 每个对象独立通过 §9.4 的逐章校验，并与此前对象组成从批次首章开始的连续序列后，立即原子写入对应章节分析工件；
-4. 遇到第一个不完整、非法、跳号或重复对象立即停止，之后的字节一律不解释；
-5. 禁止补括号、续写半个 JSON、猜测缺失字段或从后续位置捞取非连续对象；
-6. 原始响应、StopReason、已保存前缀范围和首个失败章节全部写入 failure artifact、事件和日志；
-7. `NextAction` 从第一份缺失分析重新组批，不重做已经提交的合法前缀。
+1. Dùng streaming JSON decoder để vào mảng `chapters` ở cấp trên；
+2. Từ chương đầu của batch đọc từng đối tượng JSON đã đóng hoàn chỉnh；
+3. Mỗi đối tượng kiểm tra độc lập theo §9.4, và sau khi ghép với các đối tượng trước đó thành một chuỗi liên tục bắt đầu từ chương đầu batch thì ghi nguyên tử ngay artifact phân tích của chương tương ứng；
+4. Gặp đối tượng đầu tiên không hoàn chỉnh, không hợp lệ, nhảy số hoặc trùng lặp thì dừng ngay, toàn bộ byte phía sau không giải thích nữa；
+5. Cấm vá ngoặc, viết tiếp nửa JSON, đoán trường bị thiếu hoặc vớt đối tượng không liên tục từ vị trí sau đó；
+6. Phản hồi thô, StopReason, phạm vi prefix đã lưu và chương đầu tiên thất bại đều phải ghi vào failure artifact, sự kiện và log；
+7. `NextAction` sẽ gom batch lại từ phân tích thiếu đầu tiên, không làm lại prefix hợp lệ đã được nộp.
 
-typed-call 必须记录本次是否拿到可用部分文本：JSON Schema 等非流式结构化模式可能在长度停止时给不出可解析前缀。若 provider 没有返回部分文本、不能明确证明是长度截断，或一个合法对象都没有完成，则不保存任何结果，发出 `prefix_salvage=unavailable` 事件/日志并回退到「失败 + 缩小重组批」，而不是静默空转。单章批次仍然截断时直接报告模型输出能力不足，不循环缩减或制造空事实。
+typed-call phải ghi nhận lần này có lấy được một phần văn bản hữu dụng hay không: chế độ cấu trúc không streaming như JSON Schema có thể không cho prefix có thể phân tích khi dừng vì độ dài. Nếu provider không trả về phần văn bản, không thể chứng minh rõ là bị cắt độ dài, hoặc thậm chí chưa hoàn thành được một đối tượng hợp lệ nào thì không lưu bất kỳ kết quả nào, phát sự kiện/log `prefix_salvage=unavailable` và rơi về “thất bại + thu nhỏ batch tái tổ chức”, thay vì im lặng chạy rỗng. Batch chỉ có một chương mà vẫn bị cắt thì báo thẳng dung lượng output của mô hình không đủ, không lặp giảm hoặc tạo fact rỗng.
 
-长度截断是容量错误，不进入“把校验错误反馈给同一模型”的语义自修复循环，也不原样重试同一批次。
+Cắt độ dài là lỗi dung lượng, không đi vào vòng tự sửa ngữ nghĩa “đưa lỗi kiểm tra lại cho cùng mô hình”, cũng không thử lại nguyên xi batch đó.
 
-### 9.6 恢复
+### 9.6 Khôi phục
 
-每章分析成功即原子写入 `analyses/NNNNNN.json`。崩溃后：
+Mỗi chương phân tích thành công sẽ được ghi nguyên tử vào `analyses/NNNNNN.json`. Sau khi sập:
 
-- `InputDigest` 匹配的分析直接复用，不重复收费；
-- 第一份缺失或失配分析成为下一批次起点；
-- 上游语义输入变化后，无法重建相同 `InputDigest` 的分析自然失效；
-- 长度截断已经提交的连续合法前缀和正常完成的工件使用完全相同的恢复规则；
-- 不允许用户越过一个失败章节继续生成不连续的后续语义事实。
+- phân tích có `InputDigest` khớp thì tái sử dụng trực tiếp, không thu phí lại；
+- phân tích thiếu đầu tiên hoặc không khớp sẽ thành điểm bắt đầu batch tiếp theo；
+- sau khi đầu vào ngữ nghĩa upstream thay đổi, các phân tích không thể dựng lại cùng `InputDigest` sẽ tự nhiên mất hiệu lực；
+- prefix hợp lệ liên tục đã được nộp do cắt độ dài và artifact hoàn thành bình thường đều dùng chung hoàn toàn cùng quy tắc khôi phục；
+- không cho phép người dùng vượt qua một chương thất bại để tiếp tục sinh ra các sự thật ngữ nghĩa phía sau không liên tục.
 
-## 10. 分层综合
+## 10. Tổng hợp theo tầng
 
-### 10.1 为什么不能再做整书单次输出
+### 10.1 Vì sao không thể xuất cả sách trong một lần nữa
 
-全书综合需要跨章理解，但不需要再次读取全部正文，也不应输出每章详细对象。逐章事实已经包含章节级语义；综合只处理这些紧凑事实。
+Tổng hợp toàn sách cần hiểu xuyên chương, nhưng không cần đọc lại toàn bộ chính văn, cũng không nên xuất lại đối tượng chi tiết của từng chương. Sự thật theo từng chương đã chứa ngữ nghĩa ở cấp chương; tổng hợp chỉ xử lý những sự thật cô đọng này.
 
-### 10.2 Map/Reduce 形状
+### 10.2 Hình dạng Map/Reduce
 
 ```text
 ImportedChapterFacts × N
-        ↓ 按当前 context window 分连续区间
+        ↓ chia thành các khoảng liên tục theo context window hiện tại
 RangeDigest × M
-        ↓ 必要时继续归并
+        ↓ nếu cần thì tiếp tục hợp nhất
 BookSynthesis
 ```
 
-短书若一次能容纳全部章节事实，直接生成 `BookSynthesis`；长书才产生 `RangeDigest`。是否分层由 token 预算机械决定，不由章数阈值决定。
+Nếu sách ngắn có thể chứa toàn bộ sự thật chương trong một lần, thì sinh trực tiếp `BookSynthesis`; chỉ sách dài mới sinh `RangeDigest`. Việc có chia tầng hay không do ngân sách token quyết định một cách cơ học, không do ngưỡng số chương.
 
-`RangeDigest` 包含该连续范围的情节推进、角色变化、世界事实、已开/已收伏笔和候选结构边界。它的输出大小受单个区间约束；最终综合不再重复输出 N 份章节详细对象，只输出全局事实和卷弧范围。
+`RangeDigest` chứa tiến triển cốt truyện, biến đổi nhân vật, sự thật thế giới, foreshadow đã mở/đã thu và các biên cấu trúc ứng viên của khoảng liên tiếp đó. Kích thước đầu ra của nó bị ràng buộc bởi từng khoảng; tổng hợp cuối không còn lặp lại N đối tượng chi tiết của chương, mà chỉ xuất sự thật toàn cục và phạm vi cung truyện.
 
-### 10.3 最终综合结果
+### 10.3 Kết quả tổng hợp cuối cùng
 
 ```go
 type BookSynthesis struct {
-	Title         *string                `json:"title"`    // 正文无法确认时为 null，由文件名推断
-	Synopsis      string                 `json:"synopsis"` // 面向读者的无剧透简介
+	Title         *string                `json:"title"`    // khi không thể xác nhận từ chính văn thì là null, suy ra từ tên file
+	Synopsis      string                 `json:"synopsis"` // giới thiệu không spoiler dành cho độc giả
 	Premise       string                 `json:"premise"`
 	Characters    []domain.Character     `json:"characters"`
 	WorldRules    []domain.WorldRule     `json:"world_rules"`
@@ -507,7 +505,7 @@ type BookSynthesis struct {
 }
 ```
 
-结构只返回范围，不重复输出所有章节：
+Cấu trúc chỉ trả về các phạm vi, không lặp lại toàn bộ chương:
 
 ```go
 type ImportedVolumeRange struct {
@@ -524,50 +522,50 @@ type ImportedArcRange struct {
 }
 ```
 
-模型自行决定卷数和弧数，可以参考源文件中的 group 标题，但不受“一卷”“1～3 弧”限制。Go 使用 `ImportedChapterFacts` 的 title/core_event/hook/scenes 组装正式 `OutlineEntry`。
+Mô hình tự quyết định số quyển và số arc, có thể tham khảo tiêu đề group trong tệp nguồn, nhưng không bị giới hạn bởi “một quyển” hay “1～3 arc”. Go dùng title/core_event/hook/scenes của `ImportedChapterFacts` để ghép thành `OutlineEntry` chính thức.
 
-### 10.4 故事状态
+### 10.4 Tình trạng truyện
 
-导入只重建正文事实，不为了让 Engine 继续而伪造未收束长线：
+Nhập chỉ tái tạo sự thật của chính văn, không bịa ra các tuyến dài chưa khép lại chỉ để cho Engine tiếp tục:
 
-- `open`：正文存在真实未收束目标或张力，正常生成 Compass；
-- `closed`：按已完结作品发布，最后一卷标记 Final；需要写续作时由用户明确 reopen 并给出新方向；
-- `uncertain`：发布前要求用户选择按未完或完结处理；若 Intent 已通过 `--story=open|closed` 保存选择则直接使用，否则进入交互等待。选择作为以当前 synthesis 为输入的 `story-resolution.json` 工件保存。
+- `open`: trong phần thân có mục tiêu chưa khép hoặc độ căng thật sự, sinh Compass bình thường;
+- `closed`: phát hành như tác phẩm đã hoàn tất, tập cuối được đánh dấu Final; nếu cần viết tiếp thì người dùng phải reopen rõ ràng và đưa ra hướng mới;
+- `uncertain`: trước khi phát hành yêu cầu người dùng chọn xử lý theo chưa hoàn hay đã hoàn; nếu Intent đã lưu lựa chọn qua `--story=open|closed` thì dùng ngay, nếu không thì vào trạng thái chờ tương tác. Lựa chọn được lưu thành artifact `story-resolution.json` với synthesis hiện tại làm input.
 
-代码不通过 `open_threads` 是否为空偷偷猜测用户意图。
+Không được lén đoán ý định người dùng bằng cách xem `open_threads` có rỗng hay không.
 
-## 11. Foundation 组装与验证
+## 11. Lắp ráp và xác minh Foundation
 
-模型输出综合语义，Go 负责组装正式领域对象。发布前必须满足：
+Mô hình xuất ngữ nghĩa tổng hợp, Go chịu trách nhiệm lắp ráp đối tượng miền chính thức. Trước khi phát hành phải thỏa:
 
-1. Premise 有合法书名标题；正文无法确认书名时使用源文件 basename，并把来源标为 filename，不让模型宣称它是“真实书名”；
-2. 所有卷和弧范围按顺序连续；
-3. 第一个范围从第 1 章开始，最后一个范围在第 N 章结束；
-4. 每章恰好属于一个弧；
-5. `FlattenOutline` 后章节数为 N，标题和逐章事实一致；
-6. 角色名、世界规则和 Compass 满足现有 domain 类型约束；
-7. PlanningTier 是合法闭集值，但选择理由来自模型而非章数阈值；
-8. closed/open 状态与 Final、Compass 的发布形状一致；
-9. Synthesis 工件的 `InputDigest` 能由当前有序分析集合重建。
+1. Premise có tiêu đề sách hợp lệ; khi không xác nhận được tên sách trong phần thân thì dùng basename của tệp nguồn, và đánh dấu nguồn là filename, không để mô hình tuyên bố đó là “tên sách thật”;
+2. Tất cả phạm vi tập và arc phải liên tục theo thứ tự;
+3. Phạm vi đầu tiên bắt đầu từ chương 1, phạm vi cuối cùng kết thúc ở chương N;
+4. Mỗi chương chỉ thuộc đúng một arc;
+5. Sau `FlattenOutline`, số chương là N, tiêu đề và факт từng chương khớp nhau;
+6. Tên nhân vật, quy tắc thế giới và Compass phải thỏa các ràng buộc kiểu domain hiện có;
+7. PlanningTier là một giá trị đóng hợp lệ, nhưng lý do lựa chọn phải đến từ mô hình chứ không phải ngưỡng số chương;
+8. Trạng thái closed/open phải khớp với Final và hình dạng phát hành của Compass;
+9. Artifact Synthesis có `InputDigest` có thể được tái dựng từ tập phân tích có thứ tự hiện tại.
 
-违反结构约束时把具体错误反馈给模型重新生成，持续到成功或 context 取消；不落盘半成品。
+Khi vi phạm ràng buộc cấu trúc, trả lỗi cụ thể về mô hình để sinh lại, lặp cho đến khi thành công hoặc context bị hủy; không ghi xuống đĩa các bản dang dở.
 
-## 12. 正式发布
+## 12. Phát hành chính thức
 
-### 12.1 发布前置条件
+### 12.1 Điều kiện trước khi phát hành
 
-新导入只允许进入：
+Import mới chỉ được phép đi vào khi:
 
-- 没有已完成章节；
-- 没有在途章节或 PendingCommit；
-- 没有另一份非同源导入工作区；
-- 正式 Foundation 为空，或与当前工作区已经发布的 digest 完全一致。
+- không có chương đã hoàn tất;
+- không có chương đang xử lý hoặc PendingCommit;
+- không có một workspace import không cùng nguồn nào khác;
+- Foundation chính thức rỗng, hoặc digest trùng khớp hoàn toàn với digest đã phát hành của workspace hiện tại.
 
-已有小说与新外部文本的合并语义不清楚，第一版明确拒绝，不猜测覆盖或追加。
+Ý nghĩa gộp giữa một tiểu thuyết đã có và văn bản ngoài mới không rõ ràng; phiên bản đầu tiên từ chối rõ ràng, không đoán là ghi đè hay nối thêm.
 
-### 12.2 Foundation 发布
+### 12.2 Phát hành Foundation
 
-按正式依赖顺序发布：
+Phát hành theo thứ tự phụ thuộc chính thức:
 
 ```text
 planning tier
@@ -576,108 +574,108 @@ planning tier
 → world rules
 → layered outline + flat outline
 → compass
-→ progress 对账
+→ progress đối soát
 ```
 
-每一步：
+Mỗi bước:
 
-1. 计算待发布内容 digest；
-2. 正式工件不存在则原子写入并追加 checkpoint；
-3. 已存在且 digest 相同则幂等跳过；
-4. 已存在但不同则返回冲突错误，不覆盖。
+1. Tính digest của nội dung chuẩn bị phát hành;
+2. Nếu artifact chính thức chưa tồn tại thì ghi nguyên tử và thêm checkpoint;
+3. Nếu đã tồn tại và digest giống nhau thì bỏ qua theo kiểu idempotent;
+4. Nếu đã tồn tại nhưng khác thì trả lỗi xung đột, không ghi đè.
 
-中途崩溃后重新从第一项对账即可，不需要跨文件事务或 Foundation Pending 状态机。
+Sau khi sập giữa chừng, chỉ cần đối soát lại từ mục đầu tiên; không cần giao dịch xuyên tệp hay máy trạng thái Foundation Pending.
 
-### 12.3 章节发布
+### 12.3 Phát hành chương
 
-按章节顺序复用现有流程：
+Tái sử dụng luồng hiện có theo thứ tự chương:
 
 ```text
-保存 draft
+Lưu draft
 → Progress.StartChapter
-→ commit_chapter(逐章事实)
+→ commit_chapter(sự thật theo từng chương)
 ```
 
-`commit_chapter` 已有 PendingCommit saga、checkpoint 和完成章节幂等检查。导入不复制第二套提交逻辑。
+`commit_chapter` đã có saga PendingCommit, checkpoint và kiểm tra idempotent cho chương đã hoàn tất. Import không sao chép một bộ logic commit thứ hai.
 
-崩溃窗口：
+Cửa sổ sập:
 
-| 窗口 | 恢复行为 |
+| Cửa sổ | Hành vi khôi phục |
 |---|---|
-| draft 前 | 重新保存同一正文 |
-| draft 后、StartChapter 前 | 对账 digest 后继续 |
-| StartChapter 后、PendingCommit 前 | 重新执行同章 commit |
-| PendingCommit 中 | 由现有提交 saga 恢复 |
-| chapter complete 后 | digest/checkpoint 一致则跳过 |
-| 正式内容与源 digest 冲突 | 显式停止，报告冲突章节 |
+| trước draft | lưu lại đúng cùng một phần thân |
+| sau draft, trước StartChapter | đối soát digest rồi tiếp tục |
+| sau StartChapter, trước PendingCommit | thực thi lại commit của cùng chương |
+| đang ở PendingCommit | khôi phục bằng saga commit hiện có |
+| sau khi chapter complete | nếu digest/checkpoint khớp thì bỏ qua |
+| nội dung chính thức xung đột với digest nguồn | dừng rõ ràng, báo chương xung đột |
 
-### 12.4 导入完成边界
+### 12.4 Ranh giới hoàn tất import
 
-全部章节稳定提交后设置一次 `AdvanceHoldAtBoundary`，原因明确为“外部小说导入完成，等待验收后续写”。它只保护这次跨系统导入，不改变用户长期 `auto/review` 模式。
+Sau khi tất cả chương được commit ổn định, đặt một lần `AdvanceHoldAtBoundary`, với lý do rõ là “Nhập tiểu thuyết bên ngoài đã hoàn tất, chờ nghiệm thu rồi viết tiếp”. Nó chỉ bảo vệ lần import xuyên hệ thống này, không thay đổi chế độ `auto/review` dài hạn của người dùng.
 
-`--yes` 只授权自动接受切分，不能隐式跳过这次 Hold。只有用户同时传入独立的 `--continue`，Runner 才不创建导入专用 Hold；随后仍遵守正常 advance mode：`auto` 可以继续续写，`review` 仍等待 `/next`。
+`--yes` chỉ cấp quyền chấp nhận tự động việc chia tách, không được ngầm bỏ qua Hold lần này. Chỉ khi người dùng đồng thời truyền thêm `--continue` riêng biệt thì Runner mới không tạo Hold chuyên cho import; sau đó vẫn tuân thủ advance mode bình thường: `auto` có thể tiếp tục viết tiếp, `review` vẫn chờ `/next`.
 
-默认 TUI 不再自动无提示接力。用户检查 Foundation 和章节状态后，使用现有继续入口恢复创作。
+Mặc định TUI không còn tự động tiếp tay trong im lặng. Sau khi người dùng kiểm tra trạng thái Foundation và chương, hãy dùng điểm tiếp tục hiện có để khôi phục sáng tác.
 
-**关面板落点**：从欢迎页发起的导入成功收尾后，Esc 关闭面板会补跑一次 `Resume()`（bootstrap 的恢复门禁只在启动时跑一次），用户直接落到工作台、被导入完成 Hold 拦在下一章边界等验收——而不是留在误按 Enter 即"开新书"的欢迎页。出错终态与工作台场景只关面板。
+**Điểm đóng bảng điều khiển**: sau khi import khởi phát từ trang chào kết thúc thành công, việc nhấn Esc để đóng panel sẽ chạy thêm một lần `Resume()` (cổng phục hồi của bootstrap chỉ chạy một lần lúc khởi động), người dùng sẽ rơi thẳng vào workspace, bị Hold hoàn tất import chặn ở ranh giới chương tiếp theo để chờ nghiệm thu — chứ không ở lại trang chào nơi bấm nhầm Enter sẽ “tạo sách mới”. Với trạng thái lỗi cuối cùng và cảnh workspace, chỉ đóng panel.
 
-**新建防线**：`PrepareUserRules` / `StartPrepared` 在书目录已有成章（`CompletedChapters` 非空）时拒绝新建——StartPrepared 开头即重置 checkpoints 与 progress，误触会静默清掉整本书（含刚导入的全部章节）。无成章的规划残留放行，保留共创 Ctrl+S 同会话重试与恢复补裁的自愈路径。
+**Hàng rào tạo mới**: `PrepareUserRules` / `StartPrepared` sẽ từ chối tạo mới khi thư mục sách đã có chương hoàn tất (`CompletedChapters` không rỗng) — vì ngay đầu `StartPrepared` sẽ reset checkpoints và progress, một lần chạm nhầm là xóa âm thầm cả cuốn sách (bao gồm toàn bộ chương vừa import). Các tàn dư quy hoạch không có chương hoàn tất vẫn được cho qua, giữ lại đường tự phục hồi qua Ctrl+S cùng phiên và khôi phục cắt bù của co-create.
 
-### 12.5 跨重启发布门禁
+### 12.5 Cổng phát hành khi qua nhiều lần khởi động lại
 
-工作区存在且 `NextAction != done` 时，`Host.New/Resume` 必须把书识别为未完成导入：
+Khi workspace tồn tại và `NextAction != done`, `Host.New/Resume` phải nhận diện sách là import chưa hoàn tất:
 
-- 允许查看、诊断和执行 `/import` 恢复；
-- 禁止普通 Engine 启动、Continue 或派发 Writer；
-- 明确显示当前恢复动作，不把已经部分发布的 Foundation/章节当作一本文义完整的可续写书籍。
+- cho phép xem, chẩn đoán và thực hiện khôi phục `/import`;
+- cấm khởi động Engine bình thường, Continue hoặc phát Writer;
+- hiển thị rõ hành động khôi phục hiện tại, không xem Foundation/chương đã phát hành một phần như một cuốn sách có ngữ nghĩa hoàn chỉnh có thể viết tiếp.
 
-门禁直接读取工作区和正式 Store 推导，不新增 `published bool`。这样发布任意窗口崩溃后，都不会在 Runner 尚未恢复时由普通创作流程消费半发布状态。
+Cổng này đọc trực tiếp từ workspace và Store chính thức để suy ra, không thêm `published bool`. Như vậy sau khi bất kỳ cửa sổ phát hành nào bị sập, trạng thái bán phát hành cũng sẽ không bị luồng sáng tác bình thường tiêu thụ khi Runner chưa khôi phục.
 
-## 13. 模型调用内核
+## 13. Lõi gọi mô hình
 
-`imp` 内部保留一个小而专用的 typed-call helper，不建设通用 LLM 工作流框架。
+Bên trong `imp` giữ một helper typed-call nhỏ và chuyên dụng, không xây một framework workflow LLM tổng quát.
 
-### 13.1 模型选择
+### 13.1 Chọn mô hình
 
-- 默认使用 architect 角色模型；
-- 语义函数的模型档位是开放旋钮：segment/analyze/synthesize 可各自声明档位，默认落到 architect，配置层可把机械性更强的 segment 指到更便宜档位。这是调用配置，不改任何语义契约，也不把「单角色」写成架构前提——目的是让「廉价档位模型变强」的成本红利也进得来；
-  - 实现落点：roles 配置支持 `import_segment` / `import_analyze` / `import_synthesize` 三个角色 key；未配置时落 architect。各函数的双预算与 thinking/结构化选项按各自档位的真实能力独立派生（小档位的小窗口只约束它自己的函数），用量按实际档位角色记账；
-- 接入所选角色已配置的 failover；
-- 使用所选角色 reasoning effort，并通过能力探测决定是否发送 thinking 参数；
-- 按真实 provider/model 写 session 元数据和 usage；
-- 纳入现有预算哨兵（2026-07-16 落地）：启动前过 `Refuse()` 与 Start/Resume/Continue 同一纪律；运行中预算硬停经 `abortWithEvent` 取消导入自己的 context（Host 登记独占作业的 cancel，不再只暂停并未运行的 Engine）。
+- Mặc định dùng mô hình vai trò architect;
+- Mức mô hình của các hàm ngữ nghĩa là một núm mở: segment/analyze/synthesize có thể tự khai báo mức, mặc định rơi về architect, lớp cấu hình có thể chỉ định segment cơ học hơn sang mức rẻ hơn. Đây là cấu hình gọi, không đổi bất kỳ hợp đồng ngữ nghĩa nào, cũng không đóng đinh “một vai trò duy nhất” thành tiền đề kiến trúc — mục đích là để cả phần lợi ích chi phí khi “mô hình mức rẻ trở nên mạnh hơn” cũng đi vào được;
+  - Điểm triển khai: cấu hình roles hỗ trợ ba key vai trò `import_segment` / `import_analyze` / `import_synthesize`; nếu không cấu hình thì rơi về architect. Hai ngân sách và tùy chọn thinking/structured của từng hàm được suy ra độc lập theo năng lực thật của mức tương ứng (cửa sổ nhỏ của mức nhỏ chỉ ràng buộc chính hàm của nó), và lượng dùng được hạch toán theo vai trò mức thực tế;
+- Kích hoạt failover đã cấu hình của vai trò được chọn;
+- Dùng reasoning effort của vai trò được chọn, và quyết định có gửi tham số thinking hay không bằng cách dò năng lực;
+- Ghi metadata session và usage theo provider/model thật;
+- Bao gồm trong sentinel ngân sách hiện có (triển khai 2026-07-16): trước khi chạy qua `Refuse()` và tuân theo cùng kỷ luật với Start/Resume/Continue; trong lúc chạy, chặn cứng ngân sách bằng cách dùng `abortWithEvent` để hủy context riêng của import (Host đăng ký cancel cho job độc quyền, không còn chỉ tạm dừng Engine chưa chạy).
 
-### 13.2 结构化输出能力
+### 13.2 Khả năng xuất cấu trúc
 
-四类导入产物共用 `llmcontract.Execute`：模型或用户配置明确支持时发送原生 JSON Schema；能力未知或明确不支持时，从同一份 Schema 自动生成 Prompt Contract。原生模式校验完整响应，兼容模式才提取平衡 JSON 对象；两条路径均先执行同一份 Schema 校验，再解码 DTO 并执行业务校验。请求报错后不得静默删除 schema 重试，能力判断错误或 Provider 拒绝必须暴露。
+Bốn loại artifact import cùng dùng `llmcontract.Execute`: khi mô hình hoặc cấu hình người dùng cho biết rõ là hỗ trợ thì gửi JSON Schema gốc; khi năng lực không rõ hoặc được chỉ rõ là không hỗ trợ thì tự sinh Prompt Contract từ cùng một Schema. Chế độ gốc kiểm tra toàn bộ phản hồi, còn chế độ tương thích chỉ tách ra đối tượng JSON cân bằng; cả hai đường đều chạy cùng một bộ kiểm tra Schema trước, rồi mới giải mã DTO và chạy kiểm tra nghiệp vụ. Sau lỗi yêu cầu không được lặng lẽ xóa schema để thử lại; phải bộc lộ lỗi nếu nhận diện năng lực sai hoặc Provider từ chối.
 
-### 13.3 请求、语义与容量失败分离
+### 13.3 Tách bạch lỗi request, ngữ nghĩa và năng lực
 
-- 请求层错误：只重试适配器明确标记 retryable 的超时、限流、网络错误，沿用现有退避语义并持续到成功或 context 取消；
-- 输出层错误：把 JSON 解析或 Validate 的具体错误反馈给同一模型，持续自修复直到成功或上下文被用户/预算系统取消；原生 Schema 契约违约、拒答和截断不会盲目重问。
-- 重试不允许静默：请求层每次退避（"进行第 N 次重试 · Xs 后重试"）与输出层每次重问都以进度事件回显到导入面板——无回显用户会误判卡死。退避事件只携带截止时刻（`RetryAt`），剩余秒数由渲染层逐 tick 计算形成实时倒计时（与创作台事件面板共用同一机制）；面板运行期常驻顶部 spinner + 已用时，日志尾部另有流式同款星标光标。
-- 错误回显不许空泛：网关 message 常常只有一句 "Provider returned error"；回显与失败文案统一附带适配器的结构化事实（错误分类/HTTP 状态/provider/模型，`modelErrDetail` 经 errors.As 从 litellm 错误链提取），事实前置，截断时优先保住。
-- 长时阶段不许静默：切分逐块、综合逐区间在函数内部调用模型（单块可达数分钟），经 `callProfile.step` 逐块/逐区间回显推进（"切分第 N/M 块，已识别 K 个边界"）。事件 Key 只给请求退避（同一调用内的瞬态，原地跳动）；校验重问是跨调用语义事件，各自成行保留历史——共用 Key 会让后块覆盖前块，排查线索全丢。
-- 全量日志转录：每条进度事件（含被面板原地覆盖的重试行）写入**导入专属日志** `<书根>/logs/import.log`（不与 tui.log 混流，一次导入一个文件看完整转录）；请求退避与语义重问另以完整错误链落同一日志。
-- 回显模型语义而非只有机械计数：切分逐块回显模型识别出的标题（"模型识别出：第十二章 风雪夜 / …（共 N 处）"），分析逐章回显核心事件（"第 12 章〈风雪夜〉：……"），综合完成回显全书概括（premise 摘要）——用户应看见模型读懂了什么。
-- 容量错误：`StopReasonLength` 不原样重试，也不进入语义自修复循环；analysis batch 在部分文本可解析时按 §9.5 保存连续合法前缀，否则记录 `prefix_salvage=unavailable` 并缩小重组批；其余语义函数直接显式失败并保留原始响应。
+- Lỗi tầng request: chỉ retry với timeout, rate limit, lỗi mạng mà adapter gắn cờ retryable rõ ràng, tiếp tục dùng ngữ nghĩa backoff hiện có cho đến khi thành công hoặc context bị hủy;
+- Lỗi tầng đầu ra: đưa lỗi cụ thể của JSON parse hoặc Validate trở lại cùng mô hình đó, tiếp tục tự sửa cho đến khi thành công hoặc context bị người dùng/hệ thống ngân sách hủy; vi phạm hợp đồng Schema gốc, từ chối trả lời và bị cắt cụt sẽ không được hỏi lại mù quáng.
+- Retry không được im lặng: mỗi lần backoff ở tầng request ("đang retry lần thứ N · retry sau Xs") và mỗi lần hỏi lại ở tầng đầu ra đều phải được hiển thị thành sự kiện tiến độ vào bảng điều khiển import — nếu không có phản hồi người dùng sẽ tưởng bị treo. Sự kiện backoff chỉ mang thời điểm chốt (`RetryAt`), số giây còn lại do lớp render tính theo từng tick để tạo bộ đếm ngược thời gian thực (dùng chung cơ chế với bảng sự kiện ở workspace sáng tác); trong thời gian chạy của panel có spinner thường trực ở trên cùng + thời gian đã dùng, còn cuối log có con trỏ sao kiểu streaming tương tự.
+- Không được ghi lỗi một cách chung chung: message của gateway thường chỉ có một câu "Provider returned error"; phần phản hồi và văn bản lỗi phải luôn kèm sự thật có cấu trúc từ adapter (phân loại lỗi/HTTP status/provider/model, `modelErrDetail` được trích từ chuỗi lỗi litellm qua errors.As), đưa sự thật lên trước, ưu tiên giữ lại khi bị cắt.
+- Không được im lặng ở các giai đoạn dài: tách theo khối, tổng hợp theo từng khoảng đều gọi mô hình bên trong hàm (một khối có thể mất vài phút), và qua `callProfile.step` để phản hồi tiến độ theo từng khối/từng khoảng ("đang tách khối thứ N/M, đã nhận diện K ranh giới"). Key sự kiện chỉ dành cho backoff của request (tạm thời trong cùng một lần gọi, nhấp nháy tại chỗ); hỏi lại do kiểm tra là sự kiện ngữ nghĩa xuyên lần gọi, mỗi cái đứng một dòng để giữ lịch sử — dùng chung Key sẽ khiến khối sau ghi đè khối trước, mất sạch manh mối điều tra.
+- Ghi log toàn phần: mọi sự kiện tiến độ (kể cả các dòng retry bị panel ghi đè ngay tại chỗ) đều được ghi vào **log chuyên cho import** `<gốc-sách>/logs/import.log` (không trộn với tui.log, một lần import xem toàn bộ transcript trong một file); backoff của request và hỏi lại ngữ nghĩa cũng ghi cùng một log dưới dạng toàn bộ chuỗi lỗi.
+- Phản hồi phải biểu đạt ngữ nghĩa của mô hình chứ không chỉ là đếm máy móc: khi tách, phản hồi từng khối phải cho thấy tiêu đề mô hình nhận ra ("mô hình nhận diện được: Chương 12 Đêm tuyết gió / … (tổng cộng N chỗ)"), khi phân tích thì phản hồi các sự kiện cốt lõi theo từng chương ("Chương 12〈Đêm tuyết gió〉: …"), khi tổng hợp xong thì phản hồi tóm tắt toàn cuốn (premise summary) — người dùng phải thấy mô hình đã hiểu gì.
+- Lỗi năng lực: `StopReasonLength` không được retry nguyên dạng, cũng không đi vào vòng tự sửa ngữ nghĩa; analysis batch, khi một phần văn bản có thể phân tích được, sẽ lưu tiền tố hợp lệ liên tục dài nhất theo §9.5, nếu không thì ghi `prefix_salvage=unavailable` và thu nhỏ batch tái tổ hợp; các hàm ngữ nghĩa còn lại sẽ thất bại rõ ràng và giữ nguyên phản hồi gốc.
 
-鉴权、权限、模型不支持和状态冲突立即失败。没有模拟成功、空对象兜底或跳过失败章节。
+Xác thực, quyền hạn, không hỗ trợ mô hình và xung đột trạng thái phải thất bại ngay. Không có success giả, không có fallback đối tượng rỗng, và không bỏ qua các chương thất bại.
 
-### 13.4 输入与输出预算
+### 13.4 Ngân sách đầu vào và đầu ra
 
-每种语义函数有独立 schema、输入预算、推理预留和可见输出预算：
+Mỗi hàm ngữ nghĩa có schema, ngân sách đầu vào, phần dự trữ suy luận và ngân sách đầu ra nhìn thấy riêng:
 
-- 分段输出只包含当前 owned range 的边界；
-- analysis batch 同时受 context window 和 completion 上限约束，输出是有限连续范围的逐章事实；
-- RangeDigest 只包含一个连续区间；
-- BookSynthesis 只包含全局事实和卷弧范围，不重复章节对象。
+- đầu ra của segment chỉ chứa ranh giới của owned range hiện tại;
+- analysis batch đồng thời bị ràng buộc bởi context window và giới hạn completion, đầu ra là các факт từng chương trong một phạm vi liên tục hữu hạn;
+- RangeDigest chỉ chứa một đoạn liên tục;
+- BookSynthesis chỉ chứa факт toàn cục và phạm vi tập/arc, không lặp lại đối tượng chương.
 
-每次请求在发送前都记录估算输入、推理预留、申请的 max tokens 和预计可见输出。估算只决定分块/组批，不删除正文或事实字段。因此不存在“总章数越多，某一次响应必然越长”的结构，也不能仅因输入放得下就忽略输出截断风险。
+Mỗi request trước khi gửi đều ghi lại đầu vào ước tính, phần dự trữ suy luận, max tokens được xin và đầu ra nhìn thấy dự kiến. Ước tính chỉ quyết định cách chia khối/gộp nhóm, không xóa các trường thân hoặc факт. Vì vậy không tồn tại cấu trúc kiểu “tổng số chương càng nhiều thì một response nào đó nhất định càng dài”, và cũng không thể chỉ vì đầu vào nhét vừa mà bỏ qua rủi ro cắt cụt đầu ra.
 
-## 14. 事件、日志和诊断
+## 14. Sự kiện, log và chẩn đoán
 
-### 14.1 事件阶段
+### 14.1 Giai đoạn sự kiện
 
 ```go
 const (
@@ -694,69 +692,69 @@ const (
 )
 ```
 
-每个事件包含 action、当前章节/区间、总数、耗时和可选错误。analysis batch 事件额外包含批次范围、预算估算、StopReason 和已提交前缀范围。Event 是投影，不参与恢复。
+Mỗi sự kiện gồm action, chương/khoảng hiện tại, tổng số, thời lượng và lỗi tùy chọn. Sự kiện analysis batch còn bao gồm phạm vi batch, ước tính ngân sách, StopReason và phạm vi prefix đã commit. Event là projection, không tham gia khôi phục.
 
-### 14.2 错误必须同时到达三处
+### 14.2 Lỗi phải đi tới ba nơi cùng lúc
 
-1. TUI 导入面板：自动换行，保留完整错误链；
-2. `tui.log`：结构化记录 stage、chapter/range、model、attempt 和 error；
-3. `meta/import/failures/`：保存最后一次失败元数据和未经裁剪的模型响应。
+1. Bảng điều khiển import trong TUI: tự xuống dòng, giữ nguyên toàn bộ chuỗi lỗi;
+2. `tui.log`: ghi cấu trúc stage, chapter/range, model, attempt và error;
+3. `meta/import/failures/`: lưu metadata của lần thất bại cuối cùng và phản hồi mô hình chưa bị cắt gọt.
 
-原始小说正文不写普通日志，也不进入默认脱敏诊断导出。失败响应位于用户自己的书目录，错误信息明确给出路径。
+Thân truyện gốc không được ghi vào log thông thường, cũng không đi vào xuất chẩn đoán ẩn danh mặc định. Phản hồi lỗi nằm trong thư mục sách của chính người dùng, và thông tin lỗi phải chỉ rõ đường dẫn.
 
-### 14.3 Session 与 Usage
+### 14.3 Session và Usage
 
-每次语义调用记录：
+Mỗi lần gọi ngữ nghĩa ghi:
 
-- 稳定 task 名，如 `import/segment/0003`、`import/analyze/0054-0061`；
-- assistant 原始响应；
-- provider/model 与 usage；
-- structured mode、thinking level 和输出校验结果。
+- tên task ổn định, như `import/segment/0003`, `import/analyze/0054-0061`;
+- phản hồi gốc của assistant;
+- provider/model và usage;
+- structured mode, mức thinking và kết quả kiểm tra đầu ra.
 
-用量统一归入 architect 角色，预算对导入成本可见。
+Usage được quy về vai trò architect, để ngân sách nhìn thấy được chi phí import.
 
-## 15. 生命周期与并发
+## 15. Vòng đời và đồng thời
 
-- 导入与 Engine、阶段共创、simulation 的写操作互斥；
-- 导入期间同一本书只允许一个 Runner；
-- 用户取消会取消在途模型调用，已原子落盘的工作区事实保留；
-- 确认前取消不会修改正式 Store；
-- 发布开始后取消不做猜测性回滚，下一次只能精确恢复发布；
-- 第一版 analysis batch 之间串行，批次内由一次模型调用按章顺序返回事实；正式发布仍按章节串行；
-- `Host.New/Resume` 在未完成导入时执行 §12.5 门禁，互斥语义跨进程重启仍成立；
-- 导出是否允许并发保持现有只读语义，但它只能看到已经正式发布的章节。
+- Import và Engine, co-create theo giai đoạn, và các thao tác ghi của simulation loại trừ lẫn nhau;
+- Trong lúc import, mỗi cuốn sách chỉ được phép có một Runner;
+- Người dùng hủy sẽ hủy các lời gọi mô hình đang chạy, còn các факты workspace đã ghi nguyên tử vẫn được giữ;
+- Hủy trước khi xác nhận sẽ không sửa Store chính thức;
+- Sau khi bắt đầu phát hành, việc hủy không thực hiện rollback suy đoán; lần sau chỉ có thể khôi phục chính xác việc phát hành;
+- Ở phiên bản đầu, các analysis batch chạy tuần tự giữa các batch, trong batch thì một lần gọi mô hình trả về факты theo thứ tự chương; phát hành chính thức vẫn tuần tự theo chương;
+- `Host.New/Resume` khi import chưa hoàn tất sẽ thực thi cổng kiểm soát ở §12.5; ý nghĩa loại trừ lẫn nhau vẫn đúng qua khởi động lại tiến trình;
+- Việc export có cho phép đồng thời hay không vẫn giữ ngữ nghĩa chỉ-đọc hiện có, nhưng nó chỉ thấy những chương đã được phát hành chính thức.
 
-## 16. 核心不变量
+## 16. Bất biến cốt lõi
 
-1. 每份工作区工件都由 `SchemaVersion + InputDigest + Payload` 标识；只有能从当前真实语义输入重建相同 `InputDigest` 才可复用。
-2. Manifest 对应唯一归一化源快照；每段非空源文本必须有且只有一个归属。
-3. 模型只能引用 Host 提供的 SourceUnit、原文锚点和章节号；Go 只接受能唯一映射回源字节的坐标。
-4. analysis batch 只能提交完整响应，或 `StopReasonLength` 下从首章开始的最大连续合法前缀；任一缺章都会阻止后续分析和综合。
-5. 卷弧范围必须连续、无重叠并完整覆盖 `1..N`；正式 Foundation 只能从通过完整验证的 Synthesis 发布。
-6. 正式章节只能按顺序通过 `commit_chapter` 发布；已存在正式工件只能在内容 digest 相同时幂等复用，不同则冲突失败。
-7. 任一模型失败都不得被解释为“无内容”或“继续下一章”，不得修复半个 JSON 或跳过失败章节。
-8. `done` 必须由工作区工件、正式工件、Progress、PendingCommit 和 checkpoint 共同证明；`done` 前普通 Engine 不得启动。
+1. Mỗi artifact workspace đều được xác định bởi `SchemaVersion + InputDigest + Payload`; chỉ có thể tái sử dụng nếu có thể dựng lại cùng `InputDigest` từ input ngữ nghĩa thật hiện tại.
+2. Manifest tương ứng với đúng một snapshot nguồn chuẩn hóa; mỗi đoạn văn bản nguồn không rỗng phải có đúng một nơi thuộc về.
+3. Mô hình chỉ được tham chiếu SourceUnit, anchor văn bản gốc và số chương do Host cung cấp; Go chỉ chấp nhận tọa độ có thể ánh xạ duy nhất về byte nguồn.
+4. analysis batch chỉ được commit phản hồi đầy đủ, hoặc với `StopReasonLength` thì commit tiền tố hợp lệ liên tục lớn nhất bắt đầu từ chương đầu; thiếu bất kỳ chương nào sẽ chặn phân tích và tổng hợp tiếp theo.
+5. Phạm vi tập/arc phải liên tục, không chồng lấn và phủ đầy `1..N`; Foundation chính thức chỉ có thể được phát hành từ Synthesis đã qua xác minh đầy đủ.
+6. Chương chính thức chỉ có thể phát hành theo thứ tự qua `commit_chapter`; artifact chính thức đã tồn tại chỉ có thể tái sử dụng idempotent khi digest nội dung giống nhau, khác thì lỗi xung đột.
+7. Mọi lỗi mô hình đều không được diễn giải là “không có nội dung” hay “tiếp chương sau”, không được sửa một nửa JSON hay bỏ qua chương thất bại.
+8. `done` phải được chứng minh đồng thời bởi workspace artifact, artifact chính thức, Progress, PendingCommit và checkpoint; trước `done` thì Engine bình thường không được khởi động.
 
-## 17. 包结构与窄接口
+## 17. Cấu trúc gói và interface hẹp
 
-保留 `internal/host/imp`，按职责拆分：
+Giữ `internal/host/imp`, tách theo trách nhiệm:
 
 ```text
 imp/
-├── types.go       公开 Options/Event 与语义 DTO
-├── source.go      读取、解码、归一化、SourceUnit/anchor
-├── workspace.go   meta/import 原子工件与 InputDigest
-├── call.go        import 专用 typed LLM 调用
-├── segment.go     结构投影、边界语义函数、覆盖验证
-├── analyze.go     双预算连续批次、逐章事实与截断前缀
-├── synthesize.go  RangeDigest 与 BookSynthesis
-├── publish.go     Foundation 对账与 commit_chapter 发布
-└── runner.go      LoadState → NextAction → 执行
+├── types.go       Expose Options/Event và semantic DTO
+├── source.go      Đọc, giải mã, chuẩn hóa, SourceUnit/anchor
+├── workspace.go   meta/import artifact nguyên tử và InputDigest
+├── call.go        typed LLM call chuyên cho import
+├── segment.go     projection cấu trúc, hàm ngữ nghĩa biên giới, xác minh bao phủ
+├── analyze.go     batch liên tục hai ngân sách, факты từng chương và prefix bị cắt
+├── synthesize.go  RangeDigest và BookSynthesis
+├── publish.go     đối soát Foundation và phát hành commit_chapter
+└── runner.go      LoadState → NextAction → thực thi
 ```
 
-不新增 `ImportEngine`、`Task`、`WorkflowInstance`、通用 Repository 或插件注册表。
+Không thêm `ImportEngine`, `Task`, `WorkflowInstance`, Repository tổng quát hay registry plugin.
 
-Host 注入的依赖保持窄：
+Các dependency do Host tiêm vào giữ ở mức hẹp:
 
 ```go
 type Deps struct {
@@ -769,205 +767,205 @@ type Deps struct {
 }
 ```
 
-`ModelRuntime` 只携带 context window、completion 上限、thinking、session/usage 回调等调用事实，并为每个语义函数预留模型档位选择位（默认 architect）；不让 `imp` 反向依赖整个 Host，也不把单一角色焊死为架构前提。
+`ModelRuntime` chỉ mang các факт gọi như context window, giới hạn completion, thinking, callback session/usage, và dành sẵn vị trí chọn mức mô hình cho từng hàm ngữ nghĩa (mặc định architect); không để `imp` phụ thuộc ngược vào toàn bộ Host, cũng không hàn chết một vai trò duy nhất thành tiền đề kiến trúc.
 
-## 18. 用户接口
+## 18. Giao diện người dùng
 
-### 18.1 新导入
+### 18.1 Import mới
 
 ```text
-/import <path> [--yes] [--story=open|closed] [--continue] [--guide=<切分指导>]
+/import <path> [--yes] [--story=open|closed] [--continue] [--guide=<hướng-dẫn-chia-tách>]
 ```
 
-默认行为：创建源快照、语义切分并打开确认预览，完成发布后设置一次导入专用 Hold。删除 `from=N`。
+Hành vi mặc định: tạo source snapshot, chia ngữ nghĩa và mở preview xác nhận, sau khi phát hành xong thì đặt một Hold chuyên cho import. Xóa `from=N`.
 
-前三个选项是彼此独立的显式授权，并写入 `intent.json`：
+Ba tùy chọn đầu là các quyền cấp rõ ràng, độc lập với nhau, và được ghi vào `intent.json`:
 
-- `--yes`：覆盖校验通过后自动接受切分；不决定 uncertain 故事状态，不跳过完成 Hold；
-- `--story=open|closed`：仅在 synthesis 返回 uncertain 时预先提供用户选择；模型已明确判断 open/closed 时不覆盖模型事实；
-- `--continue`：不创建导入专用 Hold；不绕过正常 advance mode，`review` 下仍需 `/next`。
+- `--yes`: sau khi vượt qua kiểm tra, tự động chấp nhận chia tách; không quyết định trạng thái câu chuyện uncertain, không bỏ qua Hold hoàn tất;
+- `--story=open|closed`: chỉ khi synthesis trả về uncertain thì mới cung cấp sẵn lựa chọn của người dùng; khi mô hình đã xác định rõ open/closed thì không ghi đè факт của mô hình;
+- `--continue`: không tạo Hold chuyên cho import; không vượt qua advance mode bình thường, trong `review` vẫn cần `/next`.
 
-`--guide` 与前三者不同：它不是启动授权而是切分的语义输入，落盘为工作区 `guidance.txt`（可含空格，须置于命令最后）。见 §18.3。
+`--guide` khác với ba mục trên: nó không phải quyền khởi động mà là input ngữ nghĩa cho việc chia tách, được ghi xuống `guidance.txt` của workspace (có thể chứa khoảng trắng, phải đặt ở cuối lệnh). Xem §18.3.
 
-因此 `/import book.txt --yes` 仍会在导入完成后停下；只有额外传入 `--continue` 才授权创作流程在正常门禁允许时接力。
+Vì vậy `/import book.txt --yes` vẫn sẽ dừng sau khi import hoàn tất; chỉ khi truyền thêm `--continue` thì mới cấp quyền để luồng sáng tác tiếp tục khi cửa kiểm soát bình thường cho phép.
 
-### 18.2 恢复
+### 18.2 Khôi phục
 
-同一本书存在活动工作区时执行无参数 `/import`，直接从事实和已保存 intent 推导下一步；源文件路径和启动参数都不是恢复必需项。带新路径的 `/import <path>` 不得覆盖活动工作区。
+Khi cùng một cuốn sách có workspace đang hoạt động, thực thi `/import` không tham số sẽ trực tiếp suy ra bước tiếp theo từ факты và intent đã lưu; đường dẫn tệp nguồn và tham số khởi động không phải điều kiện bắt buộc để khôi phục. `/import <path>` có đường dẫn mới không được ghi đè workspace đang hoạt động.
 
-未完成导入必须主动可见，不能等用户创作被门禁拒绝才暴露。实现为三道递进提示：
+Import chưa hoàn tất phải hiển thị chủ động, không thể đợi tới lúc người dùng sáng tác bị cổng kiểm soát từ chối mới lộ ra. Thực hiện bằng ba lớp nhắc nhở tăng dần:
 
-1. 启动时 TUI 检测一次（`imp.ResumeSummary`，按 `NextAction` 生成阶段化描述），欢迎界面醒目显示"发现未完成的导入（已分析 N/M 章），输入 /import 从断点恢复"；
-2. 用户无视提示尝试创作时，跨重启门禁（§12.5）拒绝引擎启动并发事件警示；
-3. 恢复运行中，导入面板实时显示当前阶段与进度。
+1. Lúc khởi động TUI kiểm tra một lần (`imp.ResumeSummary`, tạo mô tả theo giai đoạn dựa trên `NextAction`), giao diện chào nổi bật hiển thị “phát hiện import chưa hoàn tất (đã phân tích N/M chương), nhập /import để khôi phục từ điểm ngắt”;
+2. Khi người dùng bỏ qua nhắc nhở và cố sáng tác, cổng kiểm soát xuyên khởi động lại (§12.5) từ chối khởi động Engine và phát cảnh báo qua sự kiện;
+3. Trong khi đang chạy khôi phục, bảng điều khiển import hiển thị thời gian thực giai đoạn hiện tại và tiến độ.
 
-### 18.3 重新切分
+### 18.3 Phân chia lại
 
-用户核对预览后用 `/import --guide=<自然语言说明>` 重新识别，例如 `--guide=幕间·X 也是独立章节`。指导写入工作区 `guidance.txt` 并纳入 segmentation 的 `InputDigest`：指导变化使旧切分及旧 confirmation、分析和 synthesis 无法重建相同 `InputDigest`，自然全部重做；不提供正则编辑器。
+Sau khi kiểm tra preview, người dùng dùng `/import --guide=<mô tả tự nhiên>` để nhận diện lại, ví dụ `--guide=Ngoại truyện X cũng là một chương độc lập`. Hướng dẫn được ghi vào `guidance.txt` của workspace và đưa vào `InputDigest` của segmentation: khi guidance thay đổi, các lần chia cũ cùng confirmation, analysis và synthesis cũ không thể dựng lại cùng `InputDigest`, nên tự động làm lại toàn bộ; không cung cấp trình chỉnh sửa regex.
 
-### 18.4 取消
+### 18.4 Hủy
 
-确认前取消只保留工作区；发布前可以显式丢弃整个工作区。发布开始后不提供“假装什么都没发生”的丢弃操作，只允许恢复完成或由用户另行处理正式书籍。
+Việc hủy trước khi xác nhận chỉ giữ lại workspace; trước khi publish có thể bỏ rõ ràng toàn bộ workspace. Sau khi publish bắt đầu, không cung cấp thao tác bỏ kiểu “giả như chưa từng có gì xảy ra”, chỉ cho phép khôi phục hoàn tất hoặc để người dùng xử lý sách chính thức theo cách khác.
 
-## 19. 实施顺序
+## 19. Thứ tự triển khai
 
-### 阶段一：工作区和纯状态推导
+### Giai đoạn một: workspace và suy diễn trạng thái thuần
 
-- Manifest、Intent、源快照、`Artifact/InputDigest`、原子读写；
-- `LoadState/NextAction`；
-- 空书和同源恢复前置校验；
-- 删除 `ResumeFrom` 设计依赖。
+- Manifest, Intent, snapshot nguồn, `Artifact/InputDigest`, đọc/ghi nguyên tử;
+- `LoadState/NextAction`;
+- kiểm tra trước cho sách rỗng và khôi phục cùng nguồn;
+- xóa phụ thuộc thiết kế `ResumeFrom`.
 
-这一阶段不调用模型，先证明恢复事实没有歧义。
+Giai đoạn này không gọi model, trước hết chứng minh sự kiện khôi phục không có mơ hồ.
 
-### 阶段二：语义切分与确认
+### Giai đoạn hai: phân đoạn ngữ nghĩa và xác nhận
 
-- SourceUnit、超长行虚拟分片、原文锚点和上下文预算分块；
-- BoundaryDecision typed call；
-- 全文覆盖验证；
-- TUI 预览、自然语言重识别、`--yes` 和 confirmation 工件。
+- SourceUnit, phân mảnh ảo cho dòng quá dài, anchor nguyên văn và chia khối theo ngân sách ngữ cảnh;
+- BoundaryDecision typed call;
+- xác minh bao phủ toàn văn;
+- xem trước TUI, nhận diện lại bằng ngôn ngữ tự nhiên, `--yes` và artifact confirmation.
 
-先用非标准标题、卷标题、前言和尾注验证“不漏一字”。
+Trước hết dùng tiêu đề phi chuẩn, tiêu đề quyển, lời nói đầu và chú thích cuối để xác minh “không sót một chữ”.
 
-### 阶段三：连续批次的逐章事实
+### Giai đoạn ba: sự kiện từng chương theo batch liên tục
 
-- `ImportedChapterFacts`；
-- context/completion 双预算批次规划；
-- 批次间顺序分析和紧凑连续性 ledger；
-- 每章 `InputDigest` 工件恢复；
-- 截断即「失败 + 缩小重组批」，并记录部分文本是否可用；
-- session、usage、failover、thinking、容量错误和结构反馈重试接线。
+- `ImportedChapterFacts`;
+- lập kế hoạch batch theo hai ngân sách context/completion;
+- phân tích thứ tự giữa các batch và ledger tính liên tục gọn nhẹ;
+- khôi phục artifact `InputDigest` của từng chương;
+- nếu bị cắt cụt thì là “thất bại + thu nhỏ và gom lại batch”, đồng thời ghi lại văn bản một phần có khả dụng hay không;
+- nối session, usage, failover, thinking, lỗi dung lượng và retry phản hồi cấu trúc.
 
-### 阶段三·补：截断前缀打捞（效率优化，可后置）
+### Giai đoạn ba · bổ sung: vớt tiền tố bị cắt cụt (tối ưu hiệu suất, có thể để sau)
 
-- `StopReasonLength` 连续合法前缀解析（§9.5）；
-- 仅在部分文本可解析时启用，不改恢复正确性；单独开关、单独验收。
+- phân tích tiền tố hợp lệ liên tục `StopReasonLength` (§9.5);
+- chỉ bật khi văn bản một phần có thể phân tích được, không thay đổi tính đúng đắn của khôi phục; công tắc riêng, nghiệm thu riêng.
 
-### 阶段四：分层综合与 Foundation
+### Giai đoạn bốn: tổng hợp phân tầng và Foundation
 
-- context-aware RangeDigest；
-- BookSynthesis；
-- 范围式卷弧结构；
-- StoryStatus；
-- Foundation 完整组装和校验。
+- RangeDigest có nhận biết ngữ cảnh;
+- BookSynthesis;
+- cấu trúc arc theo quyển dạng phạm vi;
+- StoryStatus;
+- lắp ráp và kiểm tra đầy đủ Foundation.
 
-### 阶段五：发布与交接
+### Giai đoạn năm: publish và bàn giao
 
-- Foundation 逐工件 digest 对账；
-- 复用 `commit_chapter` 发布；
-- 取消/崩溃恢复；
-- 跨重启 Engine 门禁；
-- 默认导入完成 AdvanceHold 与显式 `--continue`；
-- 完整 TUI/log/failure artifact。
+- đối soát digest từng artifact của Foundation;
+- tái sử dụng `commit_chapter` để publish;
+- khôi phục khi hủy/crash;
+- cổng Engine xuyên restart;
+- sau khi import mặc định hoàn tất thì AdvanceHold và `--continue` rõ ràng;
+- artifact TUI/log/failure đầy đủ.
 
-### 阶段六：删除旧实现
+### Giai đoạn sáu: xóa triển khai cũ
 
-- 删除 `splitter.go` 的章节格式裁决；
-- 删除 tagged envelope；
-- 删除 `ReverseFoundation` 整书调用；
-- 删除 `pickScale` 章数阈值；
-- 删除 `ResumeFrom/from=N`；
-- 删除“固定一卷、1～3 弧、强制 open threads”的 prompt 约束；
-- 实现完成后再更新 README 和 architecture 的旧流程描述。
+- xóa phán quyết định dạng chương của `splitter.go`;
+- xóa tagged envelope;
+- xóa lệnh gọi toàn sách `ReverseFoundation`;
+- xóa ngưỡng số chương `pickScale`;
+- xóa `ResumeFrom/from=N`;
+- xóa ràng buộc prompt “một quyển cố định, 1～3 arc, bắt buộc open threads”;
+- sau khi triển khai xong mới cập nhật mô tả quy trình cũ trong README và architecture.
 
-## 20. 测试与验收
+## 20. Kiểm thử và nghiệm thu
 
-### 20.1 纯函数和属性测试
+### 20.1 Kiểm thử hàm thuần và thuộc tính
 
-- 任意合法 segmentation 都满足全文范围无重叠、无缺口；
-- 非法 SourceUnit、非唯一原文锚点、倒序和重复边界必定拒绝；
-- 边界顺序按 `(Line, Part)` 数值序判断；构造「字典序与数值序结论相反」的 unit 集，断言以数值序通过；
-- 正常行与虚拟分片都能无损映射回同一份归一化源字节；
-- 任意合法卷弧 ranges 恰好覆盖 `1..N`；
-- 相同语义输入稳定生成相同 `InputDigest`，任一真实输入变化都会使对应工件失配；
-- 双预算组批不会超过给定 context/completion 约束；
-- NextAction 对同一事实快照恒定。
+- mọi segmentation hợp lệ đều thỏa mãn phạm vi toàn văn không chồng lấn, không có khoảng trống;
+- SourceUnit bất hợp lệ, anchor nguyên văn không duy nhất, biên đảo thứ tự và trùng lặp chắc chắn bị từ chối;
+- thứ tự biên được xét theo thứ tự số của `(Line, Part)`; xây dựng một tập unit mà “thứ tự từ điển và thứ tự số cho kết luận ngược nhau”, assert rằng thứ tự số được chấp nhận;
+- dòng bình thường và phân mảnh ảo đều có thể ánh xạ ngược không mất mát về cùng một phần byte nguồn đã chuẩn hóa;
+- mọi ranges arc quyển hợp lệ đều vừa khít bao phủ `1..N`;
+- đầu vào ngữ nghĩa giống nhau ổn định sinh cùng `InputDigest`, bất kỳ thay đổi đầu vào thực nào cũng khiến artifact tương ứng không khớp;
+- gom batch theo hai ngân sách không vượt quá ràng buộc context/completion đã cho;
+- NextAction bất biến đối với cùng một snapshot sự kiện.
 
-对坐标映射、范围组装、批次预算和 `InputDigest` 做 fuzz/property test，不断言模型会输出某个固定标题。
+Làm fuzz/property test cho ánh xạ tọa độ, lắp ráp phạm vi, ngân sách batch và `InputDigest`, không assert rằng model sẽ xuất một tiêu đề cố định nào đó.
 
-### 20.2 模型契约测试
+### 20.2 Kiểm thử hợp đồng model
 
-- 非标准章名和混合卷章结构；
-- 序章/楔子/番外被模型语义判断为章节；
-- front/back matter 明确展示而非丢弃；
-- 整本单行、单行多章节和超预算行通过 SourceUnit + anchor 精确切分；
-- 安静章节允许空 characters；
-- 非法 JSON、缺字段、越界范围进入反馈重试；
-- analysis batch 返回连续逐章对象，不能跳号或重复；
-- `StopReasonLength` 只保存最大连续合法前缀，半个对象和后续非连续对象不保存；
-- 结构化模式不产出可解析部分文本时，断言走「失败 + 缩小重组批」且日志标注 `prefix_salvage=unavailable`；
-- 普通 `StopReasonStop` 下的损坏 JSON 不进入截断前缀路径；
-- 单章仍截断时显式失败，不生成空事实；
-- Prompt Contract 的解析/业务错误持续反馈自修复，直到成功或上下文取消；原生 Schema 契约违约、拒答与截断立即保留原始响应并终止；
-- 不支持 thinking/JSON Schema 的模型不收到非法参数。
+- tên chương phi chuẩn và cấu trúc quyển/chương hỗn hợp;
+- prologue/dẫn nhập/ngoại truyện được model phán đoán ngữ nghĩa là chương;
+- front/back matter được hiển thị rõ ràng thay vì bị vứt bỏ;
+- cả sách một dòng, một dòng nhiều chương và dòng vượt ngân sách được cắt chính xác thông qua SourceUnit + anchor;
+- chương yên tĩnh cho phép characters rỗng;
+- JSON bất hợp lệ, thiếu trường, phạm vi vượt biên đi vào retry phản hồi;
+- analysis batch trả về các object từng chương liên tục, không được nhảy số hoặc lặp;
+- `StopReasonLength` chỉ lưu tiền tố hợp lệ liên tục lớn nhất, không lưu nửa object và object phía sau không liên tục;
+- khi structured mode không tạo ra văn bản một phần có thể phân tích, assert đi theo “thất bại + thu nhỏ và gom lại batch” và log đánh dấu `prefix_salvage=unavailable`;
+- JSON hỏng dưới `StopReasonStop` thông thường không đi vào đường tiền tố cắt cụt;
+- khi một chương vẫn bị cắt cụt thì thất bại rõ ràng, không sinh sự kiện rỗng;
+- lỗi phân tích/nghiệp vụ của Prompt Contract liên tục phản hồi để tự sửa cho tới khi thành công hoặc context bị hủy; vi phạm hợp đồng Schema native, từ chối trả lời và cắt cụt lập tức giữ lại phản hồi gốc và dừng;
+- model không hỗ trợ thinking/JSON Schema không nhận tham số bất hợp lệ.
 
-模型测试断言契约和不变量，不断言精确文学判断。
+Kiểm thử model assert hợp đồng và bất biến, không assert phán đoán văn học chính xác.
 
-### 20.3 崩溃矩阵
+### 20.3 Ma trận crash
 
-至少覆盖：
+Ít nhất bao phủ:
 
-- 源快照后；
-- segmentation 后、确认前；
-- analysis batch 第 N 个对象落盘前后；
-- 长度截断前缀最后一章落盘前后；
-- RangeDigest 中间；
-- Synthesis 后、Foundation 前；
-- 每个 Foundation 工件前后；
-- draft/StartChapter/PendingCommit/progress/checkpoint 各窗口；
-- 最后一章提交后、AdvanceHold 前后；
-- Foundation/章节部分发布后重启并尝试普通 Host.Resume。
+- sau snapshot nguồn;
+- sau segmentation, trước xác nhận;
+- trước và sau khi object thứ N của analysis batch được ghi xuống đĩa;
+- trước và sau khi chương cuối cùng của tiền tố cắt cụt do độ dài được ghi xuống đĩa;
+- giữa RangeDigest;
+- sau Synthesis, trước Foundation;
+- trước và sau mỗi artifact Foundation;
+- từng cửa sổ draft/StartChapter/PendingCommit/progress/checkpoint;
+- sau khi submit chương cuối cùng, trước và sau AdvanceHold;
+- sau khi một phần Foundation/chương đã publish thì restart và thử Host.Resume thông thường.
 
-每个窗口重启后只能继续当前动作，不能重复消费成功的模型调用，也不能越过失败工件。`NextAction != done` 时普通 Engine 必须被门禁阻止，直到导入恢复完成。
+Sau khi restart ở mỗi cửa sổ, chỉ được tiếp tục hành động hiện tại, không được tiêu thụ lặp lại model call đã thành công, cũng không được vượt qua artifact thất bại. Khi `NextAction != done`, Engine thông thường bắt buộc phải bị cổng chặn cho tới khi khôi phục import hoàn tất.
 
-### 20.4 #83 回归形状
+### 20.4 Dạng hồi quy #83
 
-构造 54 章及更长输入，验证：
+Dựng đầu vào 54 chương và dài hơn, xác minh:
 
-1. 没有单次调用要求输出 54 章详细大纲；
-2. analysis batch 同时根据输入 context 和可见输出 completion 预算组批，不因输入放得下就塞入过多章节；
-3. 阶段三·补：模拟“前 13 章完整、第 14 章截断”的 `StopReasonLength`，只提交前 13 章，下一动作从第 14 章开始；未实现前缀打捞时，整批失败后从批次首章重组批；
-4. 模拟无完整对象的截断响应，错误完整显示、写 log、保存原始响应且不落分析工件；
-5. 模拟普通损坏 JSON，走结构反馈重试而不是前缀打捞；
-6. 修正后只重跑第一份缺失动作，不重做已完成章节；
-7. 非标准标题通过语义切分进入预览，不通过新增正则修复。
+1. Không có lệnh gọi đơn nào yêu cầu xuất dàn ý chi tiết 54 chương;
+2. analysis batch được gom theo cả ngân sách context đầu vào và ngân sách completion đầu ra khả kiến, không nhồi quá nhiều chương chỉ vì đầu vào chứa được;
+3. Giai đoạn ba · bổ sung: mô phỏng `StopReasonLength` “13 chương đầu hoàn chỉnh, chương 14 bị cắt cụt”, chỉ submit 13 chương đầu, hành động tiếp theo bắt đầu từ chương 14; khi chưa triển khai vớt tiền tố, cả batch thất bại rồi gom lại batch từ chương đầu của batch;
+4. Mô phỏng phản hồi cắt cụt không có object hoàn chỉnh, hiển thị đầy đủ lỗi, ghi log, lưu phản hồi gốc và không ghi artifact phân tích;
+5. Mô phỏng JSON hỏng thông thường, đi theo retry phản hồi cấu trúc thay vì vớt tiền tố;
+6. Sau khi sửa chỉ chạy lại hành động thiếu đầu tiên, không làm lại các chương đã hoàn thành;
+7. Tiêu đề phi chuẩn đi vào xem trước thông qua phân đoạn ngữ nghĩa, không sửa bằng cách thêm regex mới.
 
-### 20.5 最终验收标准
+### 20.5 Tiêu chuẩn nghiệm thu cuối cùng
 
-1. 默认交互模式让用户在正式写盘前看到并确认全部章节边界；`--yes` 能显式自动接受且留下同等审计工件。
-2. 任意非空源文本都能从 segmentation 找到唯一归属。
-3. 200～500 章不会形成一次读取全书正文并输出全部章节对象的模型调用；每个分析批次同时受输入和输出预算约束，全局输出只表达全局事实与卷弧范围。
-4. 任一阶段崩溃后无需 `from=N` 即可精确恢复。
-5. 正式状态在完整语义验证前保持不变。
-6. 发布中断后现有 commit saga 能恢复，且不会重复提交章节。
-7. 未完成导入跨重启后不能启动普通 Engine；只能查看、诊断或恢复导入。
-8. `--yes` 不跳过完成 Hold；只有独立 `--continue` 才跳过，且不会绕过 review 门禁。
-9. 模型和 provider 的能力、用量、StopReason、预算估算和错误均可观测。
-10. 更换更强模型即可改善切分、分析和综合质量，并自然扩大安全批次、减少调用次数，不修改 Go 文学规则。
+1. Chế độ tương tác mặc định cho phép người dùng nhìn thấy và xác nhận toàn bộ biên chương trước khi ghi chính thức xuống đĩa; `--yes` có thể tự động chấp nhận rõ ràng và để lại artifact kiểm toán tương đương.
+2. Bất kỳ văn bản nguồn không rỗng nào cũng có thể tìm được thuộc về duy nhất từ segmentation.
+3. 200～500 chương sẽ không tạo thành một model call đọc toàn bộ chính văn cả sách và xuất toàn bộ object chương; mỗi analysis batch đồng thời bị ràng buộc bởi ngân sách đầu vào và đầu ra, đầu ra toàn cục chỉ biểu đạt sự kiện toàn cục và phạm vi arc quyển.
+4. Sau khi crash ở bất kỳ giai đoạn nào, không cần `from=N` vẫn có thể khôi phục chính xác.
+5. Trạng thái chính thức giữ nguyên trước khi xác minh ngữ nghĩa đầy đủ.
+6. Sau khi publish bị gián đoạn, commit saga hiện có có thể khôi phục, và sẽ không submit chương lặp.
+7. Import chưa hoàn tất sau restart không được khởi động Engine thông thường; chỉ được xem, chẩn đoán hoặc khôi phục import.
+8. `--yes` không bỏ qua Hold hoàn tất; chỉ `--continue` độc lập mới bỏ qua, và sẽ không vòng qua cổng review.
+9. Năng lực, usage, StopReason, ước lượng ngân sách và lỗi của model và provider đều có thể quan sát.
+10. Chỉ cần đổi sang model mạnh hơn là có thể cải thiện chất lượng cắt đoạn, phân tích và tổng hợp, đồng thời tự nhiên mở rộng batch an toàn, giảm số lần gọi, không sửa quy tắc văn học trong Go.
 
-## 21. 面向未来的扩展性
+## 21. Khả năng mở rộng hướng tương lai
 
-本方案的扩展性来自稳定边界，而不是预建抽象：
+Khả năng mở rộng của phương án này đến từ biên ổn định, không phải abstraction dựng sẵn:
 
-- 模型理解增强：Boundary/Chapter/Synthesis 三类语义函数直接变准；
-- 上下文或输出窗口扩大：双预算器自动扩大安全 analysis batch，并减少分块和 Reduce 层数；
-- 结构化输出增强：typed-call 自动选择更强的 provider 约束；
-- 廉价档位模型变强：机械性更强的 segment 可切到更便宜档位，成本红利随之进入，不改语义契约；
-- 新输入格式：只需把 EPUB 等转换为同一归一化文本和 SourceUnit 坐标；
-- 新的全书语义：在 `ImportedChapterFacts` 或 `BookSynthesis` 增加有明确消费者的字段，不改恢复和发布协议；
-- 用户共创增强：在确认边界增加自然语言修正，不把格式知识写进代码。
+- hiểu biết của model tăng cường: ba loại hàm ngữ nghĩa Boundary/Chapter/Synthesis trực tiếp trở nên chính xác hơn;
+- cửa sổ ngữ cảnh hoặc đầu ra mở rộng: bộ tính hai ngân sách tự động mở rộng analysis batch an toàn, đồng thời giảm số khối và số tầng Reduce;
+- đầu ra có cấu trúc tăng cường: typed-call tự động chọn ràng buộc provider mạnh hơn;
+- model phân khúc rẻ trở nên mạnh hơn: segment có tính cơ giới mạnh hơn có thể chuyển sang phân khúc rẻ hơn, lợi ích chi phí theo đó đi vào, không đổi hợp đồng ngữ nghĩa;
+- định dạng đầu vào mới: chỉ cần chuyển EPUB v.v. thành cùng một văn bản chuẩn hóa và tọa độ SourceUnit;
+- ngữ nghĩa toàn sách mới: thêm trường có consumer rõ ràng vào `ImportedChapterFacts` hoặc `BookSynthesis`, không đổi giao thức khôi phục và publish;
+- đồng sáng tạo với người dùng tăng cường: thêm chỉnh sửa bằng ngôn ngữ tự nhiên khi xác nhận biên, không viết tri thức định dạng vào code.
 
-不变的部分是全文覆盖、`InputDigest` 身份、范围校验和幂等发布。这些是模型再强也不值得交给模型的簿记；可变的语义全部留在模型函数中，因此模型升级的红利可以穿透到产品结果。
+Phần bất biến là bao phủ toàn văn, danh tính `InputDigest`, kiểm tra phạm vi và publish lũy đẳng. Đây là bookkeeping mà dù model mạnh hơn cũng không đáng giao cho model; toàn bộ ngữ nghĩa có thể thay đổi đều để trong các hàm model, vì vậy lợi ích nâng cấp model có thể xuyên thấu tới kết quả sản phẩm.
 
-## 22. 最终决策
+## 22. Quyết định cuối cùng
 
-采用**分阶段语义导入管线**，拒绝两条方向：
+Áp dụng **pipeline import ngữ nghĩa theo giai đoạn**, từ chối hai hướng:
 
-1. 继续扩大章节正则和章数/弧数阈值；
-2. 用一个自由长循环 Agent 接管全部导入。
+1. Tiếp tục mở rộng regex chương và ngưỡng số chương/số arc;
+2. Dùng một Agent vòng lặp dài tự do tiếp quản toàn bộ import.
 
-最终边界是：
+Biên cuối cùng là:
 
-> **模型决定文本意味着什么；代码保证每个字去了哪里、每个结果对应哪份输入、每次调用的输入输出都装得下、失败后从哪里继续，以及什么时候有资格成为正式事实。**
+> **Model quyết định văn bản có nghĩa là gì; code bảo đảm từng chữ đi đâu, mỗi kết quả tương ứng với đầu vào nào, đầu vào/đầu ra của mỗi lần gọi đều chứa vừa, sau thất bại tiếp tục từ đâu, và khi nào đủ tư cách trở thành sự kiện chính thức.**
 
-这既保留模型自主能力和未来红利，也保持 ainovel-cli 当前 Engine + 类型化语义函数 + 文件事实层的简洁架构。
+Điều này vừa giữ lại năng lực tự chủ và lợi ích tương lai của model, vừa duy trì kiến trúc gọn nhẹ hiện tại của ainovel-cli: Engine + hàm ngữ nghĩa typed + lớp sự kiện file.

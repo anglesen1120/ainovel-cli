@@ -6,8 +6,8 @@ import (
 	"testing"
 )
 
-// TestRawFileSources_ScansAllMarkdownInOrder 验证目录下多个 .md 都被扫到，
-// 按文件名字典序返回；非 .md 文件被忽略；原文原样保留。
+// TestRawFileSources_ScansAllMarkdownInOrder xác minh nhiều tệp .md trong thư mục đều được quét,
+// trả về theo thứ tự từ điển tên tệp; tệp không phải .md bị bỏ qua; nội dung gốc được giữ nguyên.
 func TestRawFileSources_ScansAllMarkdownInOrder(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "rules")
 	if err := os.MkdirAll(dir, 0o755); err != nil {
@@ -18,39 +18,39 @@ func TestRawFileSources_ScansAllMarkdownInOrder(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	write("b.md", "# B 偏好")
-	write("a.md", "# A 偏好")
+	write("b.md", "# Sở thích B")
+	write("a.md", "# Sở thích A")
 	write("ignore.txt", "not a rule")
-	write("empty.md", "   ") // 空白文件应跳过
+	write("empty.md", "   ") // Tệp chỉ có khoảng trắng phải bị bỏ qua
 
 	srcs := RawFileSources(LoadOptions{HomeRulesDir: dir})
 	if len(srcs) != 2 {
-		t.Fatalf("应扫到 a.md / b.md 两个来源（.txt 与空白跳过），得到 %d：%+v", len(srcs), srcs)
+		t.Fatalf("phải quét được hai nguồn a.md / b.md (.txt và tệp rỗng bị bỏ qua), got %d: %+v", len(srcs), srcs)
 	}
-	// 字典序：a 在前 b 在后
+	// Thứ tự từ điển: a đứng trước b
 	if srcs[0].Label != "global:a.md" || srcs[1].Label != "global:b.md" {
-		t.Errorf("应按字典序返回，得到 %q, %q", srcs[0].Label, srcs[1].Label)
+		t.Errorf("phải trả về theo thứ tự từ điển, got %q, %q", srcs[0].Label, srcs[1].Label)
 	}
 	for _, s := range srcs {
 		if s.Kind != SourceGlobal {
-			t.Errorf("HomeRulesDir 来源应为 SourceGlobal，得到 %v", s.Kind)
+			t.Errorf("nguồn HomeRulesDir phải là SourceGlobal, got %v", s.Kind)
 		}
 	}
 }
 
-// TestRawFileSources_DirMissing 验证目录不存在时静默跳过（返回 nil）。
+// TestRawFileSources_DirMissing xác minh khi thư mục không tồn tại thì âm thầm bỏ qua (trả về nil).
 func TestRawFileSources_DirMissing(t *testing.T) {
 	srcs := RawFileSources(LoadOptions{HomeRulesDir: filepath.Join(t.TempDir(), "nope")})
 	if len(srcs) != 0 {
-		t.Errorf("缺失目录应返回 0 来源，得到 %d", len(srcs))
+		t.Errorf("thư mục thiếu phải trả về 0 nguồn, got %d", len(srcs))
 	}
 	if len(RawFileSources(LoadOptions{})) != 0 {
-		t.Error("空 LoadOptions 应返回 0 来源")
+		t.Error("LoadOptions rỗng phải trả về 0 nguồn")
 	}
 }
 
-// TestRawFileSources_IgnoresHiddenAndSubdirs 锁死：隐藏/编辑器临时文件（. 开头）被忽略、
-// 子目录不递归——防止脏文件二进制内容当偏好正文注入 LLM。
+// TestRawFileSources_IgnoresHiddenAndSubdirs cố định: tệp ẩn/tệp tạm của editor (bắt đầu bằng .) bị bỏ qua,
+// không đệ quy vào thư mục con, tránh tiêm nội dung nhị phân bẩn vào LLM như văn bản sở thích.
 func TestRawFileSources_IgnoresHiddenAndSubdirs(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "rules")
 	if err := os.MkdirAll(filepath.Join(dir, "sub"), 0o755); err != nil {
@@ -70,11 +70,11 @@ func TestRawFileSources_IgnoresHiddenAndSubdirs(t *testing.T) {
 
 	srcs := RawFileSources(LoadOptions{HomeRulesDir: dir})
 	if len(srcs) != 1 || srcs[0].Label != "global:real.md" {
-		t.Fatalf("应只扫到 real.md（隐藏/脏/子目录忽略），得到 %+v", srcs)
+		t.Fatalf("phải chỉ quét được real.md (bỏ qua tệp ẩn/bẩn/thư mục con), got %+v", srcs)
 	}
 }
 
-// TestRawFileSources_GlobalThenProject 验证全局来源在前、项目来源在后。
+// TestRawFileSources_GlobalThenProject xác minh nguồn global đứng trước, nguồn project đứng sau.
 func TestRawFileSources_GlobalThenProject(t *testing.T) {
 	base := t.TempDir()
 	global := filepath.Join(base, "global")
@@ -84,15 +84,15 @@ func TestRawFileSources_GlobalThenProject(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if err := os.WriteFile(filepath.Join(global, "g.md"), []byte("# 全局"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(global, "g.md"), []byte("# Global"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(project, "p.md"), []byte("# 本书"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(project, "p.md"), []byte("# Sách này"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
 	srcs := RawFileSources(LoadOptions{HomeRulesDir: global, ProjectRulesDir: project})
 	if len(srcs) != 2 || srcs[0].Kind != SourceGlobal || srcs[1].Kind != SourceProject {
-		t.Fatalf("应先全局后项目，得到 %+v", srcs)
+		t.Fatalf("phải là global trước rồi project sau, got %+v", srcs)
 	}
 }

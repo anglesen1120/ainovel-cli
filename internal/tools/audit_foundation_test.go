@@ -20,19 +20,19 @@ func completeShortFoundation(t *testing.T) *store.Store {
 	if err := s.Progress.Init(1); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.Book.Save(domain.BookMetadata{Title: "审查测试", Synopsis: "林舟在夜禁之城寻找生路。"}); err != nil {
+	if err := s.Book.Save(domain.BookMetadata{Title: "Bài kiểm tra thẩm định", Synopsis: "Lâm Chu tìm đường sống trong thành phố cấm đi lại ban đêm."}); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.Outline.SavePremise("# 审查测试\n\n## 主角目标\n林舟求生"); err != nil {
+	if err := s.Outline.SavePremise("# Bài kiểm tra thẩm định\n\n## Mục tiêu của nhân vật chính\nLâm Chu cầu sinh"); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.Outline.SaveOutline([]domain.OutlineEntry{{Chapter: 1, Title: "求生", CoreEvent: "林舟脱险"}}); err != nil {
+	if err := s.Outline.SaveOutline([]domain.OutlineEntry{{Chapter: 1, Title: "Cầu sinh", CoreEvent: "Lâm Chu thoát nạn"}}); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.Characters.Save([]domain.Character{{Name: "林舟", Role: "主角", Description: "求生者"}}); err != nil {
+	if err := s.Characters.Save([]domain.Character{{Name: "Lâm Chu", Role: "Nhân vật chính", Description: "Người cầu sinh"}}); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.World.SaveWorldRules([]domain.WorldRule{{Category: "society", Rule: "城门夜禁", Boundary: "入夜关闭"}}); err != nil {
+	if err := s.World.SaveWorldRules([]domain.WorldRule{{Category: "society", Rule: "Cổng thành cấm đi lại ban đêm", Boundary: "Đóng khi đêm xuống"}}); err != nil {
 		t.Fatal(err)
 	}
 	return s
@@ -42,14 +42,14 @@ func TestAuditFoundationControlsWritingTransition(t *testing.T) {
 	s := completeShortFoundation(t)
 	tool := NewAuditFoundationTool(s)
 	if !tool.StrictSchema() {
-		t.Fatal("audit_foundation must use strict schema")
+		t.Fatal("audit_foundation phải dùng lược đồ nghiêm ngặt")
 	}
 	if err := llmcontract.ValidateStrictReady(tool.Schema()); err != nil {
-		t.Fatalf("audit_foundation schema is not strict-ready: %v", err)
+		t.Fatalf("lược đồ audit_foundation chưa sẵn sàng cho chế độ nghiêm ngặt: %v", err)
 	}
 	missing, err := s.FoundationMissing()
 	if err != nil || len(missing) != 1 || missing[0] != "foundation_audit" {
-		t.Fatalf("expected only foundation_audit, got %v, err=%v", missing, err)
+		t.Fatalf("mong đợi chỉ có foundation_audit, nhận được %v, err=%v", missing, err)
 	}
 	fingerprint, err := s.FoundationFingerprint()
 	if err != nil {
@@ -58,29 +58,29 @@ func TestAuditFoundationControlsWritingTransition(t *testing.T) {
 	failed, _ := json.Marshal(map[string]any{
 		"fingerprint": fingerprint,
 		"ready":       false,
-		"summary":     "角色名不一致",
+		"summary":     "Tên nhân vật không nhất quán",
 		"issues": []map[string]any{{
-			"artifact": "characters", "description": "人物不一致", "evidence": "前提为林舟，角色表为他人", "suggestion": "统一角色",
+			"artifact": "characters", "description": "Nhân vật không nhất quán", "evidence": "Tiền đề là Lâm Chu, bảng nhân vật lại là người khác", "suggestion": "Thống nhất nhân vật",
 		}},
 	})
 	if _, err := tool.Execute(context.Background(), failed); err != nil {
-		t.Fatalf("failed audit should persist guidance: %v", err)
+		t.Fatalf("thẩm định thất bại phải lưu lại hướng dẫn: %v", err)
 	}
 	if p, _ := s.Progress.Load(); p.Phase == domain.PhaseWriting {
-		t.Fatal("failed audit must not enter writing")
+		t.Fatal("thẩm định thất bại không được chuyển sang giai đoạn viết")
 	}
 
 	passed, _ := json.Marshal(map[string]any{
 		"fingerprint": fingerprint,
 		"ready":       true,
-		"summary":     "基础设定一致",
+		"summary":     "Thiết lập nền tảng nhất quán",
 		"issues":      []any{},
 	})
 	if _, err := tool.Execute(context.Background(), passed); err != nil {
-		t.Fatalf("passed audit: %v", err)
+		t.Fatalf("thẩm định đạt: %v", err)
 	}
 	if p, _ := s.Progress.Load(); p.Phase != domain.PhaseWriting {
-		t.Fatalf("passed audit must enter writing, got %s", p.Phase)
+		t.Fatalf("thẩm định đạt phải chuyển sang giai đoạn viết, nhận %s", p.Phase)
 	}
 }
 
@@ -92,21 +92,21 @@ func TestSaveFoundationWaitsForSemanticAudit(t *testing.T) {
 	if err := s.Progress.Init(1); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.Book.Save(domain.BookMetadata{Title: "测试书", Synopsis: "林舟冒险进入夜禁之城。"}); err != nil {
+	if err := s.Book.Save(domain.BookMetadata{Title: "Sách kiểm tra", Synopsis: "Lâm Chu mạo hiểm bước vào thành phố cấm đi lại ban đêm."}); err != nil {
 		t.Fatal(err)
 	}
 	if err := s.Outline.SavePremise("# test"); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.Characters.Save([]domain.Character{{Name: "林舟", Role: "主角"}}); err != nil {
+	if err := s.Characters.Save([]domain.Character{{Name: "Lâm Chu", Role: "Nhân vật chính"}}); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.World.SaveWorldRules([]domain.WorldRule{{Category: "society", Rule: "夜禁", Boundary: "入夜"}}); err != nil {
+	if err := s.World.SaveWorldRules([]domain.WorldRule{{Category: "society", Rule: "Cấm đi lại ban đêm", Boundary: "Khi trời tối"}}); err != nil {
 		t.Fatal(err)
 	}
 	args, _ := json.Marshal(map[string]any{
 		"type": "outline", "scale": "short",
-		"content": []map[string]any{{"chapter": 1, "title": "开端", "core_event": "林舟入城", "hook": "夜禁", "scenes": []string{"入城"}}},
+		"content": []map[string]any{{"chapter": 1, "title": "Khởi đầu", "core_event": "Lâm Chu vào thành", "hook": "Cấm đi lại ban đêm", "scenes": []string{"Vào thành"}}},
 	})
 	result, err := NewSaveFoundationTool(s).Execute(context.Background(), args)
 	if err != nil {
@@ -120,10 +120,10 @@ func TestSaveFoundationWaitsForSemanticAudit(t *testing.T) {
 		t.Fatal(err)
 	}
 	if payload.Ready || len(payload.Remaining) != 1 || payload.Remaining[0] != "foundation_audit" {
-		t.Fatalf("save_foundation must wait for audit: %+v", payload)
+		t.Fatalf("save_foundation phải chờ thẩm định: %+v", payload)
 	}
 	if p, _ := s.Progress.Load(); p.Phase == domain.PhaseWriting {
-		t.Fatal("save_foundation must not enter writing before audit")
+		t.Fatal("save_foundation không được vào giai đoạn viết trước khi thẩm định")
 	}
 }
 
@@ -133,13 +133,13 @@ func TestAuditFoundationRejectsStaleFingerprint(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := s.Outline.SavePremise("# 已修改的版本"); err != nil {
+	if err := s.Outline.SavePremise("# Phiên bản đã được sửa"); err != nil {
 		t.Fatal(err)
 	}
 	args, _ := json.Marshal(map[string]any{
-		"fingerprint": fingerprint, "ready": true, "summary": "通过", "issues": []any{},
+		"fingerprint": fingerprint, "ready": true, "summary": "Đạt", "issues": []any{},
 	})
-	if _, err := NewAuditFoundationTool(s).Execute(context.Background(), args); err == nil || !strings.Contains(err.Error(), "重新调用 novel_context") {
-		t.Fatalf("expected stale fingerprint rejection, got %v", err)
+	if _, err := NewAuditFoundationTool(s).Execute(context.Background(), args); err == nil || !strings.Contains(err.Error(), "hãy gọi lại novel_context") {
+		t.Fatalf("mong đợi từ chối fingerprint lỗi thời, nhận %v", err)
 	}
 }

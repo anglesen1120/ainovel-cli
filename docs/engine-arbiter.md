@@ -1,77 +1,77 @@
-# 控制面演进:Engine + Arbiter(移除 Coordinator 长循环)
+# Sự tiến hóa của mặt phẳng điều khiển: Engine + Arbiter (loại bỏ vòng lặp dài Coordinator)
 
-> 状态(2026-07-14 v6):**代码实现完成**——Engine/Arbiter 已实施,Coordinator 及全部配套已删除(§十清单);端到端验证写完整书、失败裁定、僵局裁定、返工验收(hold+editor 时序)、boundary hold 即停、退出竞态干预保全与单许可单章节。三轮外部评审的阻断项全部处置(含 feedback 事实闭环、PendingSteer 崩溃保护、lifecycle 竞态)。
-> **文档迁移已完成(2026-07-12)**:architecture.md 正文已全量重写为 Engine+Arbiter 现行架构(含新验证策略/目录/纪律);README、context-management、evaluation-system、observability、user-rules-runtime 的旧架构叙事已清理(仅保留标注的历史对照)。Coordinator 配置与会话兼容路径均已删除；Arbiter 当前刻意统一使用 Default 模型，不开放独立角色配置。
-> **设计语义澄清(第四/五轮评审)**:① writer feedback 的消费点**就是**下一次结构操作(expand_arc/append_volume/update_compass 经 novel_context 参考后清空)——它是"对后续大纲的建议"(commit schema 原文),不是即时调度信号;弧中途的严重偏离走 editor 评审与用户干预通道。非分层书无结构操作,**commit 不落盘其 feedback**(避免永久无消费者的垃圾事实;返回值镜像保留供诊断)。② rule_violations 已闭环:commit 双路径落盘(**best-effort 质量元数据**,与章节提交非同级强一致——恰在 pending_commit 清除后崩溃会缺一条记录,可接受)→ novel_context(chapter=N) 注入 → editor 按 §机械检查映射消费。③ PendingSteer 崩溃保护是 **best-effort 单在途持久化**:首次持久化失败会显式停止裁定；裁定期、动作应用失败、正常退出/Abort 受保护;两个明确不保证的窗口——(a) 派单转入内存执行队列(e.next)后、worker 启动前的硬杀进程(毫秒级窗口,defer 不执行);(b) interMu 等待中的并发干预(尚未写入槽位)。用户在场可感知,重发成本秒级,不为此建持久化 intent/FIFO。④ 启动裁定失败不是死局(2026-07-12 真实故障补课:provider 账号失效致 plan_start 失败,恢复路径全部走不通):StartPrompt(输入事实)改为在裁定**之前**落盘;plan_start 从未完成时,引擎 planStartFallback 依据它现场补裁——首次裁定的重试不违反"恢复不重做已有裁定";补裁失败显式暂停回显,失败裁定的审计记录带 error 字段(DecisionRecord.Error)。
-> 本文档保留为设计决策记录;当前架构见 README 架构节与 docs/engine-rfc.md。关联:docs/voice-layer.md(已实施)。
+> Trạng thái (2026-07-14 v6): **triển khai mã đã hoàn tất** —— Engine/Arbiter đã được triển khai, Coordinator và toàn bộ phần phụ trợ đã bị xóa (danh sách §mười); xác minh đầu-cuối-đến-cuối đã viết sách hoàn chỉnh, phân xử thất bại, phân xử bế tắc, nghiệm thu làm lại (trình tự hold+editor), boundary hold dừng ngay, bảo toàn can thiệp tranh chấp thoát và một giấy phép một chương. Tất cả hạng mục chặn từ ba vòng đánh giá bên ngoài đã được xử lý (bao gồm vòng khép kín sự kiện phản hồi, bảo vệ sập PendingSteer, tranh chấp vòng đời).
+> **Di trú tài liệu đã hoàn tất (2026-07-12)**: phần thân architecture.md đã được viết lại toàn bộ thành kiến trúc hiện hành Engine+Arbiter (bao gồm chiến lược/thư mục/kỷ luật xác minh mới); README, context-management, evaluation-system, observability, user-rules-runtime đã được dọn sạch tường thuật kiến trúc cũ (chỉ giữ lại đối chiếu lịch sử có đánh dấu). Cấu hình Coordinator và các đường tương thích phiên đều đã bị xóa; Arbiter hiện cố ý thống nhất dùng mô hình Default, không mở cấu hình vai trò độc lập.
+> **Làm rõ ngữ nghĩa thiết kế (vòng đánh giá thứ tư/năm)**: ① điểm tiêu thụ phản hồi của writer **chính là** thao tác cấu trúc tiếp theo (expand_arc/append_volume/update_compass sau khi được novel_context tham chiếu thì xóa) —— nó là "khuyến nghị cho đề cương tiếp theo" (nguyên văn commit schema), không phải tín hiệu điều phối tức thời; lệch hướng nghiêm trọng giữa arc đi qua kênh đánh giá editor và can thiệp người dùng. Sách phi phân tầng không có thao tác cấu trúc, **commit không ghi phản hồi của nó xuống đĩa** (tránh sự kiện rác không bao giờ có consumer vĩnh viễn; mirror giá trị trả về được giữ lại để chẩn đoán). ② rule_violations đã khép vòng: commit ghi đĩa theo hai đường (**siêu dữ liệu chất lượng best-effort**, không có tính nhất quán mạnh cùng cấp với commit chương —— nếu sập ngay sau khi pending_commit được xóa sẽ thiếu một bản ghi, chấp nhận được) → novel_context(chapter=N) tiêm vào → editor tiêu thụ theo ánh xạ §kiểm tra cơ học. ③ Bảo vệ sập PendingSteer là **một lần persistent hóa đang thực hiện, theo cơ chế best-effort**: lần persistent đầu tiên thất bại sẽ dừng phân xử rõ ràng; được bảo vệ trong kỳ phân xử, khi áp dụng action thất bại, thoát bình thường/Abort; hai cửa sổ không đảm bảo được nêu rõ —— (a) sau khi chuyển dispatch vào hàng đợi thực thi trong bộ nhớ (e.next), trước khi worker khởi động bị buộc dừng tiến trình (cửa sổ mili-giây, defer không thực thi); (b) can thiệp đồng thời đang chờ interMu (chưa ghi vào slot). Người dùng có mặt có thể cảm nhận, chi phí gửi lại tính bằng giây, không vì vậy xây intent/FIFO persistent. ④ Thất bại phân xử lúc khởi động không phải ngõ cụt (bổ túc lỗi thực tế 2026-07-12: tài khoản provider mất hiệu lực khiến plan_start thất bại, mọi đường khôi phục đều không chạy được): StartPrompt (sự kiện đầu vào) đổi thành ghi đĩa **trước** phân xử; khi plan_start chưa hoàn thành, engine planStartFallback dựa vào nó để phân xử bù tại chỗ —— retry của lần phân xử đầu không vi phạm "khôi phục không làm lại phân xử đã có"; phân xử bù thất bại sẽ tạm dừng rõ ràng và echo, bản ghi kiểm toán của phân xử thất bại mang trường error (DecisionRecord.Error).
+> Tài liệu này được giữ lại làm bản ghi quyết định thiết kế; kiến trúc hiện tại xem mục kiến trúc trong README và docs/engine-rfc.md. Liên quan: docs/voice-layer.md (đã triển khai).
 
-## 一、动机:被打补丁包围的过时假设
+## Một, động cơ: giả định lỗi thời bị bao quanh bởi các bản vá
 
-项目的 founding assumption——"一次 Prompt、一个常驻 LLM 长循环驱动整本书"——已过时。4 月 Hybrid 重构后,决策权实际在 `flow.Route` 手里,Coordinator 在主循环 90% 的调用只做**原样转发**。为"维持一个不该停的 LLM 会话"付出的补丁生态:
+Giả định nền tảng của dự án —— "một Prompt, một vòng lặp dài LLM thường trú điều khiển cả cuốn sách" —— đã lỗi thời. Sau tái cấu trúc Hybrid tháng 4, quyền quyết định thực tế nằm trong tay `flow.Route`, Coordinator trong 90% lời gọi của vòng lặp chính chỉ làm **chuyển tiếp nguyên trạng**. Hệ sinh thái vá lỗi phải trả để "duy trì một phiên LLM không nên dừng":
 
-1. StopGuard + blockMessage 动态文案工程
-2. Dispatcher 重复指令协议("第 N 次下达")
-3. coordinator.md 行为规训(恢复特例 / 查询类必须同轮派单 / 不得用停机表达立场)
+1. StopGuard + kỹ nghệ nội dung động blockMessage
+2. Giao thức chỉ thị lặp lại Dispatcher ("ban hành lần thứ N")
+3. Quy chuẩn hành vi coordinator.md (trường hợp đặc biệt khôi phục / loại truy vấn phải dispatch cùng vòng / không được dùng dừng máy để biểu đạt lập trường)
 4. completePhaseGate / writerExpandedChapterGate
 5. MaxTurns=100_000
 6. FlowBoundaryHook
-7. 完结分歧特例
+7. Trường hợp đặc biệt bất đồng kết thúc
 
-**项目内部新子系统(import/simulation/cocreate/userrules)全部没走 Coordinator,已在用"Host 直接编排 + LLM 作函数"范式**——本方案把主流程统一到自己已验证的模式上。
+**Tất cả hệ con mới trong nội bộ dự án (import/simulation/cocreate/userrules) đều không đi qua Coordinator, đã dùng mô thức "Host trực tiếp điều phối + LLM làm hàm"** —— phương án này thống nhất luồng chính về mô thức mà chính nó đã xác minh.
 
-## 二、目标形态
+## Hai, hình thái mục tiêu
 
 ```
 Entry
   ↓
-Host(保留包名;内部新增 EngineLoop,不做纯机械改名)
-  ├─ 读 Store → flow.Route → 直接运行 Worker
-  ├─ 明确语义场景 → 调 Arbiter 函数
-  └─ 事件投影 / 预算 / 停靠点 / 通知(现职responsibility保留)
+Host(giữ tên package; bên trong thêm EngineLoop, không đổi tên thuần cơ học)
+  ├─ đọc Store → flow.Route → chạy trực tiếp Worker
+  ├─ cảnh ngữ nghĩa rõ ràng → gọi hàm Arbiter
+  └─ chiếu sự kiện / ngân sách / điểm dừng / thông báo(giữ responsibility hiện tại)
   ↓
-Workers(architect / writer / editor,内部自主,checkpoint-delta 守卫保留)
+Workers(architect / writer / editor, tự chủ nội bộ, giữ checkpoint-delta guard)
   ↓
-Tools → Store(唯一事实源)
+Tools → Store(nguồn sự thật duy nhất)
 ```
 
-职责:**Route 管一切可查表的下一步;Arbiter 管边界清晰的语义判断;Worker 管开放式创作;Engine 执行决定、不参与文学判断;Observer/Diag 只观察。**
+Trách nhiệm: **Route quản mọi bước tiếp theo có thể tra bảng; Arbiter quản phán đoán ngữ nghĩa có ranh giới rõ; Worker quản sáng tác mở; Engine thực thi quyết định, không tham gia phán đoán văn học; Observer/Diag chỉ quan sát.**
 
-一句话概括终态:**一个串行确定性 Engine、三个自主 Worker、少数几个按需 Arbiter 函数、一个文件系统事实层。**
+Tóm tắt trạng thái cuối bằng một câu: **một Engine xác định tuần tự, ba Worker tự chủ, một số ít hàm Arbiter theo nhu cầu, một lớp sự thật hệ thống tệp.**
 
-### 两平面对称(拟写入 architecture.md 作为新铁律)
+### Đối xứng hai mặt phẳng (dự kiến ghi vào architecture.md như luật thép mới)
 
 ```
-确定性平面:  flow.LoadState   → flow.Route     → Instruction   (穷举规格测试)
-语义平面:    arbiter.Collect* → arbiter.Decide* → XxxDecision   (决策落盘 + eval 回归)
-              └── 事实采集(IO) ──┘└── 决策核心(可离线重放) ──┘└── Engine 执行 ──┘
+Mặt phẳng xác định:  flow.LoadState   → flow.Route     → Instruction   (kiểm thử đặc tả vét cạn)
+Mặt phẳng ngữ nghĩa: arbiter.Collect* → arbiter.Decide* → XxxDecision   (quyết định ghi đĩa + hồi quy eval)
+              └── thu thập sự kiện(IO) ──┘└── lõi quyết định(có thể phát lại ngoại tuyến) ──┘└── Engine thực thi ──┘
 ```
 
-## 三、Arbiter 场景(最终集,保持最小)
+## Ba, cảnh Arbiter (tập cuối cùng, giữ tối thiểu)
 
-| 场景 | 触发 | 备注 |
+| Cảnh | Kích hoạt | Ghi chú |
 |------|------|------|
-| `plan_start` | 新书启动 | 选 short/long 规划师 + 扩充过短需求 |
-| `intervention` | 用户干预 | 查询 / 长效规则 / 剧情结构调整 / 已写返工 / 完本后返工或拒绝 |
-| `worker_failure` | Worker 报错**且确定性分类无出路** | 网络/参数/前置工件缺失等由确定性代码先分类,不送 Arbiter |
-| `deadlock` | 上一轮后仍产生同一路由指令 | 计数与终止语义见 §八 必答题 5 |
-| `completion_dispute` | **候补,有证据再加** | 卷末完结判定已由 Route 派 architect(分支 10)承担;仅"结构未到边界但故事该收"的中途分歧才需要,真实发生率未知,不预建 |
+| `plan_start` | Khởi động sách mới | Chọn planner short/long + mở rộng yêu cầu quá ngắn |
+| `intervention` | Can thiệp người dùng | Truy vấn / quy tắc dài hạn / điều chỉnh cấu trúc cốt truyện / làm lại phần đã viết / làm lại hoặc từ chối sau khi hoàn bản |
+| `worker_failure` | Worker báo lỗi **và phân loại xác định không còn đường ra** | Mạng/tham số/thiếu artifact tiền đề v.v. do mã xác định phân loại trước, không gửi Arbiter |
+| `deadlock` | Sau vòng trước vẫn sinh cùng một chỉ thị định tuyến | Ngữ nghĩa đếm và kết thúc xem §tám câu hỏi bắt buộc 5 |
+| `completion_dispute` | **ứng viên, có bằng chứng mới thêm** | Phán định kết thúc cuối volume đã do Route dispatch architect (nhánh 10) đảm nhiệm; chỉ bất đồng giữa chừng "cấu trúc chưa tới biên nhưng câu chuyện nên kết" mới cần, tần suất thực tế chưa biết, không xây trước |
 
-完本总结不是裁定,是生成任务——由 Engine 直接派 editor 或一次普通 LLM 调用完成,不占 Arbiter 场景。
+Tổng kết hoàn bản không phải phân xử, là nhiệm vụ sinh nội dung —— do Engine dispatch trực tiếp editor hoặc một lần gọi LLM thông thường hoàn thành, không chiếm cảnh Arbiter.
 
-## 四、Arbiter 设计
+## Bốn, thiết kế Arbiter
 
-### 4.1 逐场景 Decision 类型(v3 修订:放弃万能结构)
+### 4.1 Kiểu Decision theo từng cảnh (sửa đổi v3: từ bỏ cấu trúc vạn năng)
 
 ```go
-// 共享子类型,防各场景漂移
+// Kiểu con dùng chung, ngăn drift giữa các cảnh
 type DispatchDecision struct {
     Instruction flow.Instruction
-    Expect      DispatchExpect // 见 §五
+    Expect      DispatchExpect // xem §năm
 }
 
 type PlanStartDecision struct {
     Planner string // architect_long | architect_short
-    Task    string // 含扩充后的需求
+    Task    string // chứa yêu cầu đã mở rộng
     Reason  string
 }
 
@@ -91,42 +91,42 @@ type FailureDecision struct {
 }
 ```
 
-演进记录:动作列表(顺序校验多余、多态数组易错)→ 万能扁平结构(顺序非法不可表达,但组合非法要靠场景×动作矩阵校验)→ **逐场景类型(场景不匹配的动作不可表达,矩阵校验消失,单场景 schema 更小、LLM 输出更稳、eval 可按场景分评)**。Validate 收缩为逐类型的事实校验(phase 约束等)。
+Bản ghi tiến hóa: danh sách action (kiểm tra thứ tự thừa, mảng đa hình dễ lỗi) → cấu trúc phẳng vạn năng (không biểu đạt được thứ tự bất hợp pháp, nhưng tổ hợp bất hợp pháp phải dựa vào ma trận cảnh × action để kiểm tra) → **kiểu theo từng cảnh (action không khớp cảnh không thể biểu đạt, kiểm tra ma trận biến mất, schema đơn cảnh nhỏ hơn, đầu ra LLM ổn hơn, eval có thể tách theo cảnh)**. Validate thu hẹp thành kiểm tra sự kiện theo từng kiểu (ràng buộc phase v.v.).
 
-### 4.2 API:每场景一对显式函数
+### 4.2 API: mỗi cảnh một cặp hàm rõ ràng
 
 ```go
-func CollectInterventionFacts(st *store.Store) InterventionFacts        // IO 边界,同 flow.LoadState 纪律
-func DecideIntervention(ctx, model, facts, text) (InterventionDecision, error) // 除统一执行器管理的模型请求外无 IO,可离线重放
-// 其余场景同形一对;Collect/Decide 形状统一,不建通用 Question/Decision 框架
+func CollectInterventionFacts(st *store.Store) InterventionFacts        // biên IO, cùng kỷ luật với flow.LoadState
+func DecideIntervention(ctx, model, facts, text) (InterventionDecision, error) // ngoài yêu cầu mô hình do executor thống nhất quản lý thì không IO, có thể phát lại ngoại tuyến
+// Các cảnh còn lại cùng dạng một cặp; hình dạng Collect/Decide thống nhất, không xây framework Question/Decision chung
 ```
 
-- **失败路径**:统一结构化执行器按模型能力选择原生 JSON Schema 或提示词契约；提示词模式的格式/Schema 错误与两种模式的业务校验错误会携带精确原因交给模型修正，生命周期仅由 `context` 控制。原生契约违约、拒答、截断、错误终止及不可重试请求错误立即显式返回；干预不产生写入，启动显式报错，failure/deadlock 保守暂停
-- **干预记忆**:decisions.jsonl 兼任干预历史,`CollectInterventionFacts` 纳入最近 N 条裁定摘要
-- **模型**:Arbiter 统一使用 Default，不暴露独立 role；只在出现明确的能力或成本需求时再扩展配置契约
+- **Đường thất bại**: executor cấu trúc hóa thống nhất chọn JSON Schema native hoặc contract prompt theo năng lực mô hình; lỗi định dạng/Schema ở chế độ prompt và lỗi kiểm tra nghiệp vụ ở cả hai chế độ sẽ mang nguyên nhân chính xác giao cho mô hình sửa, vòng đời chỉ do `context` kiểm soát. Vi phạm contract native, từ chối trả lời, bị cắt, kết thúc lỗi và lỗi yêu cầu không thể retry trả về rõ ràng ngay; can thiệp không sinh ghi, khởi động báo lỗi rõ ràng, failure/deadlock tạm dừng thận trọng
+- **Bộ nhớ can thiệp**: decisions.jsonl kiêm lịch sử can thiệp, `CollectInterventionFacts` đưa vào tóm tắt N phán quyết gần nhất
+- **Mô hình**: Arbiter thống nhất dùng Default, không phơi bày role độc lập; chỉ khi xuất hiện nhu cầu năng lực hoặc chi phí rõ ràng mới mở rộng contract cấu hình
 
-### 4.3 审计(小而稳定;审计≠恢复源)
+### 4.3 Kiểm toán (nhỏ và ổn định; kiểm toán ≠ nguồn khôi phục)
 
 ```json
 {"schema_version":1,"id":"...","kind":"intervention","checkpoint_seq":123,
  "input":"...","facts":{...},"decision":{...},"reason":"...","duration_ms":1200}
 ```
 
-(token/成本不在记录内——裁定模型经 usageTrackedModel 包装,用量统一进 UsageTracker/预算,与各 Worker 同一套账。)
+(token/chi phí không nằm trong bản ghi —— mô hình phân xử được bọc qua usageTrackedModel, usage thống nhất vào UsageTracker/ngân sách, cùng một hệ sổ sách với các Worker.)
 
-- facts 只存结构化事实 + 摘要 + artifact/checkpoint 引用,**不复制正文、不存完整上下文包**;单条大小上限,超限截断并标记
-- **input 保留在记录内**(离线重放 `Decide*(facts, input)` 必需——没有 input 的审计无法回归);脱敏发生在 **diag export 边界**,不发生在落盘时
-- 审计日志不是事件溯源,也不是恢复数据源
+- facts chỉ lưu sự kiện cấu trúc hóa + tóm tắt + tham chiếu artifact/checkpoint, **không sao chép chính văn, không lưu gói ngữ cảnh đầy đủ**; giới hạn kích thước từng bản ghi, vượt giới hạn thì cắt ngắn và đánh dấu
+- **input giữ lại trong bản ghi** (cần cho phát lại ngoại tuyến `Decide*(facts, input)` —— kiểm toán không có input thì không thể hồi quy); khử nhạy cảm xảy ra tại **biên diag export**, không xảy ra khi ghi đĩa
+- Nhật ký kiểm toán không phải event sourcing, cũng không phải nguồn dữ liệu khôi phục
 
-## 五、状态提交协议(串行 Engine 循环)
+## Năm, giao thức commit trạng thái (vòng lặp Engine tuần tự)
 
 ```
-读事实 → Route / Arbiter 产出决定 → 核对前置条件 → 执行动作
-       → Worker 运行 → 重算 Route 后置条件 → 下一轮
+Đọc sự kiện → Route / Arbiter tạo quyết định → đối chiếu tiền điều kiện → thực thi action
+       → Worker chạy → tính lại hậu điều kiện Route → vòng tiếp theo
 ```
 
-- **不变量:控制状态只在 Engine 边界串行变更。**干预可在 Worker 运行期间并行咨询(只读安全、用户秒级看到 Answer/Reason 回显),但**改控制态的动作(hold/reopen/dispatch)进 Engine 队列,边界核对后提交**;answer(无状态)与 rules(内容平面,本章旧规则下章生效即语义)即时执行
-- 每个 Dispatch 携带 Collect 时刻快照,边界对账,不符 → 丢弃、记 `decision_stale`、以新事实重询:
+- **Bất biến: trạng thái điều khiển chỉ thay đổi tuần tự tại biên Engine.** Can thiệp có thể tư vấn song song trong lúc Worker chạy (chỉ đọc an toàn, người dùng thấy echo Answer/Reason trong vài giây), nhưng **action thay đổi control state (hold/reopen/dispatch) đi vào hàng đợi Engine, sau khi đối chiếu ở biên mới commit**; answer (không trạng thái) và rules (mặt phẳng nội dung, chương này dùng rule cũ chương sau có hiệu lực chính là ngữ nghĩa) thực thi tức thì
+- Mỗi Dispatch mang snapshot thời điểm Collect, đối sổ ở biên, không khớp → bỏ, ghi `decision_stale`, hỏi lại với sự kiện mới:
 
 ```go
 type DispatchExpect struct {
@@ -137,76 +137,76 @@ type DispatchExpect struct {
 }
 ```
 
-- 明确前置条件优于全局 Store 哈希(可读、可诊断);不做全局 digest
+- Tiền điều kiện rõ ràng ưu tiên hơn Store hash toàn cục (dễ đọc, dễ chẩn đoán); không làm global digest
 
-## 六、恢复模型(只恢复事实,不恢复会话)
+## Sáu, mô hình khôi phục (chỉ khôi phục sự kiện, không khôi phục phiên)
 
 ```
-启动 → 读 Progress → 读最新 Checkpoint → 查 PendingSteer/AdvanceHold/章节许可 → Gate 对账 → Route → 继续运行 Worker
+Khởi động → đọc Progress → đọc Checkpoint mới nhất → tra PendingSteer/AdvanceHold/giấy phép chương → đối sổ Gate → Route → tiếp tục chạy Worker
 ```
 
-plan_start 的恢复依赖单一持久化事实(RunMeta 内),**裁定先落事实、再起执行**:
+Khôi phục plan_start phụ thuộc một sự kiện persistent duy nhất (trong RunMeta), **ghi sự kiện trước phân xử, rồi mới bắt đầu thực thi**:
 
 ```go
 type PlanStartRecord struct {
     RawPrompt   string
     Planner     string
     PlannerTask string
-    DecisionID  string // 关联审计记录
-    Status      string // decided | dispatched | done —— 启动事务中间态显式化
+    DecisionID  string // liên kết bản ghi kiểm toán
+    Status      string // decided | dispatched | done —— hiển thị hóa trạng thái trung gian của transaction khởi động
 }
 ```
 
-崩溃于任意点:Record 存在则按 Status 续走,不重复咨询;Record 缺失视同新书重询(重询可接受,审计留双记录)。
+Sập tại bất kỳ điểm nào: nếu Record tồn tại thì tiếp tục theo Status, không tư vấn lặp; nếu thiếu Record thì xem như sách mới hỏi lại (hỏi lại chấp nhận được, kiểm toán để lại hai bản ghi).
 
-## 七、迁移路线(v3 重排:Engine 先行,Arbiter 后接线)
+## Bảy, lộ trình di trú (v3 sắp xếp lại: Engine đi trước, Arbiter nối sau)
 
-顺序调整的依据:原"Arbiter 先行"需要一套过渡管线(裁定经 steering 伪装成 Host 指令喂给 Coordinator);**Engine 先落地则该管线整个不用建**,Arbiter 直接对 Engine 执行器接线。每一步都在删东西,不建临时桥;"双脑期权"顾虑被顺序结构性消解。
+Căn cứ điều chỉnh thứ tự: "Arbiter đi trước" ban đầu cần một bộ pipeline chuyển tiếp (phán quyết giả trang thành chỉ thị Host qua steering để đút cho Coordinator); **nếu Engine hạ cánh trước thì toàn bộ pipeline đó không cần xây**, Arbiter nối trực tiếp với executor Engine. Mỗi bước đều xóa thứ gì đó, không xây cầu tạm; lo ngại "quyền chọn hai não" được thứ tự này triệt tiêu về mặt cấu trúc.
 
-| # | 步骤 | 状态 |
+| # | Bước | Trạng thái |
 |---|------|------|
-| 0 | 无条件项:规划补齐入 Router(穷举规格先行);decisions.jsonl 审计。实现改进:规划师身份从既有 `RunMeta.PlanningTier` 推导,无需新增记录机制 | ✅ 2026-07-12 |
-| 1 | 文风层交付(docs/voice-layer.md) | ✅ 2026-07-12 |
-| 2 | Step 2 RFC 定稿(docs/engine-rfc.md,七道必答题) | ✅ 2026-07-12 |
-| 3 | WorkerRunner:以 subagent.Runner 程序化直调,事件经 ctx ToolProgress 中继 | ✅ 2026-07-22 |
-| 4-5 | Engine 接管全部派发 + Arbiter 四场景接线(plan_start/intervention/failure/deadlock),直连 Engine 执行器(实施中发现 Engine 先行使 steering 过渡管线整个不用建,4/5 合并落地) | ✅ 2026-07-12 |
-| 6 | 删除 Coordinator 及全部配套(§十清单全部执行);端到端集成测试(真实工具写完整书/失败裁定/僵局裁定) | ✅ 2026-07-12 |
+| 0 | Hạng mục vô điều kiện: bổ sung planning vào Router (đặc tả vét cạn đi trước); kiểm toán decisions.jsonl. Cải tiến triển khai: danh tính planner suy ra từ `RunMeta.PlanningTier` sẵn có, không cần cơ chế bản ghi mới | ✅ 2026-07-12 |
+| 1 | Giao lớp văn phong (docs/voice-layer.md) | ✅ 2026-07-12 |
+| 2 | Chốt Step 2 RFC (docs/engine-rfc.md, bảy câu hỏi bắt buộc) | ✅ 2026-07-12 |
+| 3 | WorkerRunner: gọi trực tiếp bằng chương trình qua subagent.Runner, sự kiện relay qua ctx ToolProgress | ✅ 2026-07-22 |
+| 4-5 | Engine tiếp quản toàn bộ dispatch + nối bốn cảnh Arbiter (plan_start/intervention/failure/deadlock), kết nối trực tiếp executor Engine (trong triển khai phát hiện Engine đi trước khiến toàn bộ pipeline chuyển tiếp steering không cần xây, 4/5 hợp nhất hạ cánh) | ✅ 2026-07-12 |
+| 6 | Xóa Coordinator và toàn bộ phụ trợ (thực thi toàn bộ danh sách §mười); kiểm thử tích hợp đầu-cuối-đến-cuối (tool thật viết sách hoàn chỉnh/phân xử thất bại/phân xử bế tắc) | ✅ 2026-07-12 |
 
-## 八、Step 2 RFC 必答题(未定稿不进入步骤 3)
+## Tám, các câu hỏi bắt buộc của Step 2 RFC (chưa chốt thì không vào bước 3)
 
-1. **Worker 提取面**:WorkerRunner API;build.go 装配件全量的所有权与生命周期——角色模型/failover、prompt cache key、ThinkingLevel、UsageRecorder、SessionLogger、Writer ContextManagerFactory、RestorePack、StopGuardFactory、StopAfterTools、Observer 嵌套事件投影
-2. **Engine 生命周期**:启动/暂停/中止/恢复;单 Worker 串行保证;/model 与 thinking 运行时切换
-3. **状态提交协议完整化**:§五 的 Expect 对账全场景化;Gate 拆除后 Engine 前置条件清单
-4. **错误分类学**:确定性分类(retry/reroute/terminal)先行,仅无出路者送 `worker_failure`;与 agentcore 层重试的分层
-5. **僵局协议**:同一 `Agent+Task` 连续重现即说明路由后置条件未满足；Worker 内部中间 checkpoint 不清零；Arbiter 决定 retry 不清零；3 次咨询、5 次硬熔断。
-6. **崩溃语义**:如何判定上一个 Worker 是否已产生有效事实
-7. **原型验收**:Observer/Usage/Context/模型切换/恢复五项与现状逐位对照
+1. **Bề mặt trích xuất Worker**: WorkerRunner API; quyền sở hữu và vòng đời của toàn bộ linh kiện lắp ráp build.go —— mô hình vai trò/failover, prompt cache key, ThinkingLevel, UsageRecorder, SessionLogger, Writer ContextManagerFactory, RestorePack, StopGuardFactory, StopAfterTools, chiếu sự kiện lồng nhau của Observer
+2. **Vòng đời Engine**: khởi động/tạm dừng/hủy/khôi phục; đảm bảo đơn Worker tuần tự; chuyển đổi runtime /model và thinking
+3. **Hoàn thiện giao thức commit trạng thái**: tổng quát hóa đối sổ Expect của §năm cho mọi cảnh; danh sách tiền điều kiện Engine sau khi tháo Gate
+4. **Phân loại học lỗi**: phân loại xác định (retry/reroute/terminal) đi trước, chỉ trường hợp không có đường ra mới gửi `worker_failure`; phân tầng với retry ở lớp agentcore
+5. **Giao thức bế tắc**: cùng một `Agent+Task` liên tục tái xuất hiện thì chứng tỏ hậu điều kiện định tuyến chưa thỏa; checkpoint trung gian trong Worker không reset về 0; Arbiter quyết định retry không reset về 0; tư vấn 3 lần, hard fuse 5 lần.
+6. **Ngữ nghĩa sập**: cách phán định Worker trước đã sinh sự kiện hữu hiệu hay chưa
+7. **Nghiệm thu prototype**: đối chiếu từng vị trí với hiện trạng ở năm mục Observer/Usage/Context/chuyển đổi mô hình/khôi phục
 
-## 九、价值账目
+## Chín, sổ giá trị
 
-| 维度 | 现状 | 终态 |
+| Chiều | Hiện trạng | Trạng thái cuối |
 |------|------|------|
-| 每章 LLM 开销 | 每边界一次转发调用 | 省去;转发失败问题类消失 |
-| 裁定可测性 | ~零(混在长会话) | 逐场景离线重放 + eval 回归 |
-| 干预响应 | 等章节边界(分钟级) | 咨询即时,控制态边界提交 |
-| 复杂度 | 七项补丁生态 | 净减 1500+ 行,三个问题类退役 |
-| 崩溃恢复 | 会话重放 + 恢复协议 | 读 store 续跑 |
-| 过渡期风险 | — | 集中在步骤 3/4(Worker 提取),由 RFC + 原型关卡控制;步骤 0/1 无条件成立 |
+| Chi phí LLM mỗi chương | Mỗi biên một lần gọi chuyển tiếp | Loại bỏ; lớp vấn đề chuyển tiếp thất bại biến mất |
+| Khả năng kiểm thử phân xử | ~gần như không (lẫn trong phiên dài) | Phát lại ngoại tuyến theo cảnh + hồi quy eval |
+| Phản hồi can thiệp | Đợi biên chương (cấp phút) | Tư vấn tức thời, control state commit ở biên |
+| Độ phức tạp | Hệ sinh thái bảy bản vá | Giảm ròng 1500+ dòng, ba lớp vấn đề nghỉ hưu |
+| Khôi phục sập | Phát lại phiên + giao thức khôi phục | Đọc store tiếp tục chạy |
+| Rủi ro thời kỳ chuyển tiếp | — | Tập trung ở bước 3/4 (trích xuất Worker), được RFC + cổng prototype kiểm soát; bước 0/1 thành lập vô điều kiện |
 
-## 十、终态删除清单
+## Mười, danh sách xóa ở trạng thái cuối
 
-Coordinator 及其会话恢复逻辑、Coordinator StopGuard、Dispatcher steering 协议与 `[Host 下达指令]` 文本协议、FlowBoundaryHook、completePhaseGate / writerExpandedChapterGate(校验平移为 Engine 前置条件)、MaxTurns=100_000、coordinator.md 全部行为规训。
+Coordinator và logic khôi phục phiên của nó, Coordinator StopGuard, giao thức Dispatcher steering và giao thức văn bản `[Host ban hành chỉ thị]`, FlowBoundaryHook, completePhaseGate / writerExpandedChapterGate (kiểm tra chuyển thành tiền điều kiện Engine), MaxTurns=100_000, toàn bộ quy chuẩn hành vi coordinator.md.
 
-## 十一、异议与评审记录
+## Mười một, phản đối và bản ghi đánh giá
 
-1. *"裁定正确性不会提升"*——成立;真实差异是聚焦/策展/前置校验 vs 会话记忆,净值略优且首次可测量
-2. *"现状跑通,动控制面冒险"*——承认;地基为此而建,分步可停可退
-3. *"架构不是瓶颈,内容质量才是"*——部分成立,文风层先行
-4. **评审一(2026-07-12)**:状态提交协议缺失→§五;Step 2 单薄→§八必答题+原型关卡;启动时序→§六;"非法状态不可表达"过度声明→4.1 演进记录;arbiter 角色白名单事实错误→4.2;审计卫生→4.3
-5. **评审二(2026-07-12)**:逐场景 Decision 类型(采纳,4.1);迁移顺序重排 Engine 先行(采纳,§七);统一边界提交(采纳,§五);PlanStartRecord(采纳,§六);不重命名 host(采纳);字数建议留协议文件(采纳,见 voice-layer)。**保留意见**:审计必须保留 input 否则无法重放(4.3);completion_dispute 降为候补场景(§三)
+1. *"Độ đúng của phân xử sẽ không tăng"* —— đúng; khác biệt thực sự là tập trung/biên tập/tiền kiểm tra vs ký ức phiên, giá trị ròng hơi tốt hơn và lần đầu có thể đo được
+2. *"Hiện trạng chạy được, động vào mặt phẳng điều khiển là mạo hiểm"* —— thừa nhận; nền móng được xây vì điều này, từng bước có thể dừng có thể lùi
+3. *"Kiến trúc không phải nút thắt, chất lượng nội dung mới là"* —— đúng một phần, lớp văn phong đi trước
+4. **Đánh giá một (2026-07-12)**: thiếu giao thức commit trạng thái → §năm; Step 2 mỏng → §tám câu hỏi bắt buộc + cổng prototype; trình tự khởi động → §sáu; tuyên bố "trạng thái bất hợp pháp không thể biểu đạt" quá mức → bản ghi tiến hóa 4.1; lỗi sự kiện whitelist vai trò arbiter → 4.2; vệ sinh kiểm toán → 4.3
+5. **Đánh giá hai (2026-07-12)**: kiểu Decision theo từng cảnh (tiếp thu, 4.1); sắp xếp lại thứ tự di trú Engine đi trước (tiếp thu, §bảy); commit biên thống nhất (tiếp thu, §năm); PlanStartRecord (tiếp thu, §sáu); không đổi tên host (tiếp thu); đề xuất số chữ để lại file giao thức (tiếp thu, xem voice-layer). **Ý kiến bảo lưu**: kiểm toán phải giữ input nếu không không thể phát lại (4.3); completion_dispute hạ xuống thành cảnh ứng viên (§ba)
 
-## 十二、纪律与不做
+## Mười hai, kỷ luật và không làm
 
-**纪律**:①新决策点先过 §二 三分法,禁止默认"给 prompt 加规则";②每个 LLM 决策点必备事实清单/结构化输出/降级路径/落盘审计;③只写事实护栏不写行为护栏;④声明式不变量优于程序性脚本;⑤控制面改动先改穷举规格再改实现。
+**Kỷ luật**: ① điểm quyết định mới trước hết đi qua phép phân loại ba phần §hai, cấm mặc định "thêm rule vào prompt"; ② mỗi điểm quyết định LLM bắt buộc có danh sách sự kiện/output cấu trúc hóa/đường degrade/kiểm toán ghi đĩa; ③ chỉ viết guardrail sự kiện không viết guardrail hành vi; ④ bất biến khai báo ưu tiên hơn script thủ tục; ⑤ thay đổi mặt phẳng điều khiển sửa đặc tả vét cạn trước rồi mới sửa triển khai.
 
-**不做**:事件溯源重写;为假想多租户抽象 Store;通用工作流 DSL;全局 State Digest;host 包重命名;completion_dispute 预建。
+**Không làm**: viết lại event sourcing; trừu tượng hóa Store cho multi-tenant giả tưởng; workflow DSL chung; State Digest toàn cục; đổi tên package host; xây trước completion_dispute.

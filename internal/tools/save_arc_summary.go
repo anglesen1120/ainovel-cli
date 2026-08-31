@@ -16,7 +16,7 @@ import (
 	"github.com/voocel/ainovel-cli/internal/store"
 )
 
-// SaveArcSummaryTool 保存弧级摘要、角色快照和写作规则，Editor 在弧结束时调用。
+// SaveArcSummaryTool lưu tóm tắt cung, ảnh chụp trạng thái nhân vật và quy tắc viết; Editor gọi khi cung kết thúc.
 type SaveArcSummaryTool struct {
 	store *store.Store
 }
@@ -27,38 +27,38 @@ func NewSaveArcSummaryTool(store *store.Store) *SaveArcSummaryTool {
 
 func (t *SaveArcSummaryTool) Name() string { return "save_arc_summary" }
 func (t *SaveArcSummaryTool) Description() string {
-	return "保存弧级摘要、角色状态快照和写作规则（长篇模式，弧结束时调用）"
+	return "Lưu tóm tắt cung, ảnh chụp trạng thái nhân vật và quy tắc viết (chế độ truyện dài, gọi khi cung kết thúc)"
 }
-func (t *SaveArcSummaryTool) Label() string { return "保存弧摘要" }
+func (t *SaveArcSummaryTool) Label() string { return "Lưu tóm tắt cung" }
 
-// 写工具，禁止并发。
+// Công cụ ghi, không cho phép chạy song song.
 func (t *SaveArcSummaryTool) ReadOnly(_ json.RawMessage) bool        { return false }
 func (t *SaveArcSummaryTool) ConcurrencySafe(_ json.RawMessage) bool { return false }
 
 func (t *SaveArcSummaryTool) Schema() map[string]any {
 	snapshotSchema := schema.Object(
-		schema.Property("name", schema.String("角色名")).Required(),
-		schema.Property("status", schema.String("当前状态（存活/受伤/失踪等）")).Required(),
-		schema.Property("power", schema.String("能力变化")),
-		schema.Property("motivation", schema.String("当前动机")).Required(),
-		schema.Property("relations", schema.String("关键关系变化")),
+		schema.Property("name", schema.String("Tên nhân vật")).Required(),
+		schema.Property("status", schema.String("Trạng thái hiện tại (còn sống/bị thương/mất tích, v.v.)")).Required(),
+		schema.Property("power", schema.String("Thay đổi năng lực")),
+		schema.Property("motivation", schema.String("Động cơ hiện tại")).Required(),
+		schema.Property("relations", schema.String("Thay đổi quan hệ chính")),
 	)
 	voiceSchema := schema.Object(
-		schema.Property("name", schema.String("角色名")).Required(),
-		schema.Property("rules", schema.Array("2-3 条语言特征规则（每条 ≤30 字）", schema.String(""))).Required(),
+		schema.Property("name", schema.String("Tên nhân vật")).Required(),
+		schema.Property("rules", schema.Array("2-3 quy tắc về đặc trưng ngôn ngữ (mỗi quy tắc ≤30 ký tự)", schema.String(""))).Required(),
 	)
 	styleRulesSchema := schema.Object(
-		schema.Property("prose", schema.Array("3-5 条叙述风格规则（每条 ≤50 字，要具体可执行）", schema.String(""))).Required(),
-		schema.Property("dialogue", schema.Array("核心角色的对话特征规则", voiceSchema)).Required(),
-		schema.Property("taboos", schema.Array("本小说需避免的写法", schema.String(""))),
+		schema.Property("prose", schema.Array("3-5 quy tắc về phong cách trần thuật (mỗi quy tắc ≤50 ký tự, cụ thể và khả thi)", schema.String(""))).Required(),
+		schema.Property("dialogue", schema.Array("Quy tắc đặc trưng lời thoại của nhân vật chính", voiceSchema)).Required(),
+		schema.Property("taboos", schema.Array("Cách viết cần tránh cho truyện này", schema.String(""))),
 	)
 	return schema.Object(
-		schema.Property("volume", schema.Int("卷号")).Required(),
-		schema.Property("arc", schema.Int("弧号")).Required(),
-		schema.Property("title", schema.String("弧标题")).Required(),
-		schema.Property("summary", schema.String("弧摘要（500字以内）")).Required(),
-		schema.Property("key_events", schema.Array("弧内关键事件", schema.String(""))).Required(),
-		schema.Property("character_snapshots", schema.Array("角色状态快照", snapshotSchema)).Required(),
+		schema.Property("volume", schema.Int("Số tập")).Required(),
+		schema.Property("arc", schema.Int("Số cung")).Required(),
+		schema.Property("title", schema.String("Tiêu đề cung")).Required(),
+		schema.Property("summary", schema.String("Tóm tắt cung (không quá 500 chữ)")).Required(),
+		schema.Property("key_events", schema.Array("Sự kiện chính trong cung", schema.String(""))).Required(),
+		schema.Property("character_snapshots", schema.Array("Ảnh chụp trạng thái nhân vật", snapshotSchema)).Required(),
 		schema.Property("style_rules", styleRulesSchema).Required(),
 	)
 }
@@ -75,15 +75,15 @@ func (t *SaveArcSummaryTool) Execute(_ context.Context, args json.RawMessage) (j
 	}
 	if err := json.Unmarshal(args, &a); err != nil {
 		if strings.Contains(err.Error(), "style_rules.dialogue") {
-			return nil, fmt.Errorf("invalid args: style_rules.dialogue must be an array of objects {name, rules}, not strings: %w: %w", errs.ErrToolArgs, err)
+			return nil, fmt.Errorf("đối số không hợp lệ: style_rules.dialogue phải là mảng đối tượng {name, rules}, không phải chuỗi: %w: %w", errs.ErrToolArgs, err)
 		}
-		return nil, fmt.Errorf("invalid args: %w: %w", errs.ErrToolArgs, err)
+		return nil, fmt.Errorf("đối số không hợp lệ: %w: %w", errs.ErrToolArgs, err)
 	}
 	if a.Volume <= 0 || a.Arc <= 0 {
-		return nil, fmt.Errorf("volume and arc must be > 0: %w", errs.ErrToolArgs)
+		return nil, fmt.Errorf("volume và arc phải lớn hơn 0: %w", errs.ErrToolArgs)
 	}
 	if strings.TrimSpace(a.Title) == "" || strings.TrimSpace(a.Summary) == "" {
-		return nil, fmt.Errorf("title and summary are required: %w", errs.ErrToolArgs)
+		return nil, fmt.Errorf("bắt buộc có title và summary: %w", errs.ErrToolArgs)
 	}
 	if err := validateArcSummaryStyleRules(a.StyleRules); err != nil {
 		return nil, err
@@ -113,17 +113,17 @@ func (t *SaveArcSummaryTool) Execute(_ context.Context, args json.RawMessage) (j
 		}
 		if len(a.CharacterSnapshots) > 0 {
 			if err := t.store.Characters.SaveSnapshots(a.Volume, a.Arc, a.CharacterSnapshots); err != nil {
-				return nil, fmt.Errorf("save character snapshots: %w: %w", errs.ErrStoreWrite, err)
+				return nil, fmt.Errorf("không thể lưu ảnh chụp nhân vật: %w: %w", errs.ErrStoreWrite, err)
 			}
 		}
 		if err := t.store.World.SaveStyleRules(rules); err != nil {
-			return nil, fmt.Errorf("save style rules: %w: %w", errs.ErrStoreWrite, err)
+			return nil, fmt.Errorf("không thể lưu quy tắc văn phong: %w: %w", errs.ErrStoreWrite, err)
 		}
 
-		// 弧摘要是 Router 的完成标记，作为最后一个语义工件写入。此前任一步
-		// 失败时摘要保持缺失，恢复后 Router 仍会重派本任务。
+		// Tóm tắt cung là dấu hoàn tất của Router, được ghi như công kiện ngữ nghĩa cuối cùng. Trước đó bất kỳ bước nào
+		// thất bại thì tóm tắt vẫn còn thiếu; sau khi khôi phục, Router vẫn sẽ phân lại nhiệm vụ này.
 		if err := t.store.Summaries.SaveArcSummary(arcSummary); err != nil {
-			return nil, fmt.Errorf("save arc summary: %w: %w", errs.ErrStoreWrite, err)
+			return nil, fmt.Errorf("không thể lưu tóm tắt cung: %w: %w", errs.ErrStoreWrite, err)
 		}
 	}
 
@@ -136,7 +136,7 @@ func (t *SaveArcSummaryTool) Execute(_ context.Context, args json.RawMessage) (j
 	if _, err := t.store.Checkpoints.AppendArtifacts(
 		domain.ArcScope(a.Volume, a.Arc), "arc_summary", artifacts...,
 	); err != nil {
-		return nil, fmt.Errorf("checkpoint arc summary: %w: %w", errs.ErrStoreWrite, err)
+		return nil, fmt.Errorf("không thể tạo checkpoint tóm tắt cung: %w: %w", errs.ErrStoreWrite, err)
 	}
 
 	return json.Marshal(map[string]any{
@@ -147,8 +147,8 @@ func (t *SaveArcSummaryTool) Execute(_ context.Context, args json.RawMessage) (j
 	})
 }
 
-// arcSummaryReplay 只放行内容完全相同的幂等收尾，用于语义工件已落盘但
-// checkpoint 追加失败的重试。任何差异都显式冲突，不能借重试覆盖历史聚合事实。
+// arcSummaryReplay chỉ cho qua phần kết thúc idempotent có nội dung hoàn toàn giống nhau, dùng khi công kiện ngữ nghĩa đã được ghi xuống nhưng
+// checkpoint thêm thất bại cần được thử lại. Mọi khác biệt đều là xung đột rõ ràng, không thể dùng thử lại để ghi đè các dữ kiện tổng hợp lịch sử.
 func (t *SaveArcSummaryTool) arcSummaryReplay(
 	summary domain.ArcSummary,
 	snapshots []domain.CharacterSnapshot,
@@ -156,18 +156,18 @@ func (t *SaveArcSummaryTool) arcSummaryReplay(
 ) (bool, error) {
 	existing, err := t.store.Summaries.LoadArcSummary(summary.Volume, summary.Arc)
 	if err != nil {
-		return false, fmt.Errorf("load arc summary: %w: %w", errs.ErrStoreRead, err)
+		return false, fmt.Errorf("không thể tải tóm tắt cung: %w: %w", errs.ErrStoreRead, err)
 	}
 	if existing == nil {
 		return false, nil
 	}
 	storedSnapshots, err := t.store.Characters.LoadSnapshots(summary.Volume, summary.Arc)
 	if err != nil {
-		return false, fmt.Errorf("load character snapshots: %w: %w", errs.ErrStoreRead, err)
+		return false, fmt.Errorf("không thể tải ảnh chụp nhân vật: %w: %w", errs.ErrStoreRead, err)
 	}
 	storedRules, err := t.store.World.LoadStyleRules()
 	if err != nil {
-		return false, fmt.Errorf("load style rules: %w: %w", errs.ErrStoreRead, err)
+		return false, fmt.Errorf("không thể tải quy tắc văn phong: %w: %w", errs.ErrStoreRead, err)
 	}
 	if storedRules != nil {
 		rules.UpdatedAt = storedRules.UpdatedAt
@@ -175,7 +175,7 @@ func (t *SaveArcSummaryTool) arcSummaryReplay(
 	if !reflect.DeepEqual(*existing, summary) ||
 		!slices.Equal(storedSnapshots, snapshots) ||
 		storedRules == nil || !reflect.DeepEqual(*storedRules, rules) {
-		return false, fmt.Errorf("第 %d 卷第 %d 弧摘要已存在但关联工件不同，拒绝覆盖: %w", summary.Volume, summary.Arc, errs.ErrToolConflict)
+		return false, fmt.Errorf("Tóm tắt cung %d của tập %d đã tồn tại nhưng công kiện liên quan khác nhau, từ chối ghi đè: %w", summary.Volume, summary.Arc, errs.ErrToolConflict)
 	}
 	return true, nil
 }
@@ -188,24 +188,24 @@ type arcSummaryStyleRules struct {
 
 func validateArcSummaryStyleRules(rules *arcSummaryStyleRules) error {
 	if rules == nil {
-		return fmt.Errorf("style_rules is required: %w", errs.ErrToolArgs)
+		return fmt.Errorf("bắt buộc có style_rules: %w", errs.ErrToolArgs)
 	}
 	if len(rules.Prose) == 0 {
-		return fmt.Errorf("style_rules.prose is required: %w", errs.ErrToolArgs)
+		return fmt.Errorf("bắt buộc có style_rules.prose: %w", errs.ErrToolArgs)
 	}
 	if len(rules.Dialogue) == 0 {
-		return fmt.Errorf("style_rules.dialogue is required; expected array of objects {name, rules}: %w", errs.ErrToolArgs)
+		return fmt.Errorf("bắt buộc có style_rules.dialogue; cần mảng đối tượng {name, rules}: %w", errs.ErrToolArgs)
 	}
 	for i, voice := range rules.Dialogue {
 		if strings.TrimSpace(voice.Name) == "" {
-			return fmt.Errorf("style_rules.dialogue[%d].name is required: %w", i, errs.ErrToolArgs)
+			return fmt.Errorf("bắt buộc có style_rules.dialogue[%d].name: %w", i, errs.ErrToolArgs)
 		}
 		if len(voice.Rules) == 0 {
-			return fmt.Errorf("style_rules.dialogue[%d].rules is required: %w", i, errs.ErrToolArgs)
+			return fmt.Errorf("bắt buộc có style_rules.dialogue[%d].rules: %w", i, errs.ErrToolArgs)
 		}
 		for j, rule := range voice.Rules {
 			if strings.TrimSpace(rule) == "" {
-				return fmt.Errorf("style_rules.dialogue[%d].rules[%d] is empty: %w", i, j, errs.ErrToolArgs)
+				return fmt.Errorf("style_rules.dialogue[%d].rules[%d] trống: %w", i, j, errs.ErrToolArgs)
 			}
 		}
 	}

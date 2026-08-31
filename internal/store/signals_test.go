@@ -15,7 +15,7 @@ func TestPendingCommitLifecycle(t *testing.T) {
 	pending := domain.PendingCommit{
 		Chapter:   3,
 		Stage:     domain.CommitStageProgressMarked,
-		Summary:   "第3章摘要",
+		Summary:   "Tóm tắt chương 3",
 		StartedAt: "2026-03-27T10:00:00Z",
 		UpdatedAt: "2026-03-27T10:01:00Z",
 		Result: &domain.CommitResult{
@@ -34,13 +34,13 @@ func TestPendingCommitLifecycle(t *testing.T) {
 		t.Fatalf("LoadPendingCommit: %v", err)
 	}
 	if got == nil {
-		t.Fatal("expected pending commit, got nil")
+		t.Fatal("mong đợi pending commit, nhận được nil")
 	}
 	if got.Chapter != 3 || got.Stage != domain.CommitStageProgressMarked {
-		t.Fatalf("unexpected pending commit: %+v", got)
+		t.Fatalf("pending commit không mong đợi: %+v", got)
 	}
 	if got.Result == nil || got.Result.NextChapter != 4 {
-		t.Fatalf("unexpected pending result: %+v", got.Result)
+		t.Fatalf("kết quả pending không mong đợi: %+v", got.Result)
 	}
 
 	if err := s.Signals.ClearPendingCommit(); err != nil {
@@ -48,9 +48,9 @@ func TestPendingCommitLifecycle(t *testing.T) {
 	}
 	got, err = s.Signals.LoadPendingCommit()
 	if err != nil {
-		t.Fatalf("LoadPendingCommit after clear: %v", err)
+		t.Fatalf("LoadPendingCommit sau khi xóa: %v", err)
 	}
 	if got != nil {
-		t.Fatalf("expected pending commit cleared, got %+v", got)
+		t.Fatalf("mong đợi pending commit đã được xóa, nhận được %+v", got)
 	}
 }
