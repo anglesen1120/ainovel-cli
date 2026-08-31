@@ -17,11 +17,11 @@ func TestUpgradeProjectMigratesLegacyBook(t *testing.T) {
 	if err := st.Init(); err != nil {
 		t.Fatalf("Init: %v", err)
 	}
-	premise := "# 《寿元账》\n\n## 核心冲突\n\n凡人以寿元换取灵性，在求生与守住人性之间挣扎。\n\n## 主角目标\n\n活下去。"
+	premise := "# Sổ thọ mệnh\n\n## xung đột cốt lõi\n\nNgười phàm đổi tuổi thọ lấy linh tính, giằng co giữa việc mưu sinh và giữ gìn nhân tính.\n\n## Mục tiêu của nhân vật chính\n\nSống sót."
 	if err := st.Outline.SavePremise(premise); err != nil {
 		t.Fatalf("SavePremise: %v", err)
 	}
-	progress := []byte(`{"novel_name":"寿元账"}`)
+	progress := []byte(`{"novel_name":"Sổ thọ mệnh"}`)
 	if err := os.WriteFile(filepath.Join(dir, "meta", "progress.json"), progress, 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -33,7 +33,7 @@ func TestUpgradeProjectMigratesLegacyBook(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Load book: %v", err)
 	}
-	if book == nil || book.Title != "寿元账" || book.Synopsis != "凡人以寿元换取灵性，在求生与守住人性之间挣扎。" {
+	if book == nil || book.Title != "Sổ thọ mệnh" || book.Synopsis != "Người phàm đổi tuổi thọ lấy linh tính, giằng co giữa việc mưu sinh và giữ gìn nhân tính." {
 		t.Fatalf("unexpected migrated book: %+v", book)
 	}
 	if checkpoint := st.Checkpoints.LatestByStep(domain.GlobalScope(), "book"); checkpoint == nil {
@@ -58,14 +58,14 @@ func TestInterventionStopsWhenPersistenceFails(t *testing.T) {
 		t.Fatal(err)
 	}
 	h := &Host{store: st, events: make(chan Event, 4)}
-	err := h.doIntervention("修改主角性格", false)
-	if err == nil || !strings.Contains(err.Error(), "持久化失败") {
+	err := h.doIntervention("Sửa tính cách nhân vật chính", false)
+	if err == nil || !strings.Contains(err.Error(), "không thể ghi bền can thiệp") {
 		t.Fatalf("expected persistence error, got %v", err)
 	}
-	// 公共 Steer 必须等待异步任务并把同一业务错误返回给 TUI；不能只表示 goroutine
-	// 启动成功，否则界面永远收不到真实失败。
-	err = h.Steer("修改主角性格")
-	if err == nil || !strings.Contains(err.Error(), "持久化失败") {
+	// Steer công khai phải chờ tác vụ bất đồng bộ và trả cùng một lỗi nghiệp vụ cho TUI;
+	// không được chỉ cho biết goroutine đã khởi động thành công, nếu không giao diện sẽ không bao giờ nhận được lỗi thật.
+	err = h.Steer("Sửa tính cách nhân vật chính")
+	if err == nil || !strings.Contains(err.Error(), "không thể ghi bền can thiệp") {
 		t.Fatalf("Steer should return persistence error, got %v", err)
 	}
 }

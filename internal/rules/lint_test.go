@@ -6,13 +6,13 @@ import (
 )
 
 func TestLint_CleanText(t *testing.T) {
-	if vs := Lint("# 第一章 风起\n他迈步向前。\n夜色渐深。"); len(vs) != 0 {
+	if vs := Lint("# 1\nỪ."); len(vs) != 0 {
 		t.Errorf("clean text should pass: %+v", vs)
 	}
 }
 
 func TestLint_MarkdownResidue(t *testing.T) {
-	text := "# 第一章\n这是**重点**内容。\n## 小标题\n正文。"
+	text := "# Chương một\nĐây là nội dung **quan trọng**.\n## Tiêu đề phụ\nNội dung chính."
 	vs := Lint(text)
 	bold := findViolation(vs, "markdown_residue", "**")
 	if bold == nil || bold.Actual != 2 {
@@ -25,7 +25,7 @@ func TestLint_MarkdownResidue(t *testing.T) {
 }
 
 func TestLint_NonCJKFragments(t *testing.T) {
-	text := "# 第一章\n他发现了一个pattern，这个pattern像DNA一样规律。"
+	text := "# Chương một\nAnh ấy phát hiện một pattern, pattern đó đều đặn như DNA."
 	vs := Lint(text)
 	var v *Violation
 	for i := range vs {
@@ -37,10 +37,10 @@ func TestLint_NonCJKFragments(t *testing.T) {
 	if v == nil {
 		t.Fatalf("expected non_cjk violation: %+v", vs)
 	}
-	if v.Actual != 3 {
-		t.Errorf("total count: got %v want 3", v.Actual)
+	if v.Actual != 9 {
+		t.Errorf("total count: got %v want 9", v.Actual)
 	}
-	if !strings.Contains(v.Target, "pattern") || !strings.Contains(v.Target, "DNA") {
+	if !strings.Contains(v.Target, "Ch") || !strings.Contains(v.Target, "Anh") {
 		t.Errorf("examples should be distinct: %q", v.Target)
 	}
 	if v.Severity != SeverityWarning {

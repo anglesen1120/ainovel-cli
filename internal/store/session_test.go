@@ -10,8 +10,8 @@ import (
 	"github.com/voocel/agentcore"
 )
 
-// TestSessionStore_MetaInjected_AssistantWithUsage 验证只有"assistant + has Usage"
-// 的消息才被附加 _meta，这是 replay 路径精确算价的前提。
+// TestSessionStore_MetaInjected_AssistantWithUsage xác minh chỉ những thông điệp có "assistant + has Usage"
+// mới được gắn _meta; đây là tiền đề để nhánh replay tính giá chính xác.
 func TestSessionStore_MetaInjected_AssistantWithUsage(t *testing.T) {
 	dir := t.TempDir()
 	s := NewSessionStore(newIO(dir))
@@ -20,42 +20,42 @@ func TestSessionStore_MetaInjected_AssistantWithUsage(t *testing.T) {
 	})
 	logger := s.SubAgentLogger(lookup)
 
-	logger("writer", "写第 1 章", agentcore.Message{
+	logger("writer", "Viết chương 1", agentcore.Message{
 		Role:  agentcore.RoleUser,
 		Usage: nil,
 	})
-	logger("writer", "写第 1 章", agentcore.Message{
+	logger("writer", "Viết chương 1", agentcore.Message{
 		Role: agentcore.RoleAssistant,
 		Usage: &agentcore.Usage{
 			Input: 1000, Output: 200, CacheRead: 800, TotalTokens: 1200,
 		},
 	})
-	logger("writer", "写第 1 章", agentcore.Message{
+	logger("writer", "Viết chương 1", agentcore.Message{
 		Role:  agentcore.RoleAssistant,
-		Usage: nil, // assistant 但无 usage（流式未带 final usage chunk）
+		Usage: nil, // assistant nhưng không có usage (luồng chưa mang chunk usage cuối cùng)
 	})
 
 	entries := readJSONL(t, filepath.Join(dir, "meta/sessions/agents/writer-ch01.jsonl"))
 	if len(entries) != 3 {
-		t.Fatalf("entries=%d want 3", len(entries))
+		t.Fatalf("entries=%d muốn 3", len(entries))
 	}
 	if _, has := entries[0]["_meta"]; has {
-		t.Errorf("user message should NOT have _meta")
+		t.Errorf("thông điệp user không nên có _meta")
 	}
 	if _, has := entries[2]["_meta"]; has {
-		t.Errorf("assistant without Usage should NOT have _meta")
+		t.Errorf("assistant không có Usage không nên có _meta")
 	}
 	meta, ok := entries[1]["_meta"].(map[string]any)
 	if !ok {
-		t.Fatalf("assistant+Usage should have _meta map, got %T %v", entries[1]["_meta"], entries[1]["_meta"])
+		t.Fatalf("assistant+Usage phải có _meta map, nhận %T %v", entries[1]["_meta"], entries[1]["_meta"])
 	}
 	if meta["provider"] != "meme" || meta["model"] != "gpt-5.4" {
-		t.Errorf("_meta = %v want provider=meme model=gpt-5.4", meta)
+		t.Errorf("_meta = %v muốn provider=meme model=gpt-5.4", meta)
 	}
 }
 
-// TestSessionStore_MetaModelSwitch 验证运行中切换模型后，后续消息的 _meta 也跟着变。
-// 这是 B 方案对"同进程内 /model 切换"的精确支持。
+// TestSessionStore_MetaModelSwitch xác minh khi đổi model trong lúc chạy thì _meta của các thông điệp
+// tiếp theo cũng đổi theo. Đây là hỗ trợ chính xác của phương án B cho việc "chuyển /model trong cùng tiến trình".
 func TestSessionStore_MetaModelSwitch(t *testing.T) {
 	dir := t.TempDir()
 	s := NewSessionStore(newIO(dir))
@@ -66,63 +66,63 @@ func TestSessionStore_MetaModelSwitch(t *testing.T) {
 	})
 	logger := s.SubAgentLogger(lookup)
 
-	logger("writer", "写第 1 章", makeAssistantWithUsage())
-	current = "model-b" // 模拟 /model 切换
-	logger("writer", "写第 1 章", makeAssistantWithUsage())
+	logger("writer", "Viết chương 1", makeAssistantWithUsage())
+	current = "model-b" // mô phỏng chuyển /model
+	logger("writer", "Viết chương 1", makeAssistantWithUsage())
 
 	entries := readJSONL(t, filepath.Join(dir, "meta/sessions/agents/writer-ch01.jsonl"))
 	if len(entries) != 2 {
-		t.Fatalf("entries=%d want 2", len(entries))
+		t.Fatalf("entries=%d muốn 2", len(entries))
 	}
 	for i, want := range []string{"model-a", "model-b"} {
 		meta, ok := entries[i]["_meta"].(map[string]any)
 		if !ok {
-			t.Fatalf("entry[%d] missing _meta", i)
+			t.Fatalf("entry[%d] thiếu _meta", i)
 		}
 		if got := meta["model"]; got != want {
-			t.Errorf("entry[%d] model = %v want %s", i, got, want)
+			t.Errorf("entry[%d] model = %v muốn %s", i, got, want)
 		}
 	}
 }
 
-// TestSessionStore_NilLookup 验证 lookup=nil 时写入仍然正常，
-// 只是不带 _meta。
+// TestSessionStore_NilLookup xác minh khi lookup=nil thì việc ghi vẫn bình thường,
+// chỉ là không có _meta.
 func TestSessionStore_NilLookup(t *testing.T) {
 	dir := t.TempDir()
 	s := NewSessionStore(newIO(dir))
 	logger := s.SubAgentLogger(nil)
-	logger("writer", "写第 1 章", makeAssistantWithUsage())
+	logger("writer", "Viết chương 1", makeAssistantWithUsage())
 
-	rel, err := s.subAgentPath("writer", "写第 1 章")
+	rel, err := s.subAgentPath("writer", "Viết chương 1")
 	if err != nil {
 		t.Fatal(err)
 	}
 	entries := readJSONL(t, filepath.Join(dir, rel))
 	if len(entries) != 1 {
-		t.Fatalf("entries=%d want 1", len(entries))
+		t.Fatalf("entries=%d muốn 1", len(entries))
 	}
 	if _, has := entries[0]["_meta"]; has {
-		t.Errorf("nil lookup should not produce _meta")
+		t.Errorf("lookup nil không nên sinh _meta")
 	}
-	// 但其他字段（role/usage）必须正常
+	// Nhưng các trường khác (role/usage) phải bình thường
 	if entries[0]["role"] != "assistant" {
-		t.Errorf("role lost: %v", entries[0]["role"])
+		t.Errorf("mất role: %v", entries[0]["role"])
 	}
 }
 
 func TestSessionStoreContinuesAgentSequenceAcrossRestarts(t *testing.T) {
 	dir := t.TempDir()
 	first := NewSessionStore(newIO(dir)).SubAgentLogger(nil)
-	first("architect_long", "处理反馈", makeAssistantWithUsage())
+	first("architect_long", "xử lý phản hồi", makeAssistantWithUsage())
 
 	second := NewSessionStore(newIO(dir)).SubAgentLogger(nil)
-	second("architect_long", "扩展大纲", makeAssistantWithUsage())
+	second("architect_long", "mở rộng dàn ý", makeAssistantWithUsage())
 
 	if got := len(readJSONL(t, filepath.Join(dir, "meta/sessions/agents/architect_long-001.jsonl"))); got != 1 {
-		t.Fatalf("first session entries = %d, want 1", got)
+		t.Fatalf("số entry của phiên đầu = %d, muốn 1", got)
 	}
 	if got := len(readJSONL(t, filepath.Join(dir, "meta/sessions/agents/architect_long-002.jsonl"))); got != 1 {
-		t.Fatalf("second session entries = %d, want 1", got)
+		t.Fatalf("số entry của phiên thứ hai = %d, muốn 1", got)
 	}
 }
 
@@ -137,7 +137,7 @@ func readJSONL(t *testing.T, path string) []map[string]any {
 	t.Helper()
 	f, err := os.Open(path)
 	if err != nil {
-		t.Fatalf("open %s: %v", path, err)
+		t.Fatalf("mở %s: %v", path, err)
 	}
 	defer f.Close()
 	var out []map[string]any
@@ -150,7 +150,7 @@ func readJSONL(t *testing.T, path string) []map[string]any {
 		}
 		var m map[string]any
 		if err := json.Unmarshal(line, &m); err != nil {
-			t.Fatalf("unmarshal line: %v\n%s", err, string(line))
+			t.Fatalf("giải mã dòng: %v\n%s", err, string(line))
 		}
 		out = append(out, m)
 	}

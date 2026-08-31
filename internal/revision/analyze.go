@@ -16,41 +16,41 @@ import (
 
 var analysisContract = llmcontract.Contract{
 	Name:        "chapter_revision_analysis",
-	Description: "分析用户对已完成章节的修订并重建完整章节事实",
+	Description: "Phân tích sửa đổi của người dùng với chương đã hoàn tất và dựng lại đầy đủ dữ kiện chương",
 	Schema:      revisionAnalysisSchema(),
 }
 
 func revisionAnalysisSchema() map[string]any {
 	textList := func(description string) map[string]any { return schema.Array(description, schema.String(description)) }
 	voice := schema.Object(
-		schema.Property("name", schema.String("角色名")).Required(),
-		schema.Property("rules", textList("对白偏好")).Required(),
+		schema.Property("name", schema.String("Tên nhân vật")).Required(),
+		schema.Property("rules", textList("Sở thích lời thoại")).Required(),
 	)
 	facts := schema.Object(chapterfacts.Properties(false)...)
 	impact := schema.Object(
-		schema.Property("deviation", schema.String("已发生剧情相对现有计划的变化")).Required(),
-		schema.Property("suggestion", schema.String("对未完成大纲的调整建议")).Required(),
+		schema.Property("deviation", schema.String("Thay đổi cốt truyện đã xảy ra so với kế hoạch hiện có")).Required(),
+		schema.Property("suggestion", schema.String("Đề xuất điều chỉnh dàn ý chưa hoàn tất")).Required(),
 	)
 	return schema.Object(
-		schema.Property("change_summary", schema.String("修改概述")).Required(),
-		schema.Property("story_changed", schema.Bool("是否改变剧情事实")).Required(),
+		schema.Property("change_summary", schema.String("Tóm tắt sửa đổi")).Required(),
+		schema.Property("story_changed", schema.Bool("Có thay đổi dữ kiện cốt truyện hay không")).Required(),
 		schema.Property("facts", facts).Required(),
 		schema.Property("style_delta", schema.Object(
-			schema.Property("prose", textList("从本次修改确认的叙述偏好")).Required(),
-			schema.Property("dialogue", schema.Array("角色对白偏好", voice)).Required(),
-			schema.Property("taboos", textList("用户主动删改所体现的禁忌")).Required(),
+			schema.Property("prose", textList("Sở thích trần thuật xác nhận từ lần sửa này")).Required(),
+			schema.Property("dialogue", schema.Array("Sở thích lời thoại nhân vật", voice)).Required(),
+			schema.Property("taboos", textList("Điều cấm kỵ thể hiện qua phần người dùng chủ động xóa sửa")).Required(),
 		)).Required(),
 		schema.Property("outline_impact", llmcontract.Nullable(impact)).Required(),
-		schema.Property("downstream_issues", textList("与后续已完成章节的潜在冲突")).Required(),
+		schema.Property("downstream_issues", textList("Xung đột tiềm ẩn với các chương đã hoàn tất phía sau")).Required(),
 	)
 }
 
 func Analyze(ctx context.Context, model agentcore.ChatModel, systemPrompt string, change Change, previous domain.ChapterRecord, downstream []domain.ChapterSummary) (domain.RevisionAnalysis, error) {
 	if model == nil {
-		return domain.RevisionAnalysis{}, fmt.Errorf("revision model is required")
+		return domain.RevisionAnalysis{}, fmt.Errorf("cần có model sửa đổi")
 	}
 	if strings.TrimSpace(systemPrompt) == "" {
-		return domain.RevisionAnalysis{}, fmt.Errorf("revision prompt is required")
+		return domain.RevisionAnalysis{}, fmt.Errorf("cần có prompt sửa đổi")
 	}
 	payload, err := json.Marshal(map[string]any{
 		"chapter": change.Chapter, "previous_facts": previous.Facts,
@@ -65,15 +65,15 @@ func Analyze(ctx context.Context, model agentcore.ChatModel, systemPrompt string
 		Validate: validateAnalysis,
 		Hooks: llmcontract.Hooks{
 			Resolved: func(res llmcontract.Resolution) {
-				slog.Debug("章节修订结构化协议选择", "mode", res.Mode, "provider", res.Provider, "model", res.Model)
+				slog.Debug("lựa chọn giao thức có cấu trúc của sửa đổi chương", "mode", res.Mode, "provider", res.Provider, "model", res.Model)
 			},
 			Correction: func(ev llmcontract.Correction) {
-				slog.Warn("章节修订输出修正", "attempt", ev.Attempt, "layer", ev.Layer, "err", ev.Err)
+				slog.Warn("chỉnh sửa đầu ra sửa đổi chương", "attempt", ev.Attempt, "layer", ev.Layer, "err", ev.Err)
 			},
 		},
 	})
 	if err != nil {
-		return domain.RevisionAnalysis{}, fmt.Errorf("分析第 %d 章修订: %w", change.Chapter, err)
+		return domain.RevisionAnalysis{}, fmt.Errorf("phân tích sửa đổi chương %d: %w", change.Chapter, err)
 	}
 	analysis.Facts.Feedback = analysis.OutlineImpact
 	return analysis, nil
@@ -81,20 +81,20 @@ func Analyze(ctx context.Context, model agentcore.ChatModel, systemPrompt string
 
 func validateAnalysis(analysis *domain.RevisionAnalysis) error {
 	if strings.TrimSpace(analysis.ChangeSummary) == "" {
-		return fmt.Errorf("change_summary is required")
+		return fmt.Errorf("cần change_summary")
 	}
 	if err := chapterfacts.Validate(analysis.Facts); err != nil {
 		return fmt.Errorf("facts: %w", err)
 	}
 	if analysis.OutlineImpact != nil && (strings.TrimSpace(analysis.OutlineImpact.Deviation) == "" || strings.TrimSpace(analysis.OutlineImpact.Suggestion) == "") {
-		return fmt.Errorf("outline_impact requires deviation and suggestion")
+		return fmt.Errorf("outline_impact cần deviation và suggestion")
 	}
 	if err := validateStyleDelta(analysis.StyleDelta); err != nil {
 		return err
 	}
 	for i, issue := range analysis.DownstreamIssues {
 		if strings.TrimSpace(issue) == "" {
-			return fmt.Errorf("downstream_issues[%d] cannot be empty", i)
+			return fmt.Errorf("downstream_issues[%d] không được để trống", i)
 		}
 	}
 	return nil
@@ -104,17 +104,17 @@ func validateStyleDelta(style domain.StyleDelta) error {
 	for name, items := range map[string][]string{"prose": style.Prose, "taboos": style.Taboos} {
 		for i, item := range items {
 			if strings.TrimSpace(item) == "" {
-				return fmt.Errorf("style_delta.%s[%d] cannot be empty", name, i)
+				return fmt.Errorf("style_delta.%s[%d] không được để trống", name, i)
 			}
 		}
 	}
 	for i, voice := range style.Dialogue {
 		if strings.TrimSpace(voice.Name) == "" || len(voice.Rules) == 0 {
-			return fmt.Errorf("style_delta.dialogue[%d] requires name and rules", i)
+			return fmt.Errorf("style_delta.dialogue[%d] cần có name và rules", i)
 		}
 		for j, rule := range voice.Rules {
 			if strings.TrimSpace(rule) == "" {
-				return fmt.Errorf("style_delta.dialogue[%d].rules[%d] cannot be empty", i, j)
+				return fmt.Errorf("style_delta.dialogue[%d].rules[%d] không được để trống", i, j)
 			}
 		}
 	}

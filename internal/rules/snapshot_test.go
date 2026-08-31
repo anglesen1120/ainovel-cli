@@ -6,92 +6,92 @@ import (
 )
 
 func TestBuildSnapshot_FieldOverridePrecedence(t *testing.T) {
-	// 低→高：defaults 设 修仙，project 覆盖为 都市；高优先级胜出。
+	// Thấp -> cao: defaults đặt tu tiên, project ghi đè thành đô thị; ưu tiên cao thắng.
 	snap := BuildSnapshot([]Candidate{
-		{Source: "system_defaults", Structured: Structured{Genre: "修仙"}},
-		{Source: "project:a.md", Structured: Structured{Genre: "都市"}},
+		{Source: "system_defaults", Structured: Structured{Genre: "tu tiên"}},
+		{Source: "project:a.md", Structured: Structured{Genre: "đô thị"}},
 	})
-	if snap.Structured.Genre != "都市" {
-		t.Fatalf("期望 project 覆盖 defaults，得到 %q", snap.Structured.Genre)
+	if snap.Structured.Genre != "đô thị" {
+		t.Fatalf("mong đợi project ghi đè defaults, got %q", snap.Structured.Genre)
 	}
 	if snap.Status != StatusReady {
-		t.Fatalf("期望 ready，得到 %s", snap.Status)
+		t.Fatalf("mong đợi ready, got %s", snap.Status)
 	}
 	if snap.Version != SnapshotVersion {
-		t.Fatalf("version 应为 %d，得到 %d", SnapshotVersion, snap.Version)
+		t.Fatalf("version phải là %d, got %d", SnapshotVersion, snap.Version)
 	}
 }
 
 func TestBuildSnapshot_EmptyAndZeroAreAbsent(t *testing.T) {
-	// 归一化器吐占位：genre:""、空串元素——都必须当缺失，不覆盖低优先级真值。
+	// Bộ chuẩn hóa có thể trả placeholder: genre:"", phần tử chuỗi rỗng; tất cả phải được xem là thiếu, không ghi đè giá trị thật ưu tiên thấp.
 	snap := BuildSnapshot([]Candidate{
 		{Source: "system_defaults", Structured: Structured{
-			Genre: "修仙",
+			Genre: "tu tiên",
 		}},
 		{Source: "startup_prompt", Structured: Structured{
-			Genre:            "",                 // 占位空串 → 不覆盖
-			ForbiddenPhrases: []string{"", "  "}, // 全空 → 丢弃
+			Genre:            "",                 // Chuỗi rỗng placeholder -> không ghi đè
+			ForbiddenPhrases: []string{"", "  "}, // Toàn rỗng -> loại bỏ
 		}},
 	})
-	if snap.Structured.Genre != "修仙" {
-		t.Fatalf("空 genre 不应覆盖，期望 修仙，得到 %q", snap.Structured.Genre)
+	if snap.Structured.Genre != "tu tiên" {
+		t.Fatalf("genre rỗng không được ghi đè, mong đợi tu tiên, got %q", snap.Structured.Genre)
 	}
 	if len(snap.Structured.ForbiddenPhrases) != 0 {
-		t.Fatalf("全空 forbidden_phrases 应被丢弃，得到 %v", snap.Structured.ForbiddenPhrases)
+		t.Fatalf("forbidden_phrases toàn rỗng phải bị loại bỏ, got %v", snap.Structured.ForbiddenPhrases)
 	}
 }
 
 func TestBuildSnapshot_PreferencesPrecedenceOrder(t *testing.T) {
 	snap := BuildSnapshot([]Candidate{
-		{Source: "global:g.md", Preferences: "全局偏好"},
-		{Source: "project:p.md", Preferences: "项目偏好"},
+		{Source: "global:g.md", Preferences: "Sở thích global"},
+		{Source: "project:p.md", Preferences: "Sở thích project"},
 	})
-	gi := strings.Index(snap.Preferences, "全局偏好")
-	pi := strings.Index(snap.Preferences, "项目偏好")
+	gi := strings.Index(snap.Preferences, "Sở thích global")
+	pi := strings.Index(snap.Preferences, "Sở thích project")
 	if gi < 0 || pi < 0 || gi > pi {
-		t.Fatalf("preferences 应按优先级低→高拼接（项目在后），得到:\n%s", snap.Preferences)
+		t.Fatalf("preferences phải nối theo ưu tiên thấp -> cao (project ở sau), got:\n%s", snap.Preferences)
 	}
 	if !strings.Contains(snap.Preferences, "## [global:g.md]") {
-		t.Fatalf("preferences 应带来源标题，得到:\n%s", snap.Preferences)
+		t.Fatalf("preferences phải có tiêu đề nguồn, got:\n%s", snap.Preferences)
 	}
 }
 
 func TestBuildSnapshot_FatigueWordsMergeByWord(t *testing.T) {
 	snap := BuildSnapshot([]Candidate{
-		{Source: "system_defaults", Structured: Structured{FatigueWords: map[string]int{"竟然": 1, "仿佛": 2}}},
-		{Source: "project:p.md", Structured: Structured{FatigueWords: map[string]int{"仿佛": 5}}},
+		{Source: "system_defaults", Structured: Structured{FatigueWords: map[string]int{"bất ngờ": 1, "như thể": 2}}},
+		{Source: "project:p.md", Structured: Structured{FatigueWords: map[string]int{"như thể": 5}}},
 	})
-	if snap.Structured.FatigueWords["竟然"] != 1 {
-		t.Fatalf("竟然 应保留 defaults 阈值 1，得到 %d", snap.Structured.FatigueWords["竟然"])
+	if snap.Structured.FatigueWords["bất ngờ"] != 1 {
+		t.Fatalf("bất ngờ phải giữ ngưỡng defaults 1, got %d", snap.Structured.FatigueWords["bất ngờ"])
 	}
-	if snap.Structured.FatigueWords["仿佛"] != 5 {
-		t.Fatalf("仿佛 应被 project 覆盖为 5，得到 %d", snap.Structured.FatigueWords["仿佛"])
+	if snap.Structured.FatigueWords["như thể"] != 5 {
+		t.Fatalf("như thể phải được project ghi đè thành 5, got %d", snap.Structured.FatigueWords["như thể"])
 	}
 }
 
 func TestBuildSnapshot_DegradedPropagates(t *testing.T) {
 	snap := BuildSnapshot([]Candidate{
-		{Source: "system_defaults", Structured: Structured{FatigueWords: map[string]int{"竟然": 1}}},
-		{Source: "project:bad.md", Preferences: "原文降级", Degraded: true},
+		{Source: "system_defaults", Structured: Structured{FatigueWords: map[string]int{"bất ngờ": 1}}},
+		{Source: "project:bad.md", Preferences: "Hạ cấp nguyên văn", Degraded: true},
 	})
 	if snap.Status != StatusDegraded {
-		t.Fatalf("任一来源降级则 status=degraded，得到 %s", snap.Status)
+		t.Fatalf("bất kỳ nguồn nào hạ cấp thì status=degraded, got %s", snap.Status)
 	}
-	// 降级来源仍以 raw preferences 进入，不阻断；其它来源 structured 照常。
+	// Nguồn hạ cấp vẫn đi vào dưới dạng raw preferences, không chặn; structured từ nguồn khác vẫn bình thường.
 	if len(snap.Structured.FatigueWords) == 0 {
-		t.Fatalf("降级不应影响其它来源的 structured")
+		t.Fatalf("hạ cấp không được ảnh hưởng structured của nguồn khác")
 	}
-	if !strings.Contains(snap.Preferences, "原文降级") {
-		t.Fatalf("降级来源应作为 raw preferences 保留")
+	if !strings.Contains(snap.Preferences, "Hạ cấp nguyên văn") {
+		t.Fatalf("nguồn hạ cấp phải được giữ như raw preferences")
 	}
 }
 
 func TestSystemDefaults_MatchesLegacyDefaultMD(t *testing.T) {
 	d := SystemDefaults().Structured
 	if len(d.ForbiddenPhrases) != 4 {
-		t.Fatalf("默认禁语应为 4 条，得到 %d", len(d.ForbiddenPhrases))
+		t.Fatalf("cụm cấm mặc định phải có 4 mục, got %d", len(d.ForbiddenPhrases))
 	}
 	if len(d.FatigueWords) != 16 {
-		t.Fatalf("默认疲劳词应为 16 条，得到 %d", len(d.FatigueWords))
+		t.Fatalf("từ gây mệt mỏi mặc định phải có 16 mục, got %d", len(d.FatigueWords))
 	}
 }

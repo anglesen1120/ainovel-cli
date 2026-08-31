@@ -10,132 +10,132 @@ func newCastTestStore(t *testing.T) *Store {
 	t.Helper()
 	s := NewStore(t.TempDir())
 	if err := s.Init(); err != nil {
-		t.Fatalf("Init: %v", err)
+		t.Fatalf("Khởi tạo: %v", err)
 	}
 	return s
 }
 
 func TestCastMergeAppearances_NewEntries(t *testing.T) {
 	s := newCastTestStore(t)
-	intros := []domain.CastIntro{{Name: "老周", BriefRole: "客栈老板"}}
-	if err := s.Cast.MergeAppearances(5, []string{"老周", "阿云"}, intros, nil); err != nil {
+	intros := []domain.CastIntro{{Name: "Ông Châu", BriefRole: "chủ quán trọ"}}
+	if err := s.Cast.MergeAppearances(5, []string{"Ông Châu", "A Vân"}, intros, nil); err != nil {
 		t.Fatalf("MergeAppearances: %v", err)
 	}
 
 	entries, err := s.Cast.Load()
 	if err != nil {
-		t.Fatalf("Load: %v", err)
+		t.Fatalf("Tải: %v", err)
 	}
 	if len(entries) != 2 {
-		t.Fatalf("expected 2 entries, got %d", len(entries))
+		t.Fatalf("mong đợi 2 mục, nhận %d", len(entries))
 	}
 	for _, e := range entries {
 		if e.FirstSeenChapter != 5 || e.LastSeenChapter != 5 || e.AppearanceCount != 1 {
-			t.Errorf("entry %s: unexpected appearance fields %+v", e.Name, e)
+			t.Errorf("mục %s: các trường xuất hiện không như mong đợi %+v", e.Name, e)
 		}
-		if e.Name == "老周" && e.BriefRole != "客栈老板" {
-			t.Errorf("expected BriefRole 客栈老板 for 老周, got %q", e.BriefRole)
+		if e.Name == "Ông Châu" && e.BriefRole != "chủ quán trọ" {
+			t.Errorf("mong đợi BriefRole chủ quán trọ cho Ông Châu, nhận %q", e.BriefRole)
 		}
-		if e.Name == "阿云" && e.BriefRole != "" {
-			t.Errorf("阿云 没有 intro，BriefRole 应为空，得到 %q", e.BriefRole)
+		if e.Name == "A Vân" && e.BriefRole != "" {
+			t.Errorf("A Vân không có intro, BriefRole phải rỗng, nhận %q", e.BriefRole)
 		}
 	}
 }
 
 func TestCastMergeAppearances_AccumulatesOnRepeat(t *testing.T) {
 	s := newCastTestStore(t)
-	if err := s.Cast.MergeAppearances(5, []string{"老周"}, nil, nil); err != nil {
-		t.Fatalf("first merge: %v", err)
+	if err := s.Cast.MergeAppearances(5, []string{"Ông Châu"}, nil, nil); err != nil {
+		t.Fatalf("lần gộp đầu: %v", err)
 	}
-	if err := s.Cast.MergeAppearances(8, []string{"老周"}, nil, nil); err != nil {
-		t.Fatalf("second merge: %v", err)
+	if err := s.Cast.MergeAppearances(8, []string{"Ông Châu"}, nil, nil); err != nil {
+		t.Fatalf("lần gộp thứ hai: %v", err)
 	}
 
 	entries, _ := s.Cast.Load()
 	if len(entries) != 1 {
-		t.Fatalf("expected 1 entry, got %d", len(entries))
+		t.Fatalf("mong đợi 1 mục, nhận %d", len(entries))
 	}
 	e := entries[0]
 	if e.FirstSeenChapter != 5 || e.LastSeenChapter != 8 || e.AppearanceCount != 2 {
-		t.Fatalf("expected first=5,last=8,count=2; got %+v", e)
+		t.Fatalf("mong đợi first=5,last=8,count=2; nhận %+v", e)
 	}
 	if len(e.AppearanceChapters) != 2 || e.AppearanceChapters[0] != 5 || e.AppearanceChapters[1] != 8 {
-		t.Errorf("AppearanceChapters wrong: %v", e.AppearanceChapters)
+		t.Errorf("AppearanceChapters sai: %v", e.AppearanceChapters)
 	}
 }
 
 func TestCastMergeAppearances_IsIdempotent(t *testing.T) {
 	s := newCastTestStore(t)
-	if err := s.Cast.MergeAppearances(5, []string{"老周"}, nil, nil); err != nil {
-		t.Fatalf("first merge: %v", err)
+	if err := s.Cast.MergeAppearances(5, []string{"Ông Châu"}, nil, nil); err != nil {
+		t.Fatalf("lần gộp đầu: %v", err)
 	}
-	// 同一章 commit 重复触发（崩溃恢复或重写场景）
-	if err := s.Cast.MergeAppearances(5, []string{"老周"}, nil, nil); err != nil {
-		t.Fatalf("second merge: %v", err)
+	// commit cùng chương bị kích hoạt lại (khôi phục sau sập hoặc tình huống ghi đè)
+	if err := s.Cast.MergeAppearances(5, []string{"Ông Châu"}, nil, nil); err != nil {
+		t.Fatalf("lần gộp thứ hai: %v", err)
 	}
 
 	entries, _ := s.Cast.Load()
 	if len(entries) != 1 {
-		t.Fatalf("expected 1 entry, got %d", len(entries))
+		t.Fatalf("mong đợi 1 mục, nhận %d", len(entries))
 	}
 	if entries[0].AppearanceCount != 1 {
-		t.Errorf("expected AppearanceCount=1 after duplicate, got %d", entries[0].AppearanceCount)
+		t.Errorf("mong đợi AppearanceCount=1 sau bản sao lặp, nhận %d", entries[0].AppearanceCount)
 	}
 }
 
 func TestCastMergeAppearances_FiltersCoreCharacters(t *testing.T) {
 	s := newCastTestStore(t)
-	core := map[string]bool{"林墨": true, "李清砚": true}
-	if err := s.Cast.MergeAppearances(3, []string{"林墨", "李清砚", "老周"}, nil, core); err != nil {
+	core := map[string]bool{"Lâm Mặc": true, "Lý Thanh Nghiễn": true}
+	if err := s.Cast.MergeAppearances(3, []string{"Lâm Mặc", "Lý Thanh Nghiễn", "Ông Châu"}, nil, core); err != nil {
 		t.Fatalf("MergeAppearances: %v", err)
 	}
 
 	entries, _ := s.Cast.Load()
-	if len(entries) != 1 || entries[0].Name != "老周" {
-		t.Fatalf("expected only 老周 in ledger, got %+v", entries)
+	if len(entries) != 1 || entries[0].Name != "Ông Châu" {
+		t.Fatalf("chỉ mong đợi Ông Châu trong sổ ghi, nhận %+v", entries)
 	}
 }
 
 func TestCastMergeAppearances_BackfillsBriefRole(t *testing.T) {
 	s := newCastTestStore(t)
-	// 第 5 章引入老周但 Writer 忘填 brief_role
-	if err := s.Cast.MergeAppearances(5, []string{"老周"}, nil, nil); err != nil {
-		t.Fatalf("first merge: %v", err)
+	// Chương 5 giới thiệu Ông Châu nhưng Writer quên điền brief_role
+	if err := s.Cast.MergeAppearances(5, []string{"Ông Châu"}, nil, nil); err != nil {
+		t.Fatalf("lần gộp đầu: %v", err)
 	}
-	// 第 8 章再次出现，Writer 这次补了 brief_role
-	intros := []domain.CastIntro{{Name: "老周", BriefRole: "客栈老板"}}
-	if err := s.Cast.MergeAppearances(8, []string{"老周"}, intros, nil); err != nil {
-		t.Fatalf("second merge: %v", err)
+	// Chương 8 lại xuất hiện, lần này Writer đã bổ sung brief_role
+	intros := []domain.CastIntro{{Name: "Ông Châu", BriefRole: "chủ quán trọ"}}
+	if err := s.Cast.MergeAppearances(8, []string{"Ông Châu"}, intros, nil); err != nil {
+		t.Fatalf("lần gộp thứ hai: %v", err)
 	}
 
 	entries, _ := s.Cast.Load()
-	if entries[0].BriefRole != "客栈老板" {
-		t.Errorf("expected BriefRole 客栈老板 backfilled, got %q", entries[0].BriefRole)
+	if entries[0].BriefRole != "chủ quán trọ" {
+		t.Errorf("mong đợi BriefRole chủ quán trọ được bổ sung ngược, nhận %q", entries[0].BriefRole)
 	}
 }
 
 func TestCastMergeAppearances_NoOverwriteBriefRole(t *testing.T) {
 	s := newCastTestStore(t)
-	// 第 5 章定下 BriefRole=客栈老板
+	// Chương 5 xác định BriefRole=chủ quán trọ
 	if err := s.Cast.MergeAppearances(5,
-		[]string{"老周"},
-		[]domain.CastIntro{{Name: "老周", BriefRole: "客栈老板"}},
+		[]string{"Ông Châu"},
+		[]domain.CastIntro{{Name: "Ông Châu", BriefRole: "chủ quán trọ"}},
 		nil,
 	); err != nil {
-		t.Fatalf("first merge: %v", err)
+		t.Fatalf("lần gộp đầu: %v", err)
 	}
-	// 第 8 章 Writer 错误地传了不同的 BriefRole（不应覆盖）
+	// Chương 8 Writer truyền nhầm một BriefRole khác (không được ghi đè)
 	if err := s.Cast.MergeAppearances(8,
-		[]string{"老周"},
-		[]domain.CastIntro{{Name: "老周", BriefRole: "赌坊打手"}},
+		[]string{"Ông Châu"},
+		[]domain.CastIntro{{Name: "Ông Châu", BriefRole: "tay sai sòng bạc"}},
 		nil,
 	); err != nil {
-		t.Fatalf("second merge: %v", err)
+		t.Fatalf("lần gộp thứ hai: %v", err)
 	}
 
 	entries, _ := s.Cast.Load()
-	if entries[0].BriefRole != "客栈老板" {
-		t.Errorf("expected BriefRole NOT overwritten, got %q", entries[0].BriefRole)
+	if entries[0].BriefRole != "chủ quán trọ" {
+		t.Errorf("mong đợi BriefRole KHÔNG bị ghi đè, nhận %q", entries[0].BriefRole)
 	}
 }
 
@@ -150,21 +150,21 @@ func TestCastRecentActive_OrdersByLastSeen(t *testing.T) {
 		t.Fatalf("RecentActive: %v", err)
 	}
 	if len(recent) != 2 {
-		t.Fatalf("expected 2, got %d", len(recent))
+		t.Fatalf("mong đợi 2, nhận %d", len(recent))
 	}
 	if recent[0].Name != "B" || recent[1].Name != "C" {
-		t.Errorf("expected order B, C; got %s, %s", recent[0].Name, recent[1].Name)
+		t.Errorf("mong đợi thứ tự B, C; nhận %s, %s", recent[0].Name, recent[1].Name)
 	}
 }
 
 func TestCastRecentActive_SkipsPromoted(t *testing.T) {
 	s := newCastTestStore(t)
 	if err := s.Cast.Save([]domain.CastEntry{
-		{Name: "已升核心", LastSeenChapter: 20, AppearanceCount: 8, Promoted: true},
-		{Name: "活跃配角", LastSeenChapter: 18, AppearanceCount: 3},
-		{Name: "另一配角", LastSeenChapter: 15, AppearanceCount: 2},
+		{Name: "đã lên core", LastSeenChapter: 20, AppearanceCount: 8, Promoted: true},
+		{Name: "phụ diễn hoạt động", LastSeenChapter: 18, AppearanceCount: 3},
+		{Name: "phụ diễn khác", LastSeenChapter: 15, AppearanceCount: 2},
 	}); err != nil {
-		t.Fatalf("Save: %v", err)
+		t.Fatalf("Lưu: %v", err)
 	}
 
 	recent, err := s.Cast.RecentActive(10)
@@ -172,28 +172,28 @@ func TestCastRecentActive_SkipsPromoted(t *testing.T) {
 		t.Fatalf("RecentActive: %v", err)
 	}
 	if len(recent) != 2 {
-		t.Fatalf("expected 2 (Promoted excluded), got %d: %+v", len(recent), recent)
+		t.Fatalf("mong đợi 2 (loại trừ Promoted), nhận %d: %+v", len(recent), recent)
 	}
 	for _, e := range recent {
 		if e.Promoted {
-			t.Errorf("Promoted entry leaked into RecentActive: %+v", e)
+			t.Errorf("mục Promoted lọt vào RecentActive: %+v", e)
 		}
 	}
-	if recent[0].Name != "活跃配角" {
-		t.Errorf("expected first=活跃配角, got %s", recent[0].Name)
+	if recent[0].Name != "phụ diễn hoạt động" {
+		t.Errorf("mong đợi phần tử đầu=phụ diễn hoạt động, nhận %s", recent[0].Name)
 	}
 }
 
 func TestCastMergeAppearances_NoOpOnEmpty(t *testing.T) {
 	s := newCastTestStore(t)
 	if err := s.Cast.MergeAppearances(5, nil, nil, nil); err != nil {
-		t.Fatalf("MergeAppearances empty: %v", err)
+		t.Fatalf("MergeAppearances rỗng: %v", err)
 	}
-	if err := s.Cast.MergeAppearances(0, []string{"老周"}, nil, nil); err != nil {
+	if err := s.Cast.MergeAppearances(0, []string{"Ông Châu"}, nil, nil); err != nil {
 		t.Fatalf("MergeAppearances chapter=0: %v", err)
 	}
 	entries, _ := s.Cast.Load()
 	if len(entries) != 0 {
-		t.Errorf("expected empty ledger, got %d entries", len(entries))
+		t.Errorf("mong đợi ledger rỗng, nhận %d mục", len(entries))
 	}
 }

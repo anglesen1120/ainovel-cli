@@ -29,10 +29,10 @@ func TestReviseOutlineReplacesFlatTailIdempotently(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := s.Outline.SaveOutline([]domain.OutlineEntry{
-		{Chapter: 1, Title: "已完成"},
-		{Chapter: 2, Title: "旧二"},
-		{Chapter: 3, Title: "旧三"},
-		{Chapter: 4, Title: "旧四"},
+		{Chapter: 1, Title: "Đã hoàn tất"},
+		{Chapter: 2, Title: "Cũ hai"},
+		{Chapter: 3, Title: "Cũ ba"},
+		{Chapter: 4, Title: "Cũ bốn"},
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -43,10 +43,10 @@ func TestReviseOutlineReplacesFlatTailIdempotently(t *testing.T) {
 	args, _ := json.Marshal(map[string]any{
 		"from_chapter": 2,
 		"replacement": []map[string]any{
-			{"title": "新二", "core_event": "转折", "hook": "追查", "scenes": []string{"现场"}},
-			{"title": "新三", "core_event": "揭示", "hook": "危机", "scenes": []string{}},
+			{"title": "Mới hai", "core_event": "bước ngoặt", "hook": "truy tìm", "scenes": []string{"hiện trường"}},
+			{"title": "Mới ba", "core_event": "tiết lộ", "hook": "khủng hoảng", "scenes": []string{}},
 		},
-		"reason": "依据已完成正文调整后续",
+		"reason": "điều chỉnh phần tiếp theo dựa trên chính văn đã hoàn tất",
 	})
 	tool := NewReviseOutlineTool(s)
 	for i := 0; i < 2; i++ {
@@ -59,7 +59,7 @@ func TestReviseOutlineReplacesFlatTailIdempotently(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(outline) != 3 || outline[0].Title != "已完成" || outline[1].Title != "新二" || outline[2].Title != "新三" {
+	if len(outline) != 3 || outline[0].Title != "Đã hoàn tất" || outline[1].Title != "Mới hai" || outline[2].Title != "Mới ba" {
 		t.Fatalf("unexpected revised outline: %+v", outline)
 	}
 	for i, entry := range outline {
@@ -87,13 +87,13 @@ func TestReviseOutlineProtectsCompletedChapter(t *testing.T) {
 	if err := s.Progress.Init(2); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.Outline.SaveOutline([]domain.OutlineEntry{{Chapter: 1, Title: "一"}, {Chapter: 2, Title: "二"}}); err != nil {
+	if err := s.Outline.SaveOutline([]domain.OutlineEntry{{Chapter: 1, Title: "Một"}, {Chapter: 2, Title: "Hai"}}); err != nil {
 		t.Fatal(err)
 	}
 	if err := s.Progress.MarkChapterComplete(1, 100, "", ""); err != nil {
 		t.Fatal(err)
 	}
-	args := json.RawMessage(`{"from_chapter":1,"replacement":[{"title":"改写","core_event":"改写","hook":"继续","scenes":[]}],"reason":"测试"}`)
+	args := json.RawMessage(`{"from_chapter":1,"replacement":[{"title":"viết lại","core_event":"viết lại","hook":"tiếp tục","scenes":[]}],"reason":"kiểm thử"}`)
 	if _, err := NewReviseOutlineTool(s).Execute(context.Background(), args); err == nil {
 		t.Fatal("expected completed chapter revision to be rejected")
 	}
@@ -101,7 +101,7 @@ func TestReviseOutlineProtectsCompletedChapter(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(outline) != 2 || outline[0].Title != "一" {
+	if len(outline) != 2 || outline[0].Title != "Một" {
 		t.Fatalf("rejected revision changed outline: %+v", outline)
 	}
 }
@@ -113,16 +113,16 @@ func TestReviseOutlinePreservesOtherLayeredArcs(t *testing.T) {
 	}
 	volumes := []domain.VolumeOutline{{
 		Index: 1,
-		Title: "卷一",
+		Title: "Tập một",
 		Arcs: []domain.ArcOutline{
-			{Index: 1, Title: "弧一", Chapters: []domain.OutlineEntry{
-				{Chapter: 1, Title: "已完成"},
-				{Chapter: 2, Title: "旧二"},
-				{Chapter: 3, Title: "旧三"},
+			{Index: 1, Title: "Cung một", Chapters: []domain.OutlineEntry{
+				{Chapter: 1, Title: "Đã hoàn tất"},
+				{Chapter: 2, Title: "Cũ hai"},
+				{Chapter: 3, Title: "Cũ ba"},
 			}},
-			{Index: 2, Title: "弧二", Chapters: []domain.OutlineEntry{
-				{Chapter: 4, Title: "保留四"},
-				{Chapter: 5, Title: "保留五"},
+			{Index: 2, Title: "Cung hai", Chapters: []domain.OutlineEntry{
+				{Chapter: 4, Title: "Giữ bốn"},
+				{Chapter: 5, Title: "Giữ năm"},
 			}},
 		},
 	}}
@@ -142,7 +142,7 @@ func TestReviseOutlinePreservesOtherLayeredArcs(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	args := json.RawMessage(`{"from_chapter":2,"replacement":[{"title":"新二","core_event":"转折","hook":"继续","scenes":[]}],"reason":"压缩当前弧"}`)
+	args := json.RawMessage(`{"from_chapter":2,"replacement":[{"title":"Mới hai","core_event":"bước ngoặt","hook":"tiếp tục","scenes":[]}],"reason":"nén cung hiện tại"}`)
 	tool := NewReviseOutlineTool(s)
 	var rawResult json.RawMessage
 	for i := 0; i < 2; i++ {
@@ -160,24 +160,24 @@ func TestReviseOutlinePreservesOtherLayeredArcs(t *testing.T) {
 		t.Fatalf("layered revise result = %#v", result)
 	}
 	if _, exists := result["total_chapters"]; exists {
-		t.Fatalf("layered revise 不得暴露固定总章数: %#v", result)
+		t.Fatalf("chỉnh sửa phân tầng không được công bố tổng số chương cố định: %#v", result)
 	}
 
 	layered, err := s.Outline.LoadLayeredOutline()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := layered[0].Arcs[0].Chapters; len(got) != 2 || got[1].Title != "新二" {
+	if got := layered[0].Arcs[0].Chapters; len(got) != 2 || got[1].Title != "Mới hai" {
 		t.Fatalf("target arc revision = %+v", got)
 	}
-	if got := layered[0].Arcs[1].Chapters; len(got) != 2 || got[0].Title != "保留四" || got[1].Title != "保留五" {
+	if got := layered[0].Arcs[1].Chapters; len(got) != 2 || got[0].Title != "Giữ bốn" || got[1].Title != "Giữ năm" {
 		t.Fatalf("following arc changed: %+v", got)
 	}
 	outline, err := s.Outline.LoadOutline()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(outline) != 4 || outline[2].Title != "保留四" || outline[2].Chapter != 3 {
+	if len(outline) != 4 || outline[2].Title != "Giữ bốn" || outline[2].Chapter != 3 {
 		t.Fatalf("flat projection not regenerated: %+v", outline)
 	}
 	progress, err := s.Progress.Load()

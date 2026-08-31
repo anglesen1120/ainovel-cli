@@ -31,7 +31,7 @@ func hubFieldIndex(fields []hubField, id string) int {
 	return -1
 }
 
-// 选中已有 Provider 应进入详情 hub（先看信息，再逐一调整），而不是直接跳进“改协议”。
+// Chọn Provider trung bình đã có sẵn phải vào hub Chi tiết (xem thông tin trước, rồi chỉnh từng mục), không nhảy thẳng vào “đổi Giao thức”.
 func TestSelectingProviderOpensHub(t *testing.T) {
 	st := &modelConfigState{editModelIdx: -1}
 	st.applyProviderChoice(configProviderChoice{existing: &host.ProviderSnapshot{
@@ -39,21 +39,21 @@ func TestSelectingProviderOpensHub(t *testing.T) {
 		Models: []bootstrap.ModelConfig{{Name: "m"}},
 	}})
 	if st.step != configStepHub {
-		t.Fatalf("选中已有 Provider 应进入 hub，得到 step=%d", st.step)
+		t.Fatalf("Chọn Provider trung bình đã có sẵn phải vào hub, nhận step=%d", st.step)
 	}
 	ids := hubFieldIDs(st.hubFields())
-	// 内置 provider（type 空）不铺 协议/Endpoint 噪音，但保留 key/models/save。
+	// Provider nội bộ (type trống) không hiển thị ồn ào về Giao thức/Endpoint, nhưng vẫn giữ key/models/save.
 	if slices.Contains(ids, "protocol") || slices.Contains(ids, "api") {
-		t.Fatalf("内置 provider hub 不应出现协议/Endpoint，得到 %v", ids)
+		t.Fatalf("hub của Provider nội bộ không nên có Giao thức/Endpoint, nhận %v", ids)
 	}
 	for _, want := range []string{"key", "baseurl", "models", "save"} {
 		if !slices.Contains(ids, want) {
-			t.Fatalf("hub 缺少 %q，得到 %v", want, ids)
+			t.Fatalf("hub thiếu %q, nhận %v", want, ids)
 		}
 	}
 }
 
-// 自定义（显式 openai 协议）Provider 的 hub 才展示协议与 Endpoint。
+// Hub của Provider tùy chỉnh (openai Giao thức tường minh) mới hiển thị Giao thức và Endpoint.
 func TestCustomProviderHubShowsProtocolAndEndpoint(t *testing.T) {
 	st := &modelConfigState{editModelIdx: -1}
 	st.applyProviderChoice(configProviderChoice{existing: &host.ProviderSnapshot{
@@ -62,25 +62,25 @@ func TestCustomProviderHubShowsProtocolAndEndpoint(t *testing.T) {
 	}})
 	ids := hubFieldIDs(st.hubFields())
 	if !slices.Contains(ids, "protocol") || !slices.Contains(ids, "api") {
-		t.Fatalf("自定义 openai provider hub 应含协议/Endpoint，得到 %v", ids)
+		t.Fatalf("hub của provider openai tùy chỉnh phải có Giao thức/Endpoint, nhận %v", ids)
 	}
 }
 
-// Esc 逐级返回：hub 行内编辑 → hub → Provider 列表 → 关闭。
+// Esc quay lại theo từng cấp: chỉnh sửa nội tuyến ở hub → hub → danh sách Provider → Tắt.
 func TestEscapeBackHierarchy(t *testing.T) {
 	st := &modelConfigState{step: configStepHub, provider: "proxy"}
 	st.beginInlineEdit("baseurl")
 	m := Model{modelConfig: st}
 	m.handleModelConfigKey(tea.KeyMsg{Type: tea.KeyEsc})
 	if st.step != configStepHub || st.editingField != "" {
-		t.Fatalf("行内编辑 Esc 应留在 hub 并取消输入，得到 step=%d field=%q", st.step, st.editingField)
+		t.Fatalf("Esc ở chỉnh sửa nội tuyến phải ở lại hub và hủy Nhập, nhận step=%d field=%q", st.step, st.editingField)
 	}
 	if got, ok := st.escapeBack(); !ok || got != configStepProvider {
-		t.Fatalf("hub Esc 应回列表，得到 %d,%v", got, ok)
+		t.Fatalf("Esc ở hub phải quay về danh sách, nhận %d,%v", got, ok)
 	}
 	st.step = configStepProvider
 	if _, ok := st.escapeBack(); ok {
-		t.Fatal("列表 Esc 应关闭整个面板")
+		t.Fatal("Esc ở danh sách phải Tắt toàn bộ bảng")
 	}
 }
 
@@ -91,17 +91,17 @@ func TestModelListAddsAndEditsInPlace(t *testing.T) {
 	m := Model{modelConfig: st}
 	m.handleModelConfigKey(tea.KeyMsg{Type: tea.KeyEnter})
 	if st.step != configStepModels || st.editingField != configModelNameField || !st.addingModel {
-		t.Fatalf("新增应留在列表行内编辑，step=%d field=%q adding=%v", st.step, st.editingField, st.addingModel)
+		t.Fatalf("Thêm mới phải ở lại chỉnh sửa nội tuyến của hàng danh sách, step=%d field=%q adding=%v", st.step, st.editingField, st.addingModel)
 	}
 	st.input.SetValue("  m2  ")
 	m.handleModelConfigKey(tea.KeyMsg{Type: tea.KeyEnter})
 	if st.editingField != configModelWindowField || st.models[1].Name != "m2" {
-		t.Fatalf("名称提交后应在同一行进入窗口列，field=%q models=%#v", st.editingField, st.models)
+		t.Fatalf("Sau khi gửi tên, phải vào cột cửa sổ ngay trên cùng một hàng, field=%q models=%#v", st.editingField, st.models)
 	}
 	st.input.SetValue("128K")
 	m.handleModelConfigKey(tea.KeyMsg{Type: tea.KeyEnter})
 	if st.editingField != "" || st.addingModel || st.models[1].ContextWindow != 128000 {
-		t.Fatalf("新增模型未在同一页完成: %#v", st)
+		t.Fatalf("Thêm Mô hình mới chưa hoàn tất trên cùng một trang: %#v", st)
 	}
 }
 
@@ -112,12 +112,12 @@ func TestModelListEditsSelectedCellAndCancels(t *testing.T) {
 	m.handleModelConfigKey(tea.KeyMsg{Type: tea.KeyRight})
 	m.handleModelConfigKey(tea.KeyMsg{Type: tea.KeyEnter})
 	if st.editingField != configModelWindowField || st.step != configStepModels {
-		t.Fatalf("右列 Enter 应行内编辑窗口，step=%d field=%q", st.step, st.editingField)
+		t.Fatalf("Enter ở cột bên phải phải vào chỉnh sửa nội tuyến trong cửa sổ, step=%d field=%q", st.step, st.editingField)
 	}
 	st.input.SetValue("200K")
 	m.handleModelConfigKey(tea.KeyMsg{Type: tea.KeyEsc})
 	if st.editingField != "" || st.models[0].ContextWindow != 1000 {
-		t.Fatalf("Esc 应取消当前单元格且不改值: %#v", st.models[0])
+		t.Fatalf("Esc phải hủy ô hiện tại và không đổi giá trị: %#v", st.models[0])
 	}
 }
 
@@ -134,10 +134,10 @@ func TestModelRenameProducesExplicitDraftAndReferenceNotice(t *testing.T) {
 	m.handleModelConfigKey(tea.KeyMsg{Type: tea.KeyEnter})
 	draft := st.draft()
 	if len(draft.Renames) != 1 || draft.Renames[0] != (host.ModelRename{From: "old", To: "renamed"}) {
-		t.Fatalf("模型改名必须保留显式身份关系，renames=%#v", draft.Renames)
+		t.Fatalf("Đổi tên Mô hình phải giữ quan hệ định danh tường minh, renames=%#v", draft.Renames)
 	}
-	if !strings.Contains(st.message, "同步更新引用") || !strings.Contains(st.message, "default") {
-		t.Fatalf("引用模型改名应明确提示保存行为，message=%q", st.message)
+	if !strings.Contains(st.message, "Khi lưu sẽ đồng bộ cập nhật tham chiếu") || !strings.Contains(st.message, "default") {
+		t.Fatalf("Đổi tên Mô hình được tham chiếu phải nhắc rõ hành vi lưu, message=%q", st.message)
 	}
 }
 
@@ -149,9 +149,9 @@ func TestModelListRendersEditableColumnsAndReferences(t *testing.T) {
 		},
 	}
 	plain := ansi.Strip(renderModelConfigModal(120, st))
-	for _, want := range []string{"模型 ID", "上下文窗口", "引用", "deepseek-chat", "128K", "default", "+ 新增模型"} {
+	for _, want := range []string{"ID mô hình", "Cửa sổ ngữ cảnh", "Tham chiếu", "deepseek-chat", "128K", "default", "+ Thêm mô hình"} {
 		if !strings.Contains(plain, want) {
-			t.Fatalf("单页模型表缺少 %q:\n%s", want, plain)
+			t.Fatalf("Bảng Mô hình một trang thiếu %q:\n%s", want, plain)
 		}
 	}
 }
@@ -170,11 +170,11 @@ func TestModelNameInlineEditorKeepsModalRowsIntact(t *testing.T) {
 	lines := strings.Split(view, "\n")
 	for i, line := range lines {
 		if width := lipgloss.Width(line); width != 72 {
-			t.Fatalf("行内模型名编辑破坏了第 %d 行宽度: width=%d line=%q\n%s", i, width, ansi.Strip(line), ansi.Strip(view))
+			t.Fatalf("Chỉnh sửa tên Mô hình nội tuyến làm hỏng độ rộng dòng %d: width=%d line=%q\n%s", i, width, ansi.Strip(line), ansi.Strip(view))
 		}
 	}
 	if len(lines) != 7 {
-		t.Fatalf("行内编辑不应引入物理换行，得到 %d 行:\n%s", len(lines), ansi.Strip(view))
+		t.Fatalf("Chỉnh sửa nội tuyến không được tạo ngắt dòng vật lý, nhận %d dòng:\n%s", len(lines), ansi.Strip(view))
 	}
 }
 
@@ -185,8 +185,8 @@ func TestRenamedReferencedModelStillCannotBeDeleted(t *testing.T) {
 			References: map[string][]string{"proxy\x00old": {"default"}},
 		},
 	}
-	if st.deleteModel(0) || len(st.models) != 1 || !strings.Contains(st.message, "正在使用") {
-		t.Fatalf("重命名尚未保存时仍应按原身份保护删除，models=%#v message=%q", st.models, st.message)
+	if st.deleteModel(0) || len(st.models) != 1 || !strings.Contains(st.message, "đang được dùng") {
+		t.Fatalf("Khi chưa lưu việc đổi tên, vẫn phải bảo vệ xóa theo định danh gốc, models=%#v message=%q", st.models, st.message)
 	}
 }
 
@@ -197,7 +197,7 @@ func TestCancellingNewModelNameRemovesTemporaryRow(t *testing.T) {
 	m.handleModelConfigKey(tea.KeyMsg{Type: tea.KeyEnter})
 	m.handleModelConfigKey(tea.KeyMsg{Type: tea.KeyEsc})
 	if len(st.models) != 1 || len(st.modelOrigins) != 1 || st.cursor != 1 {
-		t.Fatalf("取消新增应清理临时行，models=%#v origins=%#v cursor=%d", st.models, st.modelOrigins, st.cursor)
+		t.Fatalf("Hủy thêm mới phải dọn dòng tạm, models=%#v origins=%#v cursor=%d", st.models, st.modelOrigins, st.cursor)
 	}
 }
 
@@ -236,15 +236,15 @@ func TestProviderHubEditsAPIKeyInlineAndTrims(t *testing.T) {
 	m := Model{modelConfig: state}
 	m.handleModelConfigKey(tea.KeyMsg{Type: tea.KeyEnter})
 	if state.step != configStepHub || state.editingField != "key" {
-		t.Fatalf("API Key 应在 hub 原行编辑，得到 step=%d field=%q", state.step, state.editingField)
+		t.Fatalf("API Key phải chỉnh sửa ngay trên hàng gốc trong hub, nhận step=%d field=%q", state.step, state.editingField)
 	}
 	state.input.SetValue("  sk-new-secret-1234567890  ")
 	m.handleModelConfigKey(tea.KeyMsg{Type: tea.KeyEnter})
 	if state.editingField != "" || state.apiKey != "sk-new-secret-1234567890" || state.apiKeyAction != host.APIKeyReplace {
-		t.Fatalf("API Key 行内提交结果错误: field=%q key=%q action=%q", state.editingField, state.apiKey, state.apiKeyAction)
+		t.Fatalf("Kết quả gửi nội tuyến API Key sai: field=%q key=%q action=%q", state.editingField, state.apiKey, state.apiKeyAction)
 	}
 	if got := state.keyStatus(); got != "sk-n******7890" {
-		t.Fatalf("新 API Key 应显示脱敏提示，得到 %q", got)
+		t.Fatalf("API Key mới phải hiển thị gợi ý che bớt, nhận %q", got)
 	}
 }
 
@@ -255,17 +255,17 @@ func TestProviderHubEditsBaseURLInlineAndKeepsLongTailVisible(t *testing.T) {
 	m := Model{modelConfig: state}
 	m.handleModelConfigKey(tea.KeyMsg{Type: tea.KeyEnter})
 	if state.editingField != "baseurl" || state.input.Value() != "https://old.example/v1" {
-		t.Fatalf("Base URL 应在原行预填编辑，field=%q value=%q", state.editingField, state.input.Value())
+		t.Fatalf("Base URL phải được điền sẵn để chỉnh sửa ngay trên hàng gốc, field=%q value=%q", state.editingField, state.input.Value())
 	}
 	state.input.SetValue("  https://example.com/a/very/long/provider/path/UNIQUE-END  ")
 	state.input.CursorEnd()
 	view := renderModelConfigModal(76, state)
 	if !strings.Contains(view, "UNIQUE-END") {
-		t.Fatalf("长 Base URL 编辑时应显示光标附近尾部:\n%s", view)
+		t.Fatalf("Khi chỉnh sửa Base URL dài, phải hiển thị phần đuôi gần con trỏ:\n%s", view)
 	}
 	m.handleModelConfigKey(tea.KeyMsg{Type: tea.KeyEnter})
 	if state.baseURL != "https://example.com/a/very/long/provider/path/UNIQUE-END" {
-		t.Fatalf("Base URL 未 TrimSpace，得到 %q", state.baseURL)
+		t.Fatalf("Base URL chưa TrimSpace, nhận %q", state.baseURL)
 	}
 }
 
@@ -276,37 +276,37 @@ func TestSaveConfigHighlightsOnlyWhenDirty(t *testing.T) {
 		APIKeyHint: "sk-o******7890", Models: []bootstrap.ModelConfig{{Name: "m1"}},
 	}})
 	if state.isDirty() {
-		t.Fatal("刚进入已有 Provider 时不应标记为已修改")
+		t.Fatal("Vừa vào Provider đã có sẵn thì không được đánh dấu là đã sửa")
 	}
 	state.baseURL = "https://new.example/v1"
 	if !state.isDirty() {
-		t.Fatal("Base URL 变化后应标记为已修改")
+		t.Fatal("Sau khi Base URL thay đổi thì phải được đánh dấu là đã sửa")
 	}
 	state.baseURL = "https://old.example/v1"
 	if state.isDirty() {
-		t.Fatal("改回基线值后应自动恢复未修改状态")
+		t.Fatal("Khi đổi lại giá trị nền thì phải tự quay về trạng thái chưa sửa")
 	}
 	state.beginInlineEdit("baseurl")
 	state.input.SetValue("https://editing.example/v1")
 	if !state.isDirty() {
-		t.Fatal("Base URL 正在输入新值时应实时标记为已修改")
+		t.Fatal("Khi Nhập giá trị mới cho Base URL thì phải được đánh dấu đã sửa theo thời gian thực")
 	}
 	state.input.SetValue(" https://old.example/v1 ")
 	if state.isDirty() {
-		t.Fatal("行内输入等价于基线值时不应误报修改")
+		t.Fatal("Khi Nhập nội tuyến bằng giá trị nền thì không được báo sai là đã sửa")
 	}
 	state.editingField = ""
 	state.apiKeyAction = host.APIKeyReplace
 	state.apiKey = "sk-new-secret"
 	if !state.isDirty() {
-		t.Fatal("替换 API Key 后应标记为已修改")
+		t.Fatal("Sau khi thay API Key thì phải được đánh dấu là đã sửa")
 	}
 
 	oldProfile := lipgloss.ColorProfile()
 	lipgloss.SetColorProfile(termenv.TrueColor)
 	t.Cleanup(func() { lipgloss.SetColorProfile(oldProfile) })
 	lines := renderProviderHubFields(state, 68)
-	want := lipgloss.NewStyle().Foreground(colorSuccess).Render("保存配置")
+	want := lipgloss.NewStyle().Foreground(colorSuccess).Render("Lưu cấu hình")
 	found := false
 	for _, line := range lines {
 		if strings.Contains(line, want) {
@@ -315,12 +315,12 @@ func TestSaveConfigHighlightsOnlyWhenDirty(t *testing.T) {
 		}
 	}
 	if !found {
-		t.Fatalf("有变更时保存项应使用成功色，lines=%q", lines)
+		t.Fatalf("Khi có thay đổi, mục lưu phải dùng màu thành công, lines=%q", lines)
 	}
 
 	newProvider := &modelConfigState{}
 	if !newProvider.isDirty() {
-		t.Fatal("新增 Provider 应始终视为未保存变更")
+		t.Fatal("Thêm Provider phải luôn được xem là thay đổi chưa lưu")
 	}
 }
 
@@ -330,16 +330,16 @@ func TestStyledBaseURLLineKeepsANSIAndFillsModalWidth(t *testing.T) {
 		"\x1b[1;38;2;255;200;0mBase URL\x1b[0m  " +
 		"\x1b[4;38;2;220;220;220mhttps://api.deepseek.com\x1b[0m"
 	if got := ansi.Strip(truncateStyledWidth(styled, 56)); got != plain {
-		t.Fatalf("ANSI 感知截断破坏了输入行: %q", got)
+		t.Fatalf("Cắt ngắn có nhận biết ANSI đã làm hỏng dòng Nhập: %q", got)
 	}
 
 	modal := renderPaddedModalFrame(60, 3, "/config", "", []string{styled})
 	lines := strings.Split(modal, "\n")
 	if len(lines) != 3 || lipgloss.Width(lines[1]) != 60 {
-		t.Fatalf("浮层输入行没有填满固定宽度: width=%d\n%s", lipgloss.Width(lines[1]), modal)
+		t.Fatalf("Dòng Nhập của lớp phủ không lấp đầy độ rộng cố định: width=%d\n%s", lipgloss.Width(lines[1]), modal)
 	}
 	if !strings.Contains(ansi.Strip(lines[1]), "https://api.deepseek.com") {
-		t.Fatalf("浮层丢失 Base URL:\n%s", modal)
+		t.Fatalf("Lớp phủ bị mất Base URL:\n%s", modal)
 	}
 }
 
@@ -349,8 +349,8 @@ func TestProviderHubDeleteClearsOnlyOptionalAPIKey(t *testing.T) {
 	optional.cursor = hubFieldIndex(optional.hubFields(), "key")
 	m := Model{modelConfig: optional}
 	m.handleModelConfigKey(tea.KeyMsg{Type: tea.KeyDelete})
-	if optional.apiKeyAction != host.APIKeyClear || optional.keyStatus() != "已清除" {
-		t.Fatalf("可选 Key 的 Delete 应标记清除，action=%q status=%q", optional.apiKeyAction, optional.keyStatus())
+	if optional.apiKeyAction != host.APIKeyClear || optional.keyStatus() != "Đã xóa" {
+		t.Fatalf("Delete của Key tùy chọn phải đánh dấu là đã xóa, action=%q status=%q", optional.apiKeyAction, optional.keyStatus())
 	}
 
 	required := &modelConfigState{step: configStepHub, provider: "openrouter",
@@ -358,19 +358,19 @@ func TestProviderHubDeleteClearsOnlyOptionalAPIKey(t *testing.T) {
 	required.cursor = hubFieldIndex(required.hubFields(), "key")
 	m = Model{modelConfig: required}
 	m.handleModelConfigKey(tea.KeyMsg{Type: tea.KeyDelete})
-	if required.apiKeyAction != host.APIKeyKeep || !strings.Contains(required.message, "不能清除") {
-		t.Fatalf("必需 Key 不应被清除，action=%q message=%q", required.apiKeyAction, required.message)
+	if required.apiKeyAction != host.APIKeyKeep || !strings.Contains(required.message, "không thể xóa") {
+		t.Fatalf("Key bắt buộc không được bị xóa, action=%q message=%q", required.apiKeyAction, required.message)
 	}
 }
 
 func TestConfigTextInputSupportsCursorEditing(t *testing.T) {
 	state := &modelConfigState{step: configStepCustomName}
-	state.startTextInput("ac", "Provider 名称", false)
+	state.startTextInput("ac", "Tên Provider", false)
 	state.input.SetCursor(1)
 	m := Model{modelConfig: state}
 	m.handleModelConfigKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'b'}})
 	if got := state.input.Value(); got != "abc" {
-		t.Fatalf("统一输入框应支持在光标处插入，得到 %q", got)
+		t.Fatalf("Hộp Nhập dùng chung phải hỗ trợ chèn tại vị trí con trỏ, nhận %q", got)
 	}
 }
 
@@ -383,27 +383,27 @@ func TestProviderHubShowsConfigPathAndConnectionAction(t *testing.T) {
 	fields := state.hubFields()
 	idx := hubFieldIndex(fields, "test")
 	if idx < 0 || fields[idx].value != "m2" {
-		t.Fatalf("测试连接应优先当前模型，fields=%#v", fields)
+		t.Fatalf("Kiểm tra kết nối phải ưu tiên Mô hình hiện tại, fields=%#v", fields)
 	}
 	view := renderModelConfigModal(120, state)
-	for _, want := range []string{"高级配置", "extra_body"} {
+	for _, want := range []string{"Cấu hình nâng cao", "extra_body"} {
 		if !strings.Contains(view, want) {
-			t.Fatalf("配置 Hub 缺少 %q:\n%s", want, view)
+			t.Fatalf("Hub cấu hình thiếu %q:\n%s", want, view)
 		}
 	}
 	compact := strings.NewReplacer("\r", "", "\n", "", " ", "", "│", "").Replace(view)
 	if !strings.Contains(compact, `C:\work\.ainovel\config.json`) {
-		t.Fatalf("配置 Hub 未完整展示配置路径:\n%s", view)
+		t.Fatalf("Hub cấu hình chưa hiển thị đầy đủ đường dẫn cấu hình:\n%s", view)
 	}
 }
 
 func TestModelConfigMessageWrapKeepsErrorTail(t *testing.T) {
 	state := &modelConfigState{step: configStepHub, provider: "proxy", apiKeyOptional: true,
-		message: "连接失败：" + strings.Repeat("上游返回了很长的错误信息", 8) + " UNIQUE-ERROR-TAIL"}
+		message: "Kết nối thất bại：" + strings.Repeat("phía trên trả về lỗi rất dài", 8) + " UNIQUE-ERROR-TAIL"}
 	view := renderModelConfigModal(64, state)
 	compact := strings.NewReplacer("\r", "", "\n", "", " ", "", "│", "").Replace(view)
 	if !strings.Contains(compact, "UNIQUE-ERROR-TAIL") {
-		t.Fatalf("长错误不应截断尾部:\n%s", view)
+		t.Fatalf("Lỗi dài không được cắt mất phần đuôi:\n%s", view)
 	}
 }
 
@@ -414,7 +414,7 @@ func TestConnectionActionStartsAsyncTestWithoutLeavingHub(t *testing.T) {
 	m := Model{modelConfig: state}
 	_, cmd := m.handleModelConfigKey(tea.KeyMsg{Type: tea.KeyEnter})
 	if cmd == nil || !state.testing || state.step != configStepHub {
-		t.Fatalf("测试连接应异步留在 hub，cmd=%v testing=%v step=%d", cmd != nil, state.testing, state.step)
+		t.Fatalf("Kiểm tra kết nối phải ở lại hub một cách bất đồng bộ, cmd=%v testing=%v step=%d", cmd != nil, state.testing, state.step)
 	}
 }
 
@@ -424,14 +424,14 @@ func TestConnectionTestCanBeCancelled(t *testing.T) {
 		testCancel: func() { cancelled = true }}
 	m := Model{modelConfig: state}
 	m.handleModelConfigKey(tea.KeyMsg{Type: tea.KeyEsc})
-	if !cancelled || !state.testing || state.message != "正在取消连接测试..." {
-		t.Fatalf("Esc 应取消在途测试并等待结果，cancelled=%v testing=%v message=%q", cancelled, state.testing, state.message)
+	if !cancelled || !state.testing || state.message != "Đang hủy kiểm tra kết nối..." {
+		t.Fatalf("Esc phải hủy kiểm tra đang diễn ra và chờ kết quả, cancelled=%v testing=%v message=%q", cancelled, state.testing, state.message)
 	}
 
 	updated, _, handled := m.handleRuntimeMsg(modelConfigConnectionMsg{err: context.Canceled})
 	m = updated.(Model)
-	if !handled || m.modelConfig.testing || m.modelConfig.message != "连接测试已取消" {
-		t.Fatalf("取消结果未正确收敛: handled=%v testing=%v message=%q", handled, m.modelConfig.testing, m.modelConfig.message)
+	if !handled || m.modelConfig.testing || m.modelConfig.message != "Kiểm tra kết nối đã bị hủy" {
+		t.Fatalf("Kết quả hủy chưa được quy tụ đúng: handled=%v testing=%v message=%q", handled, m.modelConfig.testing, m.modelConfig.message)
 	}
 }
 
@@ -452,27 +452,27 @@ func TestModelSwitchLabelIncludesContextWindow(t *testing.T) {
 	}
 }
 
-// 与 /model 一致：/config 渲染成内容高度的带框浮层（不再撑成 3/4 屏的居中蒙层）。
+// Nhất quán với /model: /config được render thành floating layer có khung với chiều cao theo nội dung (không còn kéo giãn thành overlay căn giữa cao 3/4 màn hình).
 func TestModelConfigModalIsCompactOverlay(t *testing.T) {
 	state := &modelConfigState{step: configStepProvider, providerChoices: []configProviderChoice{
-		{label: "编辑 openrouter", existing: &host.ProviderSnapshot{Name: "openrouter"}},
-		{label: "+ 新增 Provider…", add: true},
+		{label: "Chỉnh sửa openrouter", existing: &host.ProviderSnapshot{Name: "openrouter"}},
+		{label: "+ Thêm Provider…", add: true},
 	}}
 	lines := strings.Split(renderModelConfigModal(120, state), "\n")
 
-	// 1 标题行 + 2 选项 + 上下边框 = 5 行；高度随内容走，不会因为屏高而膨胀。
+	// 1 dòng tiêu đề + 2 tùy chọn + viền trên dưới = 5 dòng; chiều cao theo nội dung, sẽ không phình ra vì chiều cao màn hình.
 	if len(lines) != 5 {
-		t.Fatalf("紧凑浮层应为 5 行（内容高度），得到 %d 行:\n%s", len(lines), strings.Join(lines, "\n"))
+		t.Fatalf("Floating layer gọn phải là 5 dòng (chiều cao nội dung), nhận được %d dòng:\n%s", len(lines), strings.Join(lines, "\n"))
 	}
 	if !strings.Contains(lines[0], "┌") || !strings.Contains(lines[0], "/config") {
-		t.Fatalf("首行应是带 /config 标题的上边框，得到 %q", lines[0])
+		t.Fatalf("Dòng đầu phải là viền trên có tiêu đề /config, nhận được %q", lines[0])
 	}
 	if !strings.Contains(lines[len(lines)-1], "└") {
-		t.Fatalf("末行应是下边框，得到 %q", lines[len(lines)-1])
+		t.Fatalf("Dòng cuối phải là viền dưới, nhận được %q", lines[len(lines)-1])
 	}
 }
 
-// 一级菜单只列“编辑已有 + 新增入口”，不铺开整份内置 Provider 目录；目录只在二级菜单出现。
+// Menu cấp một chỉ liệt kê “chỉnh sửa mục đã có + mục thêm mới”, không trải toàn bộ thư mục Provider dựng sẵn; thư mục chỉ xuất hiện ở menu cấp hai.
 func TestProviderMenuIsTwoLevel(t *testing.T) {
 	state := &modelConfigState{snapshot: host.ModelConfigurationSnapshot{
 		Providers:       []host.ProviderSnapshot{{Name: "openrouter"}, {Name: "anthropic"}},
@@ -480,30 +480,30 @@ func TestProviderMenuIsTwoLevel(t *testing.T) {
 	}}
 	state.buildProviderMenus()
 
-	// 一级 = 2 个编辑 + 1 个新增入口；末项是“新增”，且没有别的 add/preset 混入。
+	// Cấp một = 2 mục chỉnh sửa + 1 mục thêm mới; mục cuối là “Thêm mới”, và không có add/preset nào khác lẫn vào.
 	if len(state.providerChoices) != 3 {
-		t.Fatalf("一级菜单应为 2 编辑 + 1 新增，得到 %d 项", len(state.providerChoices))
+		t.Fatalf("Menu cấp một phải là 2 mục chỉnh sửa + 1 mục thêm mới, nhận được %d mục", len(state.providerChoices))
 	}
 	if !state.providerChoices[len(state.providerChoices)-1].add {
-		t.Fatal("一级菜单末项应是“新增 Provider…”入口")
+		t.Fatal("Mục cuối của menu cấp một phải là lối vào “Thêm Provider…”")
 	}
 	for i, c := range state.providerChoices[:2] {
 		if c.existing == nil || c.add {
-			t.Fatalf("一级菜单第 %d 项应为编辑已有 Provider，得到 %#v", i, c)
+			t.Fatalf("Mục thứ %d của menu cấp một phải là chỉnh sửa Provider đã có, nhận được %#v", i, c)
 		}
 	}
 
-	// 二级 = 可新增目录：非空，且已配置的内置项（openrouter/anthropic）不再重复出现。
+	// Cấp hai = thư mục có thể thêm mới: không rỗng, và các mục dựng sẵn đã cấu hình (openrouter/anthropic) không xuất hiện lặp lại nữa.
 	if len(state.presetChoices) == 0 {
-		t.Fatal("二级菜单应列出可新增的 Provider 目录")
+		t.Fatal("Menu cấp hai phải liệt kê thư mục Provider có thể thêm mới")
 	}
 	if len(state.presetChoices) >= len(bootstrap.ProviderPresets()) {
-		t.Fatalf("已配置的内置 Provider 应从新增目录中剔除，presets=%d 全量=%d",
+		t.Fatalf("Provider dựng sẵn đã cấu hình phải được loại khỏi thư mục thêm mới, presets=%d tổng=%d",
 			len(state.presetChoices), len(bootstrap.ProviderPresets()))
 	}
 	for _, c := range state.presetChoices {
 		if c.preset != nil && (c.preset.Name == "openrouter" || c.preset.Name == "anthropic") {
-			t.Fatalf("新增目录不应包含已配置的 %q", c.preset.Name)
+			t.Fatalf("Thư mục thêm mới không được chứa %q đã cấu hình", c.preset.Name)
 		}
 	}
 }

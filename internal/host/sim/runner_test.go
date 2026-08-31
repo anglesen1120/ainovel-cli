@@ -103,7 +103,7 @@ func TestRunnerGeneratesProfileThenSkipsUnchanged(t *testing.T) {
 		if ev.Err != nil {
 			t.Fatalf("rerun errored: %v", ev.Err)
 		}
-		if strings.Contains(ev.Message, "画像已是最新") {
+		if strings.Contains(ev.Message, "Hồ sơ đã là mới nhất") {
 			upToDate = true
 		}
 	}
@@ -222,48 +222,49 @@ func validSourceReportJSON(summary string) string {
 func validSynthesisJSON(note string) string {
 	return fmt.Sprintf(`{
   "style": {
-    "narrative_voice": ["limited close narration"],
-    "sentence_rhythm": ["mix short impact lines with medium action lines"],
+    "narrative_voice": ["trần thuật cận cảnh có giới hạn"],
+    "sentence_rhythm": ["đan xen câu ngắn tạo lực với câu hành động vừa"],
     "prose_texture": [%q],
-    "perspective": ["stay near the protagonist"],
-    "mood": ["tense, urgent"],
-    "do_not_copy": ["do not reuse original names or sentences"]
+    "perspective": ["bám sát nhân vật chính"],
+    "mood": ["căng thẳng, khẩn cấp"],
+    "do_not_copy": ["không dùng lại tên hoặc câu văn gốc"]
   },
   "lexicon": {
-    "common_words": ["door", "shadow"],
-    "emotion_words": ["hesitation"],
-    "scene_words": ["corridor"],
-    "transition_words": ["meanwhile"],
-    "signature_phrases": ["not yet"]
+    "common_words": ["cánh cửa", "bóng tối"],
+    "emotion_words": ["do dự"],
+    "scene_words": ["hành lang"],
+    "transition_words": ["trong lúc đó"],
+    "signature_phrases": ["chưa phải lúc"]
   },
   "plot_design": {
-    "opening_patterns": ["start inside an unresolved pressure"],
-    "escalation_patterns": ["make the cost visible after each answer"],
-    "turning_point_patterns": ["reframe the clue"],
-    "payoff_patterns": ["pay off the object before adding the next question"]
+    "opening_patterns": ["bắt đầu trong một áp lực chưa được giải quyết"],
+    "escalation_patterns": ["làm cái giá phải trả hiện rõ sau mỗi câu trả lời"],
+    "turning_point_patterns": ["định khung lại manh mối"],
+    "payoff_patterns": ["giải quyết vật thể trước khi thêm câu hỏi tiếp theo"]
   },
   "hook_design": {
-    "hook_types": ["mystery", "choice"],
-    "placement": ["open and close scenes with changed stakes"],
-    "cliffhanger_patterns": ["choice before consequence"],
-    "payoff_rules": ["answer one question while opening another"]
+    "hook_types": ["bí ẩn", "lựa chọn"],
+    "placement": ["mở đầu và khép lại cảnh bằng mức độ rủi ro đã thay đổi"],
+    "cliffhanger_patterns": ["lựa chọn trước hệ quả"],
+    "payoff_rules": ["trả lời một câu hỏi trong khi mở ra câu hỏi khác"]
   },
   "pacing_density": {
-    "scene_density": ["one scene should carry goal, obstacle, turn"],
-    "information_release": ["delay explanation until after action"],
-    "dialogue_action_ratio": ["dialogue must change leverage"],
-    "compression_rules": ["summarize transit, dramatize decisions"]
+    "scene_density": ["mỗi cảnh phải mang theo mục tiêu, trở ngại và bước ngoặt"],
+    "information_release": ["trì hoãn lời giải thích đến sau hành động"],
+    "dialogue_action_ratio": ["đối thoại phải thay đổi thế cân bằng"],
+    "compression_rules": ["tóm tắt việc di chuyển, dựng cảnh quyết định"]
   },
   "reader_engagement": {
-    "methods": ["curiosity gap", "stakes"],
-    "emotional_drivers": ["fear of loss"],
-    "progression_rewards": ["visible clue gain"],
-    "anti_patterns": ["flat exposition"]
+    "methods": ["khoảng trống tò mò", "mức độ rủi ro"],
+    "emotional_drivers": ["nỗi sợ mất mát"],
+    "progression_rewards": ["manh mối mới hiện rõ"],
+    "anti_patterns": ["kể lể phẳng"]
   },
   "role_guidance": {
-    "architect": ["design arcs with repeated cost escalation"],
-    "writer": ["borrow techniques, never copy text"],
-    "editor": ["check imitation stays structural rather than plagiaristic"]
+    "architect": ["thiết kế các cung truyện với cái giá tăng dần lặp lại"],
+    "writer": ["mượn kỹ thuật, tuyệt đối không sao chép văn bản"],
+    "editor": ["kiểm tra việc mô phỏng chỉ ở cấu trúc thay vì đạo văn"]
   }
+}
 }`, note)
 }

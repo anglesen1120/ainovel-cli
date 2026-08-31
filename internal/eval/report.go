@@ -14,7 +14,7 @@ const (
 	ArmVariant  = "variant"
 )
 
-// Suite 是一次评测运行的聚合结果。
+// Suite là kết quả tổng hợp của một lần chạy đánh giá.
 type Suite struct {
 	RunID   string       `json:"run_id"`
 	Mode    string       `json:"mode"` // single / ab
@@ -56,7 +56,7 @@ type RangeSummary struct {
 	Max float64 `json:"max"`
 }
 
-// Aggregate 把单 case 结果汇总成 suite，并计算整体门禁：任一 FAIL→FAIL，否则任一 WARN→WARN。
+// Aggregate tổng hợp kết quả từng case thành suite và tính cổng tổng thể: bất kỳ FAIL→FAIL, nếu không thì bất kỳ WARN→WARN.
 func Aggregate(runID, mode, variant string, repeat int, cases []CaseResult) Suite {
 	gate := Pass
 	for _, c := range cases {
@@ -187,7 +187,7 @@ func worstOutcome(a, b Outcome) Outcome {
 	return Pass
 }
 
-// WriteReport 在 outDir 下写 report.json（机读）与 report.md（人读）。
+// WriteReport ghi report.json (dành cho máy) và report.md (dành cho người) vào outDir.
 func WriteReport(s Suite, outDir string) error {
 	if err := os.MkdirAll(outDir, 0o755); err != nil {
 		return err
@@ -202,7 +202,7 @@ func WriteReport(s Suite, outDir string) error {
 	return os.WriteFile(filepath.Join(outDir, "report.md"), []byte(renderMarkdown(s)), 0o644)
 }
 
-// Summary 是给 stdout 的精简结论。
+// Summary là kết luận ngắn gọn dành cho stdout.
 func Summary(s Suite) string {
 	var hardFails, warnings int
 	for _, c := range s.Cases {

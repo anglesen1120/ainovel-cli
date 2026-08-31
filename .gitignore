@@ -1,42 +1,42 @@
-# If you prefer the allow list template instead of the deny list, see community template:
+# Nếu bạn thích mẫu danh sách cho phép thay vì danh sách từ chối, hãy xem mẫu cộng đồng:
 # https://github.com/github/gitignore/blob/main/community/Golang/Go.AllowList.gitignore
 #
-# Binaries for programs and plugins
+# Tệp nhị phân cho chương trình và plugin
 *.exe
 *.exe~
 *.dll
 *.so
 *.dylib
 
-# Test binary, built with `go test -c`
+# Tệp nhị phân kiểm thử, được tạo bằng `go test -c`
 *.test
 
-# Code coverage profiles and other test artifacts
+# Hồ sơ độ bao phủ mã và các tạo phẩm kiểm thử khác
 *.out
 coverage.*
 *.coverprofile
 profile.cov
 
-# Dependency directories (remove the comment below to include it)
+# Thư mục phụ thuộc (xóa chú thích bên dưới để đưa vào)
 # vendor/
 
-# Go workspace file
+# Tệp không gian làm việc Go
 go.work
 go.work.sum
 
-# env file
+# Tệp env
 .env
 
-# 项目级配置 dotdir（镜像 ~/.ainovel/）：config.json 含密钥，rules/ 为本地写作偏好
+# dotdir cấu hình cấp dự án (phản chiếu ~/.ainovel/): config.json chứa khóa, rules/ là tùy chọn viết cục bộ
 .ainovel/
 
-# Editor/IDE
+# Trình soạn thảo/IDE
 .idea/
 .vscode/
 .cache
 .DS_Store
 
-# GoReleaser artifacts
+# Tạo phẩm GoReleaser
 dist/
 release-notes.md
 /ainovel-cli

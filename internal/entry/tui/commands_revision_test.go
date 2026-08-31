@@ -5,12 +5,12 @@ import "testing"
 func TestRevisionCommandIsRegisteredAndNeedsIdle(t *testing.T) {
 	spec, ok := commandRegistryInstance().Find("sync")
 	if !ok {
-		t.Fatal("expected /sync command to be registered")
+		t.Fatal("/sync phải được đăng ký")
 	}
 	if !spec.NeedsIdle || !spec.AutoExecute {
-		t.Fatalf("unexpected /sync policy: %+v", spec)
+		t.Fatalf("policy /sync không đúng: %+v", spec)
 	}
 	if !hasPaletteItem(builtinCommandItems(), "sync") {
-		t.Fatal("expected /sync in command palette")
+		t.Fatal("/sync phải có trong command palette")
 	}
 }

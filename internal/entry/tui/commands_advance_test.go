@@ -11,15 +11,15 @@ func TestAdvanceCommandsAreRegistered(t *testing.T) {
 	registry := commandRegistryInstance()
 	review, ok := registry.Find("review")
 	if !ok || review.NeedsIdle {
-		t.Fatalf("/review should be available while running: %+v", review)
+		t.Fatalf("/review phải khả dụng khi đang chạy: %+v", review)
 	}
 	next, ok := registry.Find("next")
 	if !ok || !next.NeedsIdle || !next.AutoExecute {
-		t.Fatalf("/next should be an idle one-shot command: %+v", next)
+		t.Fatalf("/next phải là lệnh one-shot khi idle: %+v", next)
 	}
 	items := builtinCommandItems()
 	if !hasPaletteItem(items, "review") || !hasPaletteItem(items, "next") {
-		t.Fatalf("advance commands missing from palette: %+v", items)
+		t.Fatalf("thiếu lệnh advance trong palette: %+v", items)
 	}
 }
 
@@ -33,7 +33,7 @@ func TestReviewWaitingPlaceholder(t *testing.T) {
 		},
 	}
 	m.syncRuntimePlaceholder()
-	if got := m.textarea.Placeholder; !strings.Contains(got, "/next") || !strings.Contains(got, "修改意见") {
-		t.Fatalf("review placeholder should expose both choices, got %q", got)
+	if got := m.textarea.Placeholder; !strings.Contains(got, "/next") || !strings.Contains(got, "ý kiến chỉnh sửa") {
+		t.Fatalf("placeholder review phải hiển thị cả hai lựa chọn, nhận %q", got)
 	}
 }

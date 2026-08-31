@@ -10,16 +10,16 @@ import (
 	"github.com/voocel/ainovel-cli/internal/llmcontract"
 )
 
-// FailureFacts 是 worker_failure / deadlock 两个场景共用的事实包:
-// Engine 已做过确定性分类(重试/参数错等不到这里),送到 Arbiter 的都是
-// "确定性代码给不出出路"的残余。
+// FailureFacts là gói facts dùng chung cho hai cảnh worker_failure / deadlock:
+// Engine đã phân loại xác định (retry/lỗi tham số... không tới đây), những gì gửi tới Arbiter đều là
+// phần còn lại mà "mã xác định không tìm được lối ra".
 type FailureFacts struct {
 	Kind          string   `json:"kind"` // worker_failure | deadlock
 	Agent         string   `json:"agent,omitempty"`
 	Task          string   `json:"task,omitempty"`
-	Error         string   `json:"error,omitempty"` // worker_failure:错误文本
+	Error         string   `json:"error,omitempty"` // worker_failure: văn bản lỗi
 	ErrorKind     string   `json:"error_kind,omitempty"`
-	Repeats       int      `json:"repeats,omitempty"` // deadlock:同指令已派次数
+	Repeats       int      `json:"repeats,omitempty"` // deadlock: số lần cùng instruction đã dispatch
 	Phase         string   `json:"phase,omitempty"`
 	NextChapter   int      `json:"next_chapter,omitempty"`
 	PendingQueue  []int    `json:"pending_rewrites,omitempty"`
@@ -27,7 +27,7 @@ type FailureFacts struct {
 	FactWarnings  []string `json:"fact_warnings,omitempty"`
 }
 
-// FailureDecision 失败/僵局裁定。
+// FailureDecision phân xử thất bại/bế tắc.
 type FailureDecision struct {
 	Action   string      `json:"action"` // retry | reroute | abort
 	Dispatch *DispatchOp `json:"dispatch,omitempty"`
@@ -36,38 +36,38 @@ type FailureDecision struct {
 
 func (d *FailureDecision) ValidateAgainst(f FailureFacts) error {
 	if strings.TrimSpace(d.Reason) == "" {
-		return fmt.Errorf("reason 不能为空")
+		return fmt.Errorf("reason không được để trống")
 	}
 	switch d.Action {
 	case "retry", "abort":
 		return nil
 	case "reroute":
 		if d.Dispatch == nil {
-			return fmt.Errorf("reroute 必须附 dispatch")
+			return fmt.Errorf("reroute phải kèm dispatch")
 		}
 		if err := d.Dispatch.validate(); err != nil {
 			return err
 		}
 		return validateDispatchAgainst(d.Dispatch, f.Phase)
 	default:
-		return fmt.Errorf("action 非法: %q（可选 retry / reroute / abort）", d.Action)
+		return fmt.Errorf("action không hợp lệ: %q (có thể chọn retry / reroute / abort)", d.Action)
 	}
 }
 
-// failureContract 紧邻 FailureDecision:action 封闭枚举,dispatch 可空对象
-// (仅 reroute 时非 null);跨字段组合仍由 ValidateAgainst 按事实校验。
+// failureContract đặt cạnh FailureDecision: action là enum đóng, dispatch là object nullable
+// (chỉ non-null khi reroute); tổ hợp liên field vẫn do ValidateAgainst kiểm tra theo facts.
 var failureContract = llmcontract.Contract{
 	Name:        "arbiter_failure",
-	Description: "失败/僵局裁定:给出出路",
+	Description: "Phân xử thất bại/bế tắc: đưa ra lối ra",
 	Schema: schema.Object(
-		schema.Property("action", schema.Enum("出路", "retry", "reroute", "abort")).Required(),
-		schema.Property("dispatch", dispatchSchema("派单目标(仅 reroute 时给出,否则为 null)")).Required(),
-		schema.Property("reason", schema.String("裁定理由")).Required(),
+		schema.Property("action", schema.Enum("Lối ra", "retry", "reroute", "abort")).Required(),
+		schema.Property("dispatch", dispatchSchema("Mục tiêu dispatch (chỉ đưa khi reroute, nếu không là null)")).Required(),
+		schema.Property("reason", schema.String("Lý do phân xử")).Required(),
 	),
 }
 
-// DecideFailure 失败/僵局咨询。失败语义:返回 error → Engine 按最保守路径处理
-// (暂停 + notify),绝不无限咨询。
+// DecideFailure tham vấn thất bại/bế tắc. Ngữ nghĩa thất bại: trả error → Engine xử lý theo đường bảo thủ nhất
+// (pause + notify), tuyệt đối không tham vấn vô hạn.
 func DecideFailure(ctx context.Context, model agentcore.ChatModel, systemPrompt string, facts FailureFacts) (FailureDecision, error) {
 	payload, err := marshalPayload(facts)
 	if err != nil {

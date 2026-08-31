@@ -15,11 +15,11 @@ import (
 
 func ImportProfile(ctx context.Context, st *store.Store, path string) (ImportResult, error) {
 	if st == nil {
-		return ImportResult{}, fmt.Errorf("store is nil")
+		return ImportResult{}, fmt.Errorf("store không được để trống")
 	}
 	path = strings.TrimSpace(path)
 	if path == "" {
-		return ImportResult{}, fmt.Errorf("profile path is required")
+		return ImportResult{}, fmt.Errorf("đường dẫn hồ sơ là bắt buộc")
 	}
 	if err := ctx.Err(); err != nil {
 		return ImportResult{}, err
@@ -30,7 +30,7 @@ func ImportProfile(ctx context.Context, st *store.Store, path string) (ImportRes
 	}
 	var imported domain.SimulationProfile
 	if err := json.Unmarshal(data, &imported); err != nil {
-		return ImportResult{}, fmt.Errorf("parse simulation profile: %w", err)
+		return ImportResult{}, fmt.Errorf("phân tích hồ sơ mô phỏng: %w", err)
 	}
 	if err := domain.ValidateSimulationProfile(&imported); err != nil {
 		return ImportResult{}, err
@@ -50,10 +50,10 @@ func ImportProfile(ctx context.Context, st *store.Store, path string) (ImportRes
 
 func RunImport(ctx context.Context, st *store.Store, path string) (<-chan Event, error) {
 	if st == nil {
-		return nil, fmt.Errorf("store is nil")
+		return nil, fmt.Errorf("store không được để trống")
 	}
 	if strings.TrimSpace(path) == "" {
-		return nil, fmt.Errorf("profile path is required")
+		return nil, fmt.Errorf("đường dẫn hồ sơ là bắt buộc")
 	}
 	events := make(chan Event, 8)
 	go func() {
@@ -65,13 +65,13 @@ func RunImport(ctx context.Context, st *store.Store, path string) (<-chan Event,
 			case <-ctx.Done():
 			}
 		}
-		emit(StageImport, "导入仿写画像...", nil)
+		emit(StageImport, "Đang nhập hồ sơ mô phỏng văn phong...", nil)
 		result, err := ImportProfile(ctx, st, path)
 		if err != nil {
-			emit(StageError, "导入仿写画像失败", err)
+			emit(StageError, "Nhập hồ sơ mô phỏng văn phong thất bại", err)
 			return
 		}
-		emit(StageDone, fmt.Sprintf("仿写画像已导入：新增 %d 篇，跳过重复 %d 篇", result.ImportedSources, result.SkippedSources), nil)
+		emit(StageDone, fmt.Sprintf("Đã nhập hồ sơ mô phỏng văn phong: thêm mới %d bài, bỏ qua %d bài trùng lặp", result.ImportedSources, result.SkippedSources), nil)
 	}()
 	return events, nil
 }

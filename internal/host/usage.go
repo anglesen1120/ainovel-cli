@@ -16,81 +16,84 @@ import (
 	storepkg "github.com/voocel/ainovel-cli/internal/store"
 )
 
-// recentSampleCap 是滑动窗大小：只保留每个 role 最近 N 次调用的 (cacheRead, input)
-// 样本，用于在左栏对比"累计 vs 近 N 次"命中率，识别"前期拖累"vs"稳态低命中"。
+// recentSampleCap là kích thước cửa sổ trượt: chỉ giữ lại N lần gọi gần nhất của mỗi role
+// làm mẫu (cacheRead, input), dùng ở cột bên trái để so sánh tỷ lệ hit "tích lũy vs gần N lần",
+// nhằm nhận diện "giai đoạn đầu kéo tụt" và "hit thấp ở trạng thái ổn định".
 const recentSampleCap = 10
 
-// 缓存链断裂判定双阈值（对齐 Claude Code 的实证经验）：命中量较上次下降超过
-// 5%（相对）且降幅 ≥2000 tokens（绝对）才算断裂——单一相对阈值会被小前缀噪声
-// 淹没，单一绝对阈值会漏掉大前缀的显著退化。
+// Ngưỡng kép để phán định đứt chuỗi cache (căn theo kinh nghiệm thực nghiệm của Claude Code):
+// lượng hit giảm hơn 5% (tương đối) so với lần trước và mức giảm >=2000 tokens (tuyệt đối) mới
+// được tính là đứt chuỗi -- chỉ dùng ngưỡng tương đối sẽ bị nhiễu tiền tố nhỏ che lấp, chỉ dùng
+// ngưỡng tuyệt đối sẽ bỏ sót suy giảm đáng kể của tiền tố lớn.
 const (
 	cacheBreakKeepRatio     = 0.95
 	cacheBreakMinDropTokens = 2000
 )
 
-// UsageTracker 累计整个会话所有 agent 的 LLM 输入/输出 token 与美元成本。
+// UsageTracker cộng dồn token đầu vào/đầu ra LLM và chi phí USD của tất cả agent trong toàn bộ phiên.
 //
-// 工作机制：
-//   - 每次 agent 的 OnMessage 回调触发时调用 Record(agentName, msg)
-//   - agentName 映射到 role（architect_* 归一为 architect），查 ModelSet 当前该 role 绑定的模型
-//   - 用 models.DefaultRegistry 查模型价格，按非缓存输入/输出/缓存读/缓存写四项累乘
-//   - 注册表无此模型时，退回 msg.Usage.Cost.Total（provider 自带，可能为 0）
-//   - 模型热切换（/model）后续消息自动按新模型算价，旧消息保留旧成本
+// Cơ chế hoạt động:
+//   - Mỗi lần callback OnMessage của agent được kích hoạt thì gọi Record(agentName, msg)
+//   - agentName được ánh xạ sang role (architect_* được chuẩn hóa thành architect), tra model đang được gán cho role đó trong ModelSet hiện tại
+//   - Dùng models.DefaultRegistry tra giá model, nhân cộng theo bốn mục: đầu vào không cache/đầu ra/cache read/cache write
+//   - Khi registry không có model này, quay về msg.Usage.Cost.Total (provider tự mang theo, có thể là 0)
+//   - Sau khi đổi nóng model (/model), các message tiếp theo tự động tính giá theo model mới, message cũ giữ nguyên chi phí cũ
 //
-// 同时维护 per-role 维度（writer/editor/architect）：
-//   - 累计命中数据 → 整体优化效果
-//   - 滑动窗最近 N 次 → 区分前期拖累 vs 稳态低命中
-//   - CacheCapable 标记 → 区分"未启用"和"真的 0% 命中"
+// Đồng thời duy trì theo chiều per-role (writer/editor/architect):
+//   - Dữ liệu hit tích lũy -> hiệu quả tối ưu tổng thể
+//   - Cửa sổ trượt gần N lần -> phân biệt giai đoạn đầu kéo tụt vs hit thấp ở trạng thái ổn định
+//   - Cờ CacheCapable -> phân biệt "chưa bật" và "thực sự hit 0%"
 //
-// 线程安全。
+// An toàn luồng.
 type UsageTracker struct {
 	mu       sync.Mutex
 	overall  agentTotals
-	perAgent map[string]*agentTotals // key 为 agentRoleName 归一后的 role 名
-	perModel map[string]*agentTotals // key 为 provider/model；provider 未知时退化为 model
+	perAgent map[string]*agentTotals // key là tên role sau khi agentRoleName chuẩn hóa
+	perModel map[string]*agentTotals // key là provider/model; khi không biết provider thì thoái hóa thành model
 	modelSet *bootstrap.ModelSet
-	store    *storepkg.Store // 可为 nil（测试场景），nil 时所有持久化方法静默 noop
+	store    *storepkg.Store // có thể là nil (ngữ cảnh test), khi nil thì mọi phương thức persistence lặng lẽ noop
 
-	// cacheTrack 是 per-role 的缓存链基线（上次调用的前缀长度/命中量/时间），
-	// 用于断裂检测。只在 live Record 路径更新——replay 重放历史不检测，
-	// 否则每次启动都会把陈年断裂刷成误报。不持久化。
+	// cacheTrack là baseline chuỗi cache theo per-role (độ dài tiền tố/lượng hit/thời gian của lần gọi trước),
+	// dùng để phát hiện đứt chuỗi. Chỉ cập nhật trên đường live Record -- replay lịch sử không phát hiện,
+	// nếu không mỗi lần khởi động đều biến đứt chuỗi cũ thành cảnh báo nhầm. Không persistence.
 	cacheTrack map[string]*cacheTrackState
 
-	// missingAssistantUsage 累计"收到 assistant 消息但 Usage 为 nil"的次数。
-	// 实测下来主要发生在自建 OpenAI 兼容 backend 没在 streaming 末尾按 OpenAI
-	// stream_options.include_usage 协议发那条 final usage chunk 时——partial.Usage
-	// 始终为 nil，所有累计字段全部停在 0。计数器让 UI 能直接告诉用户"是上游不返
-	// usage 不是这边坏了"，而不是死磕缓存面板代码。
+	// missingAssistantUsage cộng dồn số lần "nhận được message assistant nhưng Usage là nil".
+	// Qua thực tế, tình huống này chủ yếu xảy ra khi backend tự dựng tương thích OpenAI không gửi final usage chunk
+	// ở cuối streaming theo giao thức OpenAI stream_options.include_usage -- partial.Usage luôn là nil,
+	// tất cả trường cộng dồn đều kẹt ở 0. Counter cho phép UI báo thẳng với người dùng rằng
+	// "upstream không trả usage, không phải bên này hỏng", thay vì cứ bám vào code panel cache.
 	missingAssistantUsage int
-	loggedMissingUsage    bool // 整个会话只 warn 一次，避免 tui.log 被刷屏
+	loggedMissingUsage    bool // chỉ warn một lần trong toàn bộ phiên, tránh tui.log bị spam
 
-	// saveCh 由 Record 在累加后非阻塞触发；autoSaveLoop 监听并按 debounce 落盘。
-	// buffered=1：连续多次 Record 折叠为一次落盘信号；满了直接丢，下个 tick 一并写。
+	// saveCh do Record kích hoạt không chặn sau khi cộng dồn; autoSaveLoop lắng nghe và ghi xuống đĩa theo debounce.
+	// buffered=1: nhiều lần Record liên tiếp được gộp thành một tín hiệu ghi; đầy thì bỏ, tick sau sẽ ghi chung.
 	saveCh       chan struct{}
 	autoSaveMu   sync.Mutex
 	autoSaveDone chan struct{}
 
-	// onCost 在每次记账后于锁外携带最新累计成本调用（BudgetSentinel 越线检测）。
-	// 必须在并发 Record 开始前通过 SetOnCost 设置，之后只读。
+	// onCost được gọi ngoài khóa sau mỗi lần ghi sổ, kèm chi phí tích lũy mới nhất (BudgetSentinel kiểm tra vượt ngưỡng).
+	// Phải được đặt bằng SetOnCost trước khi các Record concurrent bắt đầu, sau đó chỉ đọc.
 	onCost func(total float64)
 
-	// onMissingUsage 在首次发现"assistant 消息无 Usage"时调用一次（与 slog warn
-	// 同时机）。预算启用时这意味着计费盲区——成本恒 0、预算永不触发，必须喊人。
+	// onMissingUsage được gọi một lần khi lần đầu phát hiện "message assistant không có Usage" (cùng thời điểm với slog warn).
+	// Khi bật budget, điều này nghĩa là có vùng mù tính phí -- chi phí luôn 0, budget không bao giờ kích hoạt, bắt buộc phải báo người.
 	onMissingUsage func()
 }
 
-// usageSample 是单次 OnMessage 的命中样本，仅记录命中率分子分母。
+// usageSample là mẫu hit của một lần OnMessage, chỉ ghi tử số và mẫu số của tỷ lệ hit.
 type usageSample struct {
 	CacheRead int
 	Input     int
 }
 
-// cacheTrackState 是一个 role 当前会话的缓存链基线。task（spawn 任务文本）是
-// 会话身份：换 task = 新 spawn = 新缓存血统（prompt_cache_key 带 #seq），首请求
-// 命中低是常态，直接换基线不比较——否则"上一会话很短、新会话首请求前缀反而更长"
-// 时会误报断裂。Input 语义（含 CacheRead，见 computeCost 注释）恰好等于"服务端
-// 处理的前缀长度"，据此可区分三种走向：前缀缩短 = 会话内压缩（合法，重置基线）；
-// 前缀增长且命中跟涨 = 链路健康；前缀增长而命中骤降 = 断裂。
+// cacheTrackState là baseline chuỗi cache của một role trong phiên hiện tại. task (văn bản task spawn) là
+// định danh phiên: đổi task = spawn mới = huyết thống cache mới (prompt_cache_key có #seq), request đầu tiên
+// hit thấp là bình thường, đổi thẳng baseline mà không so sánh -- nếu không, khi "phiên trước rất ngắn,
+// request đầu của phiên mới lại có tiền tố dài hơn" sẽ cảnh báo đứt chuỗi nhầm. Ngữ nghĩa Input
+// (bao gồm CacheRead, xem chú thích computeCost) vừa đúng bằng "độ dài tiền tố server xử lý",
+// nhờ đó phân biệt ba xu hướng: tiền tố ngắn lại = nén context trong phiên (hợp lệ, reset baseline);
+// tiền tố tăng và hit cũng tăng = chuỗi khỏe; tiền tố tăng nhưng hit tụt mạnh = đứt chuỗi.
 type cacheTrackState struct {
 	task          string
 	lastPrefix    int
@@ -98,10 +101,10 @@ type cacheTrackState struct {
 	lastAt        time.Time
 }
 
-// agentTotals 是一个 agent 的累计计数。
-//   - Saved 是按当前命中数据反算的"如果按非缓存价计费"的差额
-//   - CacheCapable 仅在该 role 至少经过一次"已知支持 cache 的模型"调用后置 true
-//   - samples 是定长 ring buffer，前 recentSampleCap 次直接追加，之后按 sampleIdx 轮转
+// agentTotals là bộ đếm tích lũy của một agent.
+//   - Saved là khoản chênh lệch tính ngược từ dữ liệu hit hiện tại theo giả định "nếu tính giá như đầu vào không cache"
+//   - CacheCapable chỉ được đặt true sau khi role đó có ít nhất một lần gọi "model đã biết hỗ trợ cache"
+//   - samples là ring buffer độ dài cố định; recentSampleCap lần đầu append trực tiếp, sau đó xoay vòng theo sampleIdx
 type agentTotals struct {
 	Input        int
 	Output       int
@@ -110,7 +113,7 @@ type agentTotals struct {
 	Cost         float64
 	Saved        float64
 	CacheCapable bool
-	CacheBreaks  int // live 检测到的缓存链断裂次数（replay 不计）
+	CacheBreaks  int // số lần đứt chuỗi cache phát hiện khi live (replay không tính)
 	samples      []usageSample
 	sampleIdx    int
 }
@@ -126,12 +129,13 @@ func NewUsageTracker(set *bootstrap.ModelSet, store *storepkg.Store) *UsageTrack
 	}
 }
 
-// Record 把一条 agent 消息分发到累加 / 诊断两条路径。
+// Record phân phối một message agent vào hai đường: cộng dồn / chẩn đoán.
 //
-// 累加只看 Usage 是否存在——"哪条消息带 Usage" 是 agentcore/litellm adapter
-// 装配细节（上游协议把 usage 放在响应顶层），未来装配规则变了也不用动这里。
-// 诊断要求 Role=Assistant 且 Content 非空，避免 AbortMsg / 异常恢复 / tool /
-// user 消息污染 missingAssistantUsage 计数。
+// Cộng dồn chỉ nhìn Usage có tồn tại hay không -- "message nào mang Usage" là chi tiết lắp ráp
+// của agentcore/litellm adapter (giao thức upstream đặt usage ở tầng trên cùng của response),
+// sau này quy tắc lắp ráp đổi cũng không cần sửa ở đây. Chẩn đoán yêu cầu Role=Assistant và
+// Content không rỗng, tránh AbortMsg / khôi phục bất thường / tool / message user làm nhiễu
+// bộ đếm missingAssistantUsage.
 func (t *UsageTracker) Record(agentName, task string, msg agentcore.AgentMessage) {
 	if t == nil {
 		return
@@ -152,16 +156,17 @@ func (t *UsageTracker) Record(agentName, task string, msg agentcore.AgentMessage
 	t.accumulate(role, provider, modelName, *m.Usage)
 }
 
-// noteCacheBreak 是缓存链断裂检测（纯观测，不修复，只在 live Record 路径调用）。
+// noteCacheBreak là phát hiện đứt chuỗi cache (chỉ quan sát, không sửa chữa, chỉ gọi trên đường live Record).
 //
-// 判定：同一会话（role+task）内前缀（Input，含 CacheRead）未缩短，而命中量较上次
-// 下降 >5% 且降幅 ≥2000 tokens。task 变化 = 新 spawn = 新缓存血统，直接换基线不
-// 比较；前缀缩短说明是上下文压缩，属合法下降，只重置基线不告警。归因按优先级给
-// 提示：间隔超过 TTL → 疑似过期；间隔很短且客户端字节本应稳定 → 疑似服务端逐出/
-// 路由漂移（中转站轮询上游是常见原因）。
+// Phán định: trong cùng một phiên (role+task), tiền tố (Input, gồm CacheRead) không ngắn lại, còn lượng hit
+// giảm >5% so với lần trước và mức giảm >=2000 tokens. task thay đổi = spawn mới = huyết thống cache mới,
+// đổi thẳng baseline không so sánh; tiền tố ngắn lại nghĩa là nén context, thuộc mức giảm hợp lệ, chỉ reset
+// baseline không cảnh báo. Quy nguyên nhân theo độ ưu tiên để đưa gợi ý: khoảng cách vượt TTL -> nghi hết hạn;
+// khoảng cách rất ngắn và byte client đáng lẽ ổn định -> nghi server eviction / lệch route
+// (trạm trung chuyển polling upstream là nguyên nhân thường gặp).
 func (t *UsageTracker) noteCacheBreak(role, task string, u agentcore.Usage) {
 	now := time.Now()
-	prefix := u.Input // litellm 各 provider 保证 Input 含 CacheRead
+	prefix := u.Input // litellm đảm bảo Input gồm CacheRead ở mọi provider
 
 	t.mu.Lock()
 	st := t.cacheTrack[role]
@@ -191,13 +196,13 @@ func (t *UsageTracker) noteCacheBreak(role, task string, u agentcore.Usage) {
 		return
 	}
 	gap := now.Sub(prevAt).Round(time.Second)
-	hint := "疑似服务端逐出/路由漂移（中转站轮询上游是常见原因）"
+	hint := "nghi server eviction / lệch route (trạm trung chuyển polling upstream là nguyên nhân thường gặp)"
 	if gap > time.Hour {
-		hint = "疑似 1h TTL 过期"
+		hint = "nghi TTL 1h đã hết hạn"
 	} else if gap > 5*time.Minute {
-		hint = "疑似 5m TTL 过期"
+		hint = "nghi TTL 5m đã hết hạn"
 	}
-	slog.Warn("缓存链断裂：前缀未缩短而命中骤降",
+	slog.Warn("Đứt chuỗi cache: tiền tố không ngắn lại nhưng hit tụt mạnh",
 		"module", "usage", "role", role,
 		"cache_read", fmt.Sprintf("%d→%d", prevRead, u.CacheRead),
 		"prefix", fmt.Sprintf("%d→%d", prevPrefix, prefix),
@@ -212,8 +217,8 @@ func usageActualModel(u *agentcore.Usage) (provider, modelName string) {
 	return strings.TrimSpace(u.Provider), strings.TrimSpace(u.Model)
 }
 
-// flagMissingUsage 累计一次"看似真 LLM 响应却没拿到 usage"事件，整会话只打一次
-// warn 日志避免 tui.log 被刷屏。
+// flagMissingUsage cộng dồn một sự kiện "trông giống response LLM thật nhưng không lấy được usage",
+// và chỉ ghi một log warn trong toàn phiên để tránh tui.log bị spam.
 func (t *UsageTracker) flagMissingUsage(agentName string) {
 	t.mu.Lock()
 	t.missingAssistantUsage++
@@ -221,7 +226,7 @@ func (t *UsageTracker) flagMissingUsage(agentName string) {
 	t.loggedMissingUsage = true
 	t.mu.Unlock()
 	if shouldLog {
-		slog.Warn("LLM 响应未携带 usage 数据，缓存/成本面板将无累计——通常是上游 streaming 未按 OpenAI include_usage 协议发 final usage chunk",
+		slog.Warn("Response LLM không mang dữ liệu usage, panel cache/chi phí sẽ không có số cộng dồn -- thường là upstream streaming không gửi final usage chunk theo giao thức OpenAI include_usage",
 			"module", "usage", "agent", agentName)
 		if t.onMissingUsage != nil {
 			t.onMissingUsage()
@@ -230,8 +235,8 @@ func (t *UsageTracker) flagMissingUsage(agentName string) {
 	t.notifyDirty()
 }
 
-// SetOnMissingUsage 注册"首次发现 usage 缺失"的一次性回调。
-// 必须在 Host 构造期、并发 Record 开始前调用一次。
+// SetOnMissingUsage đăng ký callback một lần cho "lần đầu phát hiện thiếu usage".
+// Phải gọi một lần trong giai đoạn dựng Host, trước khi các Record concurrent bắt đầu.
 func (t *UsageTracker) SetOnMissingUsage(cb func()) {
 	if t == nil {
 		return
@@ -239,8 +244,8 @@ func (t *UsageTracker) SetOnMissingUsage(cb func()) {
 	t.onMissingUsage = cb
 }
 
-// notifyDirty 非阻塞触发一次落盘信号，由 autoSaveLoop 按 debounce 实际写入。
-// 信号通道 buffered=1：连续多次 Record 折叠成一次保存请求即可。
+// notifyDirty kích hoạt không chặn một tín hiệu ghi xuống đĩa, do autoSaveLoop thực sự ghi theo debounce.
+// Kênh tín hiệu buffered=1: nhiều lần Record liên tiếp chỉ cần gộp thành một yêu cầu lưu.
 func (t *UsageTracker) notifyDirty() {
 	if t == nil || t.saveCh == nil {
 		return
@@ -251,10 +256,10 @@ func (t *UsageTracker) notifyDirty() {
 	}
 }
 
-// accumulate 把一条带 Usage 的消息累计到 overall / per-role / per-model 三份计数。
-// provider/model 为空表示"用当前 ModelSet 拿 role 对应模型"（实时路径）；非空表示
-// "强制按指定模型算价"（replay 路径用 session jsonl 里的 _meta）。
-// resolveCost 在锁外执行（它只读 modelSet/Registry），锁内只做加法。
+// accumulate cộng dồn một message có Usage vào ba bộ đếm overall / per-role / per-model.
+// provider/model rỗng nghĩa là "dùng ModelSet hiện tại để lấy model tương ứng role" (đường realtime);
+// không rỗng nghĩa là "ép tính giá theo model chỉ định" (đường replay dùng _meta trong session jsonl).
+// resolveCost chạy ngoài khóa (nó chỉ đọc modelSet/Registry), trong khóa chỉ làm phép cộng.
 func (t *UsageTracker) accumulate(role, provider, modelName string, u agentcore.Usage) {
 	provider, modelName = t.effectiveModel(role, provider, modelName)
 	cost, saved, capable := t.resolveCost(modelName, u)
@@ -286,8 +291,8 @@ func (t *UsageTracker) accumulate(role, provider, modelName string, u agentcore.
 	}
 }
 
-// SetOnCost 注册记账回调（携带最新累计成本，锁外调用）。
-// 必须在 Host 构造期、并发 Record 开始前调用一次。
+// SetOnCost đăng ký callback ghi sổ (mang theo chi phí tích lũy mới nhất, gọi ngoài khóa).
+// Phải gọi một lần trong giai đoạn dựng Host, trước khi các Record concurrent bắt đầu.
 func (t *UsageTracker) SetOnCost(cb func(total float64)) {
 	if t == nil {
 		return
@@ -327,13 +332,13 @@ func modelUsageKey(provider, modelName string) string {
 	}
 }
 
-// addUsage 把单次调用的 token 与成本叠加到一份 totals 上。
-// 必须在持有 UsageTracker.mu 的情况下调用。
+// addUsage cộng dồn token và chi phí của một lần gọi vào một totals.
+// Phải gọi khi đang giữ UsageTracker.mu.
 //
-// CacheCapable 优先用"事实"判定：只要见过 CacheRead 或 CacheWrite > 0，就证明
-// 上游确实做了 prompt caching。注册表的 CacheReadCostPer1M 仅作 fallback，
-// 因为自建 backend 模型（mimo-v2.5-pro / 国内代理等）通常不在 BerriAI/litellm
-// pricing 索引里，但实际 Usage 里完全有 cache 数据，UI 不该误判为"未启用"。
+// CacheCapable ưu tiên dùng "sự thật" để phán định: chỉ cần từng thấy CacheRead hoặc CacheWrite > 0
+// thì chứng minh upstream thực sự đã làm prompt caching. CacheReadCostPer1M trong registry chỉ là fallback,
+// vì các model backend tự dựng (mimo-v2.5-pro / proxy nội địa, v.v.) thường không nằm trong chỉ mục pricing
+// của BerriAI/litellm, nhưng trong Usage thực tế hoàn toàn có dữ liệu cache, UI không nên phán nhầm là "chưa bật".
 func addUsage(t *agentTotals, u agentcore.Usage, cost, saved float64, capable bool) {
 	t.Input += u.Input
 	t.Output += u.Output
@@ -347,7 +352,7 @@ func addUsage(t *agentTotals, u agentcore.Usage, cost, saved float64, capable bo
 	pushSample(t, u.CacheRead, u.Input)
 }
 
-// pushSample 向 ring buffer 推一个样本。前 recentSampleCap 次纯 append，之后轮转覆盖。
+// pushSample đẩy một mẫu vào ring buffer. recentSampleCap lần đầu chỉ append, sau đó xoay vòng ghi đè.
 func pushSample(t *agentTotals, cacheRead, input int) {
 	s := usageSample{CacheRead: cacheRead, Input: input}
 	if len(t.samples) < recentSampleCap {
@@ -358,8 +363,8 @@ func pushSample(t *agentTotals, cacheRead, input int) {
 	t.sampleIdx = (t.sampleIdx + 1) % recentSampleCap
 }
 
-// recentSums 返回滑动窗内 cacheRead 和 input 的总和，作为"近 N 次命中率"的分子分母。
-// 用 sum/sum 而非"单次比率的平均"以避免小样本（input=几百 token）放大噪声。
+// recentSums trả về tổng cacheRead và input trong cửa sổ trượt, làm tử số và mẫu số của "tỷ lệ hit gần N lần".
+// Dùng sum/sum thay vì "trung bình tỷ lệ từng lần" để tránh mẫu nhỏ (input=vài trăm token) phóng đại nhiễu.
 func recentSums(t *agentTotals) (cacheRead, input int) {
 	for _, s := range t.samples {
 		cacheRead += s.CacheRead
@@ -368,7 +373,7 @@ func recentSums(t *agentTotals) (cacheRead, input int) {
 	return cacheRead, input
 }
 
-// Totals 返回累计总量的快照。
+// Totals trả về snapshot của tổng lượng tích lũy.
 func (t *UsageTracker) Totals() (cost float64, input, output, cacheRead, cacheWrite int) {
 	if t == nil {
 		return 0, 0, 0, 0, 0
@@ -378,7 +383,7 @@ func (t *UsageTracker) Totals() (cost float64, input, output, cacheRead, cacheWr
 	return t.overall.Cost, t.overall.Input, t.overall.Output, t.overall.CacheRead, t.overall.CacheWrite
 }
 
-// SavedUSD 返回因缓存命中节省的累计美元数。
+// SavedUSD trả về số USD tích lũy tiết kiệm được nhờ cache hit.
 func (t *UsageTracker) SavedUSD() float64 {
 	if t == nil {
 		return 0
@@ -388,7 +393,7 @@ func (t *UsageTracker) SavedUSD() float64 {
 	return t.overall.Saved
 }
 
-// OverallRecent 返回滑动窗内（≤ recentSampleCap 次）的 cacheRead 总和、input 总和、样本数。
+// OverallRecent trả về tổng cacheRead, tổng input và số mẫu trong cửa sổ trượt (<= recentSampleCap lần).
 func (t *UsageTracker) OverallRecent() (cacheRead, input, samples int) {
 	if t == nil {
 		return 0, 0, 0
@@ -399,7 +404,7 @@ func (t *UsageTracker) OverallRecent() (cacheRead, input, samples int) {
 	return r, in, len(t.overall.samples)
 }
 
-// OverallCacheBreaks 返回 live 检测到的缓存链断裂总次数。
+// OverallCacheBreaks trả về tổng số lần đứt chuỗi cache được phát hiện khi live.
 func (t *UsageTracker) OverallCacheBreaks() int {
 	if t == nil {
 		return 0
@@ -409,7 +414,7 @@ func (t *UsageTracker) OverallCacheBreaks() int {
 	return t.overall.CacheBreaks
 }
 
-// OverallCacheCapable 整体是否至少经过一次已知支持 cache 的模型。
+// OverallCacheCapable cho biết tổng thể đã từng có ít nhất một lần gọi model đã biết hỗ trợ cache hay chưa.
 func (t *UsageTracker) OverallCacheCapable() bool {
 	if t == nil {
 		return false
@@ -419,9 +424,9 @@ func (t *UsageTracker) OverallCacheCapable() bool {
 	return t.overall.CacheCapable
 }
 
-// MissingAssistantUsage 返回累计"收到 assistant 消息但 Usage 为 nil"的次数。
-// 大于 0 通常意味着上游 streaming 没发 OpenAI 的 final usage chunk，
-// UI 据此显示提示而非误以为缓存模块本身坏了。
+// MissingAssistantUsage trả về số lần tích lũy "nhận được message assistant nhưng Usage là nil".
+// Lớn hơn 0 thường nghĩa là upstream streaming không gửi final usage chunk của OpenAI,
+// UI dựa vào đó hiển thị gợi ý thay vì hiểu nhầm là module cache bản thân bị hỏng.
 func (t *UsageTracker) MissingAssistantUsage() int {
 	if t == nil {
 		return 0
@@ -431,10 +436,10 @@ func (t *UsageTracker) MissingAssistantUsage() int {
 	return t.missingAssistantUsage
 }
 
-// ── 持久化 ──
+// -- Persistence --
 
-// Snapshot 拷贝当前累计状态为可序列化的 domain.UsageState。
-// 滑动窗 samples 不进 snapshot——它是短期诊断窗口，跨进程意义不大。
+// Snapshot sao chép trạng thái tích lũy hiện tại thành domain.UsageState có thể serialize.
+// samples của cửa sổ trượt không vào snapshot -- nó là cửa sổ chẩn đoán ngắn hạn, không nhiều ý nghĩa xuyên process.
 func (t *UsageTracker) Snapshot() domain.UsageState {
 	if t == nil {
 		return domain.UsageState{}
@@ -458,9 +463,9 @@ func (t *UsageTracker) Snapshot() domain.UsageState {
 	return state
 }
 
-// LoadFromStore 从 store.Usage 读取持久化的快照并回填到内存。返回 true 表示
-// 成功加载到了一份非空（schema 匹配）的状态；false 表示无文件或不可用，调用方
-// 应继续走 session replay 一次性回填。
+// LoadFromStore đọc snapshot đã persistence từ store.Usage và điền ngược vào memory. Trả về true nghĩa là
+// đã load thành công một trạng thái không rỗng (schema khớp); false nghĩa là không có file hoặc không dùng được,
+// caller nên tiếp tục đi đường session replay để điền một lần.
 func (t *UsageTracker) LoadFromStore() (bool, error) {
 	if t == nil || t.store == nil {
 		return false, nil
@@ -476,7 +481,7 @@ func (t *UsageTracker) LoadFromStore() (bool, error) {
 	return true, nil
 }
 
-// SaveNow 立刻把当前 snapshot 落盘。autoSaveLoop / Close 路径都通过它写。
+// SaveNow lập tức ghi snapshot hiện tại xuống đĩa. Các đường autoSaveLoop / Close đều ghi qua nó.
 func (t *UsageTracker) SaveNow() error {
 	if t == nil || t.store == nil {
 		return nil
@@ -484,8 +489,8 @@ func (t *UsageTracker) SaveNow() error {
 	return t.store.Usage.Save(t.Snapshot())
 }
 
-// StartAutoSave 起一个 goroutine，监听 saveCh + debounce 落盘。ctx done 前会
-// 把最后一次未保存的状态 flush 出去。Close 通过 cancel ctx 触发 flush + 退出。
+// StartAutoSave khởi một goroutine, lắng nghe saveCh + debounce để ghi xuống đĩa. Trước khi ctx done,
+// trạng thái chưa lưu cuối cùng sẽ được flush ra. Close kích hoạt flush + thoát thông qua cancel ctx.
 func (t *UsageTracker) StartAutoSave(ctx context.Context) {
 	if t == nil || t.store == nil {
 		return
@@ -500,8 +505,8 @@ func (t *UsageTracker) StartAutoSave(ctx context.Context) {
 	}()
 }
 
-// WaitAutoSave 等待取消后的最后一次 flush 完成。Host.Close 先调用 cancel，
-// 再等待这里，避免 autoSaveLoop 与退出前 SaveNow 并发写同一快照。
+// WaitAutoSave chờ lần flush cuối cùng sau khi hủy hoàn tất. Host.Close gọi cancel trước,
+// rồi chờ ở đây, tránh autoSaveLoop và SaveNow trước khi thoát cùng ghi đồng thời một snapshot.
 func (t *UsageTracker) WaitAutoSave() {
 	if t == nil {
 		return
@@ -514,12 +519,12 @@ func (t *UsageTracker) WaitAutoSave() {
 	}
 }
 
-// autoSaveLoop 把高频 dirty 信号节流为 500ms 一次的落盘。
+// autoSaveLoop tiết lưu tín hiệu dirty tần suất cao thành một lần ghi xuống đĩa mỗi 500ms.
 //
-// 设计说明：500ms 是经验值——每章 1-2 个 LLM turn，落盘 1-2 次完全可接受；
-// 即便用户手动 ctrl+C 退出来不及触发 timer，ctx 取消路径也会 flush 最后一次。
-// 真正的崩溃（OS kill -9）会丢最近 0.5s 内的累计——上游 session jsonl 仍是
-// 完整事实，下次启动会从 sessions/ replay 修补差额。
+// Ghi chú thiết kế: 500ms là giá trị kinh nghiệm -- mỗi chương có 1-2 LLM turn, ghi 1-2 lần hoàn toàn chấp nhận được;
+// ngay cả khi người dùng tự ctrl+C thoát không kịp kích hoạt timer, đường hủy ctx cũng sẽ flush lần cuối.
+// Crash thật sự (OS kill -9) sẽ mất phần tích lũy trong 0.5s gần nhất -- session jsonl upstream vẫn là
+// sự thật đầy đủ, lần khởi động sau sẽ replay từ sessions/ để bù phần chênh.
 func (t *UsageTracker) autoSaveLoop(ctx context.Context) {
 	const debounce = 500 * time.Millisecond
 	timer := time.NewTimer(time.Hour)
@@ -529,7 +534,7 @@ func (t *UsageTracker) autoSaveLoop(ctx context.Context) {
 	var pending bool
 	flush := func() {
 		if err := t.SaveNow(); err != nil {
-			slog.Warn("usage 落盘失败", "module", "usage", "err", err)
+			slog.Warn("Ghi usage xuống đĩa thất bại", "module", "usage", "err", err)
 		}
 		pending = false
 	}
@@ -557,9 +562,9 @@ func (t *UsageTracker) autoSaveLoop(ctx context.Context) {
 	}
 }
 
-// applyState 把持久化快照写回内存。仅在启动时调用（LoadFromStore / replay 后），
-// 此时尚未启动 autoSaveLoop / Record 也不会并发触发，可不持锁；但保留 mu 以防
-// 测试或未来调用顺序变化引入并发。
+// applyState ghi snapshot đã persistence trở lại memory. Chỉ gọi khi khởi động (LoadFromStore / sau replay),
+// lúc này chưa start autoSaveLoop / Record cũng sẽ không kích hoạt concurrent, nên có thể không cần khóa;
+// nhưng vẫn giữ mu để phòng test hoặc thứ tự gọi trong tương lai thay đổi và đưa vào concurrency.
 func (t *UsageTracker) applyState(state domain.UsageState) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
@@ -585,8 +590,8 @@ func (t *UsageTracker) applyState(state domain.UsageState) {
 	t.missingAssistantUsage = state.MissingUsage
 }
 
-// totalsSnapshot 把内存 agentTotals 拷贝成可持久化 domain.AgentUsageTotals。
-// samples ring buffer 故意不带出去——见 UsageState 注释。
+// totalsSnapshot sao chép agentTotals trong memory thành domain.AgentUsageTotals có thể persistence.
+// Cố ý không mang samples ring buffer ra ngoài -- xem chú thích UsageState.
 func totalsSnapshot(t *agentTotals) domain.AgentUsageTotals {
 	if t == nil {
 		return domain.AgentUsageTotals{}
@@ -603,8 +608,8 @@ func totalsSnapshot(t *agentTotals) domain.AgentUsageTotals {
 	}
 }
 
-// totalsFromState 把持久化形态还原为内存 agentTotals。samples 留空，重启后
-// 重新从 0 开始积累，几轮 Record 后即可恢复"近 N 次命中率"语义。
+// totalsFromState khôi phục dạng đã persistence thành agentTotals trong memory. samples để trống,
+// sau restart sẽ tích lũy lại từ 0, sau vài lượt Record là có thể khôi phục ngữ nghĩa "tỷ lệ hit gần N lần".
 func totalsFromState(s domain.AgentUsageTotals) agentTotals {
 	return agentTotals{
 		Input:        s.Input,
@@ -618,7 +623,7 @@ func totalsFromState(s domain.AgentUsageTotals) agentTotals {
 	}
 }
 
-// AgentUsage 是一个 agent 的累计用量快照（向 UI 暴露）。
+// AgentUsage là snapshot mức dùng tích lũy của một agent (expose cho UI).
 type AgentUsage struct {
 	Role            string
 	Model           string
@@ -634,7 +639,7 @@ type AgentUsage struct {
 	RecentSamples   int
 }
 
-// PerAgent 返回各 role 累计用量。结果按 CacheRead 数量降序，未消费过 token 的 role 跳过。
+// PerAgent trả về mức dùng tích lũy của từng role. Kết quả sắp xếp giảm dần theo số CacheRead, role chưa tiêu thụ token thì bỏ qua.
 func (t *UsageTracker) PerAgent() []AgentUsage {
 	if t == nil {
 		return nil
@@ -670,7 +675,7 @@ func (t *UsageTracker) PerAgent() []AgentUsage {
 	return out
 }
 
-// PerModel 返回各模型累计用量。结果按成本降序，其次按输入量降序。
+// PerModel trả về mức dùng tích lũy của từng model. Kết quả sắp xếp giảm dần theo chi phí, sau đó theo lượng input giảm dần.
 func (t *UsageTracker) PerModel() []AgentUsage {
 	if t == nil {
 		return nil
@@ -702,12 +707,12 @@ func (t *UsageTracker) PerModel() []AgentUsage {
 	return out
 }
 
-// resolveCost 同时返回本次消息的 cost / saved / capable。
-//   - cost: 注册表命中按 4 项累乘；未命中回落 provider 自带 cost
-//   - saved: 仅注册表命中、CacheRead > 0、且 InputCost > CacheReadCost 时 > 0
-//   - capable: 注册表命中且该模型 CacheReadCostPer1M > 0 → 已知支持 prompt caching
+// resolveCost đồng thời trả về cost / saved / capable của message lần này.
+//   - cost: nếu registry hit thì nhân cộng theo 4 mục; không hit thì quay về cost provider tự mang theo
+//   - saved: chỉ > 0 khi registry hit, CacheRead > 0, và InputCost > CacheReadCost
+//   - capable: registry hit và model này có CacheReadCostPer1M > 0 -> đã biết hỗ trợ prompt caching
 //
-// modelName 优先用调用方传入的（replay 时来自 session jsonl 的 _meta.model）。
+// modelName ưu tiên dùng giá trị caller truyền vào (_meta.model từ session jsonl khi replay).
 func (t *UsageTracker) resolveCost(modelName string, u agentcore.Usage) (cost, saved float64, capable bool) {
 	if entry, ok := models.DefaultRegistry().Resolve(modelName); ok {
 		c := computeCost(u, *entry)
@@ -723,8 +728,8 @@ func (t *UsageTracker) resolveCost(modelName string, u agentcore.Usage) (cost, s
 	return 0, 0, false
 }
 
-// agentRoleName 把 subagent 名字归一到 role 名。
-// architect_short/mid/long 都归到 architect；其他原样返回。
+// agentRoleName chuẩn hóa tên subagent thành tên role.
+// architect_short/mid/long đều quy về architect; các tên khác trả nguyên dạng.
 func agentRoleName(agentName string) string {
 	if strings.HasPrefix(agentName, "architect_") {
 		return "architect"
@@ -732,16 +737,16 @@ func agentRoleName(agentName string) string {
 	return agentName
 }
 
-// computeCost 按 $/1M tokens 单价计算本次调用的美元开销。
+// computeCost tính chi phí USD của lần gọi này theo đơn giá $/1M tokens.
 //
-// 语义前提（由 litellm 各 provider 统一保证，参见 anthropic.go / bedrock.go /
-// openai.go / gemini.go / compat.go 的 Usage 装配点）：
+// Tiền đề ngữ nghĩa (được litellm đảm bảo thống nhất ở mọi provider, xem các điểm lắp ráp Usage trong
+// anthropic.go / bedrock.go / openai.go / gemini.go / compat.go):
 //
-//	u.Input  = 全部输入 token，**包含** CacheRead；不含 CacheWrite
-//	u.Output = 输出 token
+//	u.Input  = toàn bộ input token, **bao gồm** CacheRead; không bao gồm CacheWrite
+//	u.Output = output token
 //
-// 因此 nonCachedInput = u.Input - u.CacheRead 在所有 provider 都成立。
-// 兜底分支保留是为了应对未来某个 provider 误返脏数据时不至于崩。
+// Vì vậy nonCachedInput = u.Input - u.CacheRead đúng với mọi provider.
+// Nhánh fallback được giữ lại để tránh crash nếu trong tương lai provider nào đó trả dữ liệu bẩn.
 func computeCost(u agentcore.Usage, e models.ModelEntry) float64 {
 	nonCachedInput := u.Input - u.CacheRead
 	if nonCachedInput < 0 {
@@ -755,9 +760,9 @@ func computeCost(u agentcore.Usage, e models.ModelEntry) float64 {
 	return c
 }
 
-// computeSaved 估算 CacheRead 命中相对于"按普通输入价计费"省下的美元。
-// 注意 CacheWrite 的溢价不抵扣 — 它属于"为后续命中铺路"的必要投入，
-// 真实收益靠后续 CacheRead 累计回收。
+// computeSaved ước tính số USD tiết kiệm được khi CacheRead hit so với "tính phí theo giá input thông thường".
+// Lưu ý không khấu trừ phần premium của CacheWrite -- nó thuộc khoản đầu tư cần thiết để "lót đường cho hit sau",
+// lợi ích thật sự được thu hồi nhờ CacheRead tích lũy về sau.
 func computeSaved(u agentcore.Usage, e models.ModelEntry) float64 {
 	if u.CacheRead <= 0 || e.InputCostPer1M <= 0 {
 		return 0

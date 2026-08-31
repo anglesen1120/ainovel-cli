@@ -61,7 +61,7 @@ func structured(jsonSchema, strict llm.Support) llm.Capabilities {
 
 func boolPtr(v bool) *bool { return &v }
 
-// TestResolveMatrix 覆盖 config 三态 × adapter 能力的全部组合。
+// TestResolveMatrix bao phủ mọi tổ hợp config ba trạng thái × capability adapter.
 func TestResolveMatrix(t *testing.T) {
 	cases := []struct {
 		name       string
@@ -70,16 +70,16 @@ func TestResolveMatrix(t *testing.T) {
 		wantSource Source
 		wantStrict bool
 	}{
-		{"无任何能力接口", baseModel{}, ModePromptContract, SourceUnknown, false},
+		{"Không có interface capability nào", baseModel{}, ModePromptContract, SourceUnknown, false},
 		{"adapter yes + strict yes", capsModel{caps: structured(llm.SupportYes, llm.SupportYes)}, ModeNativeJSONSchema, SourceAdapter, true},
-		{"adapter yes + strict no（Gemini 形态）", capsModel{caps: structured(llm.SupportYes, llm.SupportNo)}, ModeNativeJSONSchema, SourceAdapter, false},
+		{"adapter yes + strict no (dạng Gemini)", capsModel{caps: structured(llm.SupportYes, llm.SupportNo)}, ModeNativeJSONSchema, SourceAdapter, false},
 		{"adapter yes + strict unknown", capsModel{caps: structured(llm.SupportYes, llm.SupportUnknown)}, ModeNativeJSONSchema, SourceAdapter, false},
 		{"adapter no", capsModel{caps: structured(llm.SupportNo, llm.SupportNo)}, ModePromptContract, SourceAdapter, false},
 		{"adapter unknown", capsModel{caps: structured(llm.SupportUnknown, llm.SupportUnknown)}, ModePromptContract, SourceUnknown, false},
-		{"config true 无能力信息默认 strict", overrideModel{override: boolPtr(true)}, ModeNativeJSONSchema, SourceConfig, true},
-		{"config true + adapter strict no 关 strict", overrideModel{capsModel{caps: structured(llm.SupportUnknown, llm.SupportNo)}, boolPtr(true)}, ModeNativeJSONSchema, SourceConfig, false},
-		{"config false 覆盖 adapter yes", overrideModel{capsModel{caps: structured(llm.SupportYes, llm.SupportYes)}, boolPtr(false)}, ModePromptContract, SourceConfig, false},
-		{"config 未配置回落 adapter", overrideModel{capsModel{caps: structured(llm.SupportYes, llm.SupportYes)}, nil}, ModeNativeJSONSchema, SourceAdapter, true},
+		{"config true không có thông tin capability mặc định strict", overrideModel{override: boolPtr(true)}, ModeNativeJSONSchema, SourceConfig, true},
+		{"config true + adapter strict no tắt strict", overrideModel{capsModel{caps: structured(llm.SupportUnknown, llm.SupportNo)}, boolPtr(true)}, ModeNativeJSONSchema, SourceConfig, false},
+		{"config false override adapter yes", overrideModel{capsModel{caps: structured(llm.SupportYes, llm.SupportYes)}, boolPtr(false)}, ModePromptContract, SourceConfig, false},
+		{"config chưa cấu hình fallback adapter", overrideModel{capsModel{caps: structured(llm.SupportYes, llm.SupportYes)}, nil}, ModeNativeJSONSchema, SourceAdapter, true},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -94,11 +94,11 @@ func TestResolveMatrix(t *testing.T) {
 func TestResolveIdentity(t *testing.T) {
 	res := Resolve(capsModel{caps: structured(llm.SupportYes, llm.SupportYes)})
 	if res.Provider != "prov" || res.Model != "mod" {
-		t.Fatalf("caps 身份未取到: %+v", res)
+		t.Fatalf("Chưa lấy được định danh caps: %+v", res)
 	}
 	res = Resolve(infoModel{info: llm.ModelInfo{Provider: "p2", Name: "m2"}})
 	if res.Provider != "p2" || res.Model != "m2" {
-		t.Fatalf("Info 兜底身份未取到: %+v", res)
+		t.Fatalf("Chưa lấy được định danh fallback Info: %+v", res)
 	}
 }
 
@@ -109,20 +109,20 @@ func TestResolveUsesAtomicFactsSnapshot(t *testing.T) {
 		JSONSchemaOverride: boolPtr(false),
 	}})
 	if res.Mode != ModePromptContract || res.Source != SourceConfig {
-		t.Fatalf("config false 快照应关闭原生 schema: %+v", res)
+		t.Fatalf("snapshot config false phải tắt schema native: %+v", res)
 	}
 	if res.Provider != "prov" || res.Model != "mod" {
-		t.Fatalf("能力身份应来自同一快照: %+v", res)
+		t.Fatalf("Định danh capability phải đến từ cùng snapshot: %+v", res)
 	}
 }
 
 func testContract() Contract {
 	return Contract{
 		Name:        "test_decision",
-		Description: "测试契约",
+		Description: "Contract kiểm thử",
 		Schema: schema.Object(
-			schema.Property("action", schema.Enum("动作", "a", "b")).Required(),
-			schema.Property("reason", schema.String("理由")).Required(),
+			schema.Property("action", schema.Enum("Hành động", "a", "b")).Required(),
+			schema.Property("reason", schema.String("Lý do")).Required(),
 		),
 	}
 }
@@ -130,7 +130,7 @@ func testContract() Contract {
 func TestPlanNativeOptions(t *testing.T) {
 	opts, res := Plan(capsModel{caps: structured(llm.SupportYes, llm.SupportYes)}, testContract())
 	if res.Mode != ModeNativeJSONSchema || len(opts) == 0 {
-		t.Fatalf("native 模式应产出 opts: res=%+v opts=%d", res, len(opts))
+		t.Fatalf("native mode phải sinh opts: res=%+v opts=%d", res, len(opts))
 	}
 	cfg := agentcore.ResolveCallConfig(opts)
 	rf := cfg.ResponseFormat
@@ -145,13 +145,13 @@ func TestPlanNativeOptions(t *testing.T) {
 func TestPlanPromptContractNoOptions(t *testing.T) {
 	opts, res := Plan(baseModel{}, testContract())
 	if res.Mode != ModePromptContract || opts != nil {
-		t.Fatalf("prompt 模式不应产出 opts: res=%+v opts=%v", res, opts)
+		t.Fatalf("prompt mode không được sinh opts: res=%+v opts=%v", res, opts)
 	}
 }
 
 func TestPreparePromptUsesSchemaOnlyForPromptContract(t *testing.T) {
 	contract := testContract()
-	base := "只负责判断动作与理由。"
+	base := "Chỉ chịu trách nhiệm phán định hành động và lý do."
 
 	prompt, err := PreparePrompt(base, contract, Resolution{Mode: ModePromptContract})
 	if err != nil {
@@ -159,7 +159,7 @@ func TestPreparePromptUsesSchemaOnlyForPromptContract(t *testing.T) {
 	}
 	for _, want := range []string{base, "<output-json-schema>", `"action"`, `"required"`} {
 		if !strings.Contains(prompt, want) {
-			t.Fatalf("prompt contract 缺少 %q:\n%s", want, prompt)
+			t.Fatalf("prompt contract thiếu %q:\n%s", want, prompt)
 		}
 	}
 
@@ -168,7 +168,7 @@ func TestPreparePromptUsesSchemaOnlyForPromptContract(t *testing.T) {
 		t.Fatal(err)
 	}
 	if native != base {
-		t.Fatalf("native 模式不应改写语义提示词: %q", native)
+		t.Fatalf("native mode không được viết lại prompt ngữ nghĩa: %q", native)
 	}
 }
 
@@ -178,65 +178,65 @@ func TestPreparePromptRejectsUnmarshalableSchema(t *testing.T) {
 		Schema: map[string]any{"bad": make(chan int)},
 	}, Resolution{Mode: ModePromptContract})
 	if err == nil || !strings.Contains(err.Error(), "marshal bad prompt schema") {
-		t.Fatalf("应暴露 schema 序列化错误, got %v", err)
+		t.Fatalf("Phải lộ lỗi serialize schema, got %v", err)
 	}
 }
 
 func TestNullableCopies(t *testing.T) {
-	orig := schema.String("可空字段")
+	orig := schema.String("Field nullable")
 	out := Nullable(orig)
 	got, ok := out["type"].([]string)
 	if !ok || len(got) != 2 || got[0] != "string" || got[1] != "null" {
 		t.Fatalf("Nullable type = %v", out["type"])
 	}
 	if orig["type"] != "string" {
-		t.Fatalf("Nullable 修改了传入 map: %v", orig["type"])
+		t.Fatalf("Nullable đã sửa map đầu vào: %v", orig["type"])
 	}
 }
 
 func TestNullableExtendsEnumWithNull(t *testing.T) {
-	orig := schema.Enum("可空枚举", "a", "b")
+	orig := schema.Enum("Enum nullable", "a", "b")
 	out := Nullable(orig)
 	enum, ok := out["enum"].([]any)
 	if !ok || len(enum) != 3 || enum[2] != nil {
 		t.Fatalf("Nullable enum = %#v", out["enum"])
 	}
 	if _, ok := orig["enum"].([]string); !ok {
-		t.Fatalf("Nullable 修改了传入 enum: %#v", orig["enum"])
+		t.Fatalf("Nullable đã sửa enum đầu vào: %#v", orig["enum"])
 	}
 	if err := ValidateJSON(out, []byte("null")); err != nil {
-		t.Fatalf("可空枚举应接受 null: %v", err)
+		t.Fatalf("Enum nullable phải chấp nhận null: %v", err)
 	}
 	if err := ValidateJSON(out, []byte(`"other"`)); err == nil {
-		t.Fatal("可空枚举不应接受枚举外字符串")
+		t.Fatal("Enum nullable không được chấp nhận string ngoài enum")
 	}
 }
 
 func TestFingerprintStable(t *testing.T) {
 	a, b := testContract(), testContract()
 	if a.Fingerprint() != b.Fingerprint() || len(a.Fingerprint()) != 12 {
-		t.Fatalf("同一契约 fingerprint 应稳定: %s vs %s", a.Fingerprint(), b.Fingerprint())
+		t.Fatalf("Fingerprint cùng contract phải ổn định: %s vs %s", a.Fingerprint(), b.Fingerprint())
 	}
 	c := testContract()
 	c.Schema = schema.Object(schema.Property("other", schema.String("x")).Required())
 	if a.Fingerprint() == c.Fingerprint() {
-		t.Fatalf("不同 schema fingerprint 不应相同")
+		t.Fatalf("Fingerprint schema khác nhau không được giống nhau")
 	}
 }
 
 func TestValidateJSONEnforcesStrictContract(t *testing.T) {
 	contract := testContract()
 	if err := ValidateJSON(contract.Schema, []byte(`{"action":"a","reason":"ok"}`)); err != nil {
-		t.Fatalf("合法 JSON 被拒绝: %v", err)
+		t.Fatalf("JSON hợp lệ bị từ chối: %v", err)
 	}
 	for name, raw := range map[string]string{
-		"缺 required": `{"action":"a"}`,
-		"非法 enum":    `{"action":"other","reason":"x"}`,
-		"字段类型错误":     `{"action":1,"reason":"x"}`,
+		"Thiếu required":    `{"action":"a"}`,
+		"không hợp lệ enum": `{"action":"other","reason":"x"}`,
+		"Sai kiểu field":    `{"action":1,"reason":"x"}`,
 	} {
 		t.Run(name, func(t *testing.T) {
 			if err := ValidateJSON(contract.Schema, []byte(raw)); err == nil {
-				t.Fatalf("应拒绝 %s", raw)
+				t.Fatalf("Phải từ chối %s", raw)
 			}
 		})
 	}
@@ -245,13 +245,13 @@ func TestValidateJSONEnforcesStrictContract(t *testing.T) {
 func TestValidateJSONRejectsInvalidEnumContract(t *testing.T) {
 	contract := testContract()
 	contract.Schema["enum"] = []any{1}
-	if err := ValidateJSON(contract.Schema, []byte(`{"action":"a","reason":"ok"}`)); err == nil || !strings.Contains(err.Error(), "enum 契约非法") {
-		t.Fatalf("应暴露非法 enum 契约，err=%v", err)
+	if err := ValidateJSON(contract.Schema, []byte(`{"action":"a","reason":"ok"}`)); err == nil || !strings.Contains(err.Error(), "Hợp đồng không hợp lệ") {
+		t.Fatalf("Phải lộ contract enum không hợp lệ, err=%v", err)
 	}
 }
 
 func TestExtractJSONObjectBalanced(t *testing.T) {
-	raw := "前缀 ```json\n{\"a\":\"}\",\"nested\":{\"b\":1}}\n``` 尾部"
+	raw := "Tiền tố ```json\n{\"a\":\"}\",\"nested\":{\"b\":1}}\n``` hậu tố"
 	want := `{"a":"}","nested":{"b":1}}`
 	if got := ExtractJSONObject(raw); got != want {
 		t.Fatalf("ExtractJSONObject = %q, want %q", got, want)
@@ -298,30 +298,30 @@ func TestExecutePromptModeSelfHealsSchemaViolation(t *testing.T) {
 		Reason string `json:"reason"`
 	}
 	out, err := Execute(t.Context(), model, Request[output]{
-		Contract: testContract(), SystemPrompt: "判断。", Payload: "输入", Agent: "test",
+		Contract: testContract(), SystemPrompt: "Phán định.", Payload: "Nhập", Agent: "test",
 	})
 	if err != nil || out.Reason != "fixed" {
-		t.Fatalf("自愈失败: %+v %v", out, err)
+		t.Fatalf("Tự phục hồi thất bại: %+v %v", out, err)
 	}
 	if model.calls != 2 {
-		t.Fatalf("应在第二次成功，calls=%d", model.calls)
+		t.Fatalf("Phải thành công ở lần thứ hai, calls=%d", model.calls)
 	}
 	if len(model.messages) != 4 || !strings.Contains(model.messages[3].TextContent(), "$.action") {
-		t.Fatalf("重问未携带精确 Schema 错误: %+v", model.messages)
+		t.Fatalf("Hỏi lại chưa kèm lỗi Schema chính xác: %+v", model.messages)
 	}
 }
 
 func TestExecuteNativeSchemaViolationFailsImmediately(t *testing.T) {
 	model := &nativeExecutionModel{executionModel: &executionModel{responses: []string{`{}`}}}
 	_, err := Execute(t.Context(), model, Request[map[string]any]{
-		Contract: testContract(), SystemPrompt: "判断。", Payload: "输入",
+		Contract: testContract(), SystemPrompt: "Phán định.", Payload: "Nhập",
 	})
 	var failure *Failure
 	if !errors.As(err, &failure) || failure.Kind != FailureContract {
-		t.Fatalf("应返回原生契约错误，得 %T %v", err, err)
+		t.Fatalf("Phải trả lỗi contract native, nhận %T %v", err, err)
 	}
 	if model.calls != 1 {
-		t.Fatalf("原生契约违约不应重问，calls=%d", model.calls)
+		t.Fatalf("Vi phạm contract native không được hỏi lại, calls=%d", model.calls)
 	}
 }
 
@@ -331,13 +331,13 @@ func TestExecuteExposesModelErrorStopReason(t *testing.T) {
 		stops:     []agentcore.StopReason{agentcore.StopReasonError},
 	}
 	_, err := Execute(t.Context(), model, Request[map[string]any]{
-		Contract: testContract(), SystemPrompt: "判断。", Payload: "输入",
+		Contract: testContract(), SystemPrompt: "Phán định.", Payload: "Nhập",
 	})
 	var failure *Failure
 	if !errors.As(err, &failure) || failure.Kind != FailureProtocol || !strings.Contains(err.Error(), "stop_reason=error") {
-		t.Fatalf("应暴露模型错误终止原因，得 %T %v", err, err)
+		t.Fatalf("Phải lộ lý do kết thúc lỗi của mô hình, nhận %T %v", err, err)
 	}
 	if model.calls != 1 {
-		t.Fatalf("错误终止不应作为 JSON 错误重问，calls=%d", model.calls)
+		t.Fatalf("Kết thúc lỗi không được xem là lỗi JSON để hỏi lại, calls=%d", model.calls)
 	}
 }

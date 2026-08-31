@@ -33,15 +33,15 @@ func TestModelConfigAcceptsLegacyAndObjectEntries(t *testing.T) {
 		t.Fatalf("marshal: %v", err)
 	}
 	if strings.Contains(string(data), `"models":["legacy-model"`) {
-		t.Fatalf("models should be normalized to objects: %s", data)
+		t.Fatalf("models phải được chuẩn hóa thành object: %s", data)
 	}
 	if !strings.Contains(string(data), `"name":"legacy-model"`) {
-		t.Fatalf("normalized model missing: %s", data)
+		t.Fatalf("thiếu model đã chuẩn hóa: %s", data)
 	}
 }
 
-// json_schema 三态：未配置=nil（按 adapter 能力）、true/false=显式声明；
-// legacy 字符串条目读入为 nil；写回再读取不得改变三态。
+// json_schema ba trạng thái: chưa cấu hình=nil (theo khả năng adapter), true/false=khai báo rõ ràng；
+// mục chuỗi legacy khi đọc vào thành nil; ghi lại rồi đọc lại không được làm thay đổi ba trạng thái.
 func TestModelConfigJSONSchemaTriState(t *testing.T) {
 	var cfg Config
 	input := `{"providers":{"custom":{"models":[
@@ -56,13 +56,13 @@ func TestModelConfigJSONSchemaTriState(t *testing.T) {
 	assertTriState := func(models []ModelConfig, stage string) {
 		t.Helper()
 		if models[0].JSONSchema == nil || !*models[0].JSONSchema {
-			t.Fatalf("%s: a 应为 true, got %v", stage, models[0].JSONSchema)
+			t.Fatalf("%s: a phải là true, nhận %v", stage, models[0].JSONSchema)
 		}
 		if models[1].JSONSchema == nil || *models[1].JSONSchema {
-			t.Fatalf("%s: b 应为 false, got %v", stage, models[1].JSONSchema)
+			t.Fatalf("%s: b phải là false, nhận %v", stage, models[1].JSONSchema)
 		}
 		if models[2].JSONSchema != nil || models[3].JSONSchema != nil {
-			t.Fatalf("%s: c/legacy 应为 nil, got %v %v", stage, models[2].JSONSchema, models[3].JSONSchema)
+			t.Fatalf("%s: c/legacy phải là nil, nhận %v %v", stage, models[2].JSONSchema, models[3].JSONSchema)
 		}
 	}
 	assertTriState(cfg.Providers["custom"].Models, "decode")
@@ -81,15 +81,15 @@ func TestModelConfigJSONSchemaTriState(t *testing.T) {
 		t.Fatalf("ModelJSONSchema(custom,a) = %v", v)
 	}
 	if v := cfg.ModelJSONSchema("custom", "missing"); v != nil {
-		t.Fatalf("未列入模型应为 nil, got %v", v)
+		t.Fatalf("không có trong model phải là nil, nhận %v", v)
 	}
 	if v := cfg.ModelJSONSchema("nope", "a"); v != nil {
-		t.Fatalf("未知 provider 应为 nil, got %v", v)
+		t.Fatalf("provider không xác định phải là nil, nhận %v", v)
 	}
 }
 
-// SwappableModel 的 json_schema 覆盖值必须随热切换原子更新：
-// 切到声明不同的模型后，下一次 JSONSchemaOverride 现读即得新事实。
+// Giá trị json_schema của SwappableModel phải được cập nhật nguyên tử theo mỗi lần hot switch:
+// khi chuyển sang model đã khai báo khác, lần đọc JSONSchemaOverride kế tiếp phải thấy ngay sự thật mới.
 func TestSwappableModelJSONSchemaOverrideFollowsSwap(t *testing.T) {
 	tr, fa := true, false
 	cfg := Config{
@@ -104,27 +104,27 @@ func TestSwappableModelJSONSchemaOverrideFollowsSwap(t *testing.T) {
 		t.Fatalf("new model set: %v", err)
 	}
 	if v := ms.Default.JSONSchemaOverride(); v == nil || !*v {
-		t.Fatalf("初始应为 true, got %v", v)
+		t.Fatalf("ban đầu phải là true, nhận %v", v)
 	}
 	facts := ms.Default.StructuredOutputFacts()
 	if facts.Info.Name != "a" || facts.Info.Provider != "openai" || facts.JSONSchemaOverride == nil || !*facts.JSONSchemaOverride {
-		t.Fatalf("初始结构化事实快照不一致: %+v", facts)
+		t.Fatalf("snapshot facts có cấu trúc ban đầu không khớp: %+v", facts)
 	}
 	if err := ms.Swap("default", "proxy", "b"); err != nil {
 		t.Fatalf("swap b: %v", err)
 	}
 	if v := ms.Default.JSONSchemaOverride(); v == nil || *v {
-		t.Fatalf("切到 b 后应为 false, got %v", v)
+		t.Fatalf("khi chuyển sang b thì phải là false, nhận %v", v)
 	}
 	facts = ms.Default.StructuredOutputFacts()
 	if facts.Info.Name != "b" || facts.JSONSchemaOverride == nil || *facts.JSONSchemaOverride {
-		t.Fatalf("切换后结构化事实快照不一致: %+v", facts)
+		t.Fatalf("snapshot facts có cấu trúc sau chuyển đổi không khớp: %+v", facts)
 	}
 	if err := ms.Swap("default", "proxy", "c"); err != nil {
 		t.Fatalf("swap c: %v", err)
 	}
 	if v := ms.Default.JSONSchemaOverride(); v != nil {
-		t.Fatalf("切到未声明的 c 后应为 nil, got %v", v)
+		t.Fatalf("khi chuyển sang c chưa khai báo thì phải là nil, nhận %v", v)
 	}
 }
 
@@ -165,7 +165,7 @@ func TestSaveProviderConfigPreservesSelectionAndUsesPrivateMode(t *testing.T) {
 	if err != nil {
 		t.Fatalf("load: %v", err)
 	}
-	// 只补 providers 段：无关字段与顶层 provider/model 选择必须原样保留。
+	// chỉ bổ sung phần providers: các trường không liên quan và lựa chọn provider/model ở tầng trên phải được giữ nguyên như cũ.
 	if got.Style != "fantasy" || got.Budget.BookUSD != 20 || got.Provider != "old" || got.ModelName != "old-model" {
 		t.Fatalf("selection or unrelated fields mutated: %#v", got)
 	}
@@ -175,8 +175,8 @@ func TestSaveProviderConfigPreservesSelectionAndUsesPrivateMode(t *testing.T) {
 	if got.Providers["new"].Models[0].ContextWindow != 500000 {
 		t.Fatalf("new provider not patched in: %#v", got.Providers["new"])
 	}
-	// 权限断言只在有 POSIX 权限位语义的平台上有意义：Windows 把一切上报为
-	// 0666/0444，此断言在该平台恒假（参见 version.TestReplaceExecutable 同款处理）。
+	// Các khẳng định về quyền chỉ có ý nghĩa trên các nền tảng có ngữ nghĩa bit quyền POSIX: Windows báo cáo mọi thứ là
+	// 0666/0444, nên khẳng định này luôn sai trên nền tảng đó (xem cách xử lý tương tự của version.TestReplaceExecutable).
 	if runtime.GOOS != "windows" {
 		info, err := os.Stat(path)
 		if err != nil {

@@ -11,16 +11,16 @@ func TestSimulationCommandsAreRegisteredAndNeedIdle(t *testing.T) {
 	for _, name := range []string{"simulate", "importsim"} {
 		spec, ok := registry.Find(name)
 		if !ok {
-			t.Fatalf("expected /%s command to be registered", name)
+			t.Fatalf("/%s phải được đăng ký", name)
 		}
 		if !spec.NeedsIdle {
-			t.Fatalf("/%s should require idle state", name)
+			t.Fatalf("/%s phải yêu cầu trạng thái idle", name)
 		}
 	}
 
 	items := builtinCommandItems()
 	if !hasPaletteItem(items, "simulate") || !hasPaletteItem(items, "importsim") {
-		t.Fatalf("expected simulate commands in palette: %+v", items)
+		t.Fatalf("phải có lệnh simulate trong palette: %+v", items)
 	}
 }
 
@@ -29,10 +29,10 @@ func TestSimulationCommandsAreBlockedWhileRunning(t *testing.T) {
 	next, _ := m.handleSlashCommand(slashCommand{name: "simulate"})
 	got := next.(Model)
 	if len(got.events) != 1 || got.events[0].Category != "ERROR" {
-		t.Fatalf("expected NeedsIdle to emit one error, got %+v", got.events)
+		t.Fatalf("NeedsIdle phải phát một lỗi, got %+v", got.events)
 	}
 	if got.simulator != nil {
-		t.Fatal("simulate modal should not start while runtime is running")
+		t.Fatal("modal simulate không được mở khi runtime đang chạy")
 	}
 }
 

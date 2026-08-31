@@ -36,16 +36,16 @@ func TestSaveReviewPersistsContractAssessment(t *testing.T) {
 	args, err := json.Marshal(map[string]any{
 		"chapter":    3,
 		"scope":      "chapter",
-		"dimensions": []map[string]any{{"dimension": "consistency", "score": 85, "verdict": "pass", "comment": "基本一致"}, {"dimension": "character", "score": 82, "verdict": "pass", "comment": "人设稳定"}, {"dimension": "pacing", "score": 78, "verdict": "warning", "comment": "略慢"}, {"dimension": "continuity", "score": 84, "verdict": "pass", "comment": "连贯"}, {"dimension": "foreshadow", "score": 80, "verdict": "pass", "comment": "正常"}, {"dimension": "hook", "score": 76, "verdict": "warning", "comment": "钩子一般"}, {"dimension": "aesthetic", "score": 81, "verdict": "pass", "comment": "语言基本成立"}},
+		"dimensions": []map[string]any{{"dimension": "consistency", "score": 85, "verdict": "pass", "comment": "Nhất quán cơ bản"}, {"dimension": "character", "score": 82, "verdict": "pass", "comment": "Tính cách ổn định"}, {"dimension": "pacing", "score": 78, "verdict": "warning", "comment": "Hơi chậm"}, {"dimension": "continuity", "score": 84, "verdict": "pass", "comment": "Mạch lạc"}, {"dimension": "foreshadow", "score": 80, "verdict": "pass", "comment": "Bình thường"}, {"dimension": "hook", "score": 76, "verdict": "warning", "comment": "Móc câu bình thường"}, {"dimension": "aesthetic", "score": 81, "verdict": "pass", "comment": "Ngôn ngữ cơ bản ổn"}},
 		"issues": []map[string]any{{
-			"type": "contract", "severity": "error", "description": "契约漏项", "evidence": "未出现试炼邀请",
-			"suggestion": "补入邀请", "chapters": []int{3}, "requires_change": true,
+			"type": "contract", "severity": "error", "description": "Thiếu mục contract", "evidence": "Chưa xuất hiện lời mời thử thách",
+			"suggestion": "Bổ sung lời mời", "chapters": []int{3}, "requires_change": true,
 		}},
 		"contract_status": "partial",
-		"contract_misses": []string{"未明确埋下内门试炼邀请"},
-		"contract_notes":  "主线推进达成，但 contract 中的第二个推进项没有落地。",
+		"contract_misses": []string{"Chưa cài rõ lời mời thử thách nội môn"},
+		"contract_notes":  "Mạch chính đã tiến tới, nhưng mục thúc đẩy thứ hai trong contract chưa rơi xuống thành dữ kiện.",
 		"verdict":         "polish",
-		"summary":         "本章基本完成目标，但 contract 仍有漏项。",
+		"summary":         "Chương này cơ bản đã hoàn thành mục tiêu, nhưng contract vẫn còn thiếu sót.",
 	})
 	if err != nil {
 		t.Fatalf("Marshal: %v", err)
@@ -65,7 +65,7 @@ func TestSaveReviewPersistsContractAssessment(t *testing.T) {
 	if review.ContractStatus != "partial" {
 		t.Fatalf("unexpected contract status: %q", review.ContractStatus)
 	}
-	if len(review.ContractMisses) != 1 || review.ContractMisses[0] != "未明确埋下内门试炼邀请" {
+	if len(review.ContractMisses) != 1 || review.ContractMisses[0] != "Chưa cài rõ lời mời thử thách nội môn" {
 		t.Fatalf("unexpected contract misses: %+v", review.ContractMisses)
 	}
 	if review.Dimension("aesthetic") == nil {
@@ -98,8 +98,8 @@ func TestSaveReviewRejectsMissingDimensions(t *testing.T) {
 		t.Fatalf("Marshal: %v", err)
 	}
 
-	if _, err := tool.Execute(context.Background(), args); err == nil || !strings.Contains(err.Error(), "dimensions must contain at least one") {
-		t.Fatalf("expected dimensions validation error, got %v", err)
+	if _, err := tool.Execute(context.Background(), args); err == nil || !strings.Contains(err.Error(), "dimensions phải chứa ít nhất một đánh giá dựa trên bằng chứng") {
+		t.Fatalf("mong đợi lỗi kiểm tra dimensions, nhận được %v", err)
 	}
 }
 
@@ -120,13 +120,13 @@ func TestSaveReviewRejectsDimensionWithoutComment(t *testing.T) {
 		"chapter": 3,
 		"scope":   "chapter",
 		"dimensions": []map[string]any{
-			{"dimension": "consistency", "score": 85, "comment": "基本一致"},
-			{"dimension": "character", "score": 82, "comment": "人设稳定"},
+			{"dimension": "consistency", "score": 85, "comment": "Nhất quán cơ bản"},
+			{"dimension": "character", "score": 82, "comment": "Tính cách ổn định"},
 			{"dimension": "pacing", "score": 78},
-			{"dimension": "continuity", "score": 84, "comment": "连贯"},
-			{"dimension": "foreshadow", "score": 80, "comment": "正常"},
-			{"dimension": "hook", "score": 76, "comment": "钩子一般"},
-			{"dimension": "aesthetic", "score": 81, "comment": "语言基本成立"},
+			{"dimension": "continuity", "score": 84, "comment": "Mạch lạc"},
+			{"dimension": "foreshadow", "score": 80, "comment": "Bình thường"},
+			{"dimension": "hook", "score": 76, "comment": "Móc câu bình thường"},
+			{"dimension": "aesthetic", "score": 81, "comment": "Ngôn ngữ cơ bản ổn"},
 		},
 		"issues":  []map[string]any{},
 		"verdict": "accept",
@@ -136,8 +136,8 @@ func TestSaveReviewRejectsDimensionWithoutComment(t *testing.T) {
 		t.Fatalf("Marshal: %v", err)
 	}
 
-	if _, err := tool.Execute(context.Background(), args); err == nil || !strings.Contains(err.Error(), "dimension comment is required: pacing") {
-		t.Fatalf("expected dimension comment validation error, got %v", err)
+	if _, err := tool.Execute(context.Background(), args); err == nil || !strings.Contains(err.Error(), "bình luận cho dimension là bắt buộc: pacing") {
+		t.Fatalf("mong đợi lỗi kiểm tra bình luận dimension, nhận được %v", err)
 	}
 }
 
@@ -160,30 +160,30 @@ func TestSaveReviewRejectsIssueOutsideChapterScope(t *testing.T) {
 		"chapter": 58,
 		"scope":   "chapter",
 		"dimensions": []map[string]any{
-			{"dimension": "consistency", "score": 85, "comment": "基本一致"},
-			{"dimension": "character", "score": 82, "comment": "人设稳定"},
-			{"dimension": "pacing", "score": 58, "comment": "节奏需要重写"},
-			{"dimension": "continuity", "score": 84, "comment": "连贯"},
-			{"dimension": "foreshadow", "score": 80, "comment": "正常"},
-			{"dimension": "hook", "score": 76, "comment": "钩子一般"},
-			{"dimension": "aesthetic", "score": 81, "comment": "语言基本成立"},
+			{"dimension": "consistency", "score": 85, "comment": "Nhất quán cơ bản"},
+			{"dimension": "character", "score": 82, "comment": "Tính cách ổn định"},
+			{"dimension": "pacing", "score": 58, "comment": "Nhịp điệu cần viết lại"},
+			{"dimension": "continuity", "score": 84, "comment": "Mạch lạc"},
+			{"dimension": "foreshadow", "score": 80, "comment": "Bình thường"},
+			{"dimension": "hook", "score": 76, "comment": "Móc câu bình thường"},
+			{"dimension": "aesthetic", "score": 81, "comment": "Ngôn ngữ cơ bản ổn"},
 		},
 		"issues": []map[string]any{{
-			"type": "pacing", "severity": "error", "description": "节奏问题", "evidence": "第65章",
-			"suggestion": "调整", "chapters": []int{65}, "requires_change": true,
+			"type": "pacing", "severity": "error", "description": "Vấn đề nhịp điệu", "evidence": "Chương 65",
+			"suggestion": "Điều chỉnh", "chapters": []int{65}, "requires_change": true,
 		}},
 		"contract_status": "partial",
 		"verdict":         "polish",
-		"summary":         "需要打磨第 58 章，不能把未完成章节入队。",
-		"contract_misses": []string{"节奏超出本章职责"},
-		"contract_notes":  "应只处理已完成章节。",
+		"summary":         "Cần mài giũa chương 58, không được đưa chương chưa hoàn thành vào hàng đợi.",
+		"contract_misses": []string{"Nhịp điệu vượt quá phạm vi của chương này"},
+		"contract_notes":  "Chỉ nên xử lý các chương đã hoàn thành.",
 	})
 	if err != nil {
 		t.Fatalf("Marshal: %v", err)
 	}
 
-	if _, err := tool.Execute(context.Background(), args); err == nil || !strings.Contains(err.Error(), "must reference chapter 58") {
-		t.Fatalf("expected out-of-scope affected chapter rejection, got %v", err)
+	if _, err := tool.Execute(context.Background(), args); err == nil || !strings.Contains(err.Error(), "phải tham chiếu chương 58") {
+		t.Fatalf("mong đợi từ chối chương bị ảnh hưởng ngoài phạm vi, nhận được %v", err)
 	}
 	review, err := s.World.LoadReview(58)
 	if err != nil {
@@ -201,8 +201,8 @@ func TestSaveReviewRejectsIssueOutsideChapterScope(t *testing.T) {
 	}
 }
 
-// TestSaveReviewKeepsModelDefinedDimension 验证工具不再把文学评价维度和分数阈值
-// 写死在 Go 中；Editor 可以按当前任务补充更准确的评价面。
+// TestSaveReviewKeepsModelDefinedDimension xác nhận công cụ không còn đóng cứng trục đánh giá văn học và ngưỡng điểm
+// trong Go; Editor có thể bổ sung các mặt đánh giá chính xác hơn theo nhiệm vụ hiện tại.
 func TestSaveReviewKeepsModelDefinedDimension(t *testing.T) {
 	s := store.NewStore(t.TempDir())
 	if err := s.Init(); err != nil {
@@ -220,7 +220,7 @@ func TestSaveReviewKeepsModelDefinedDimension(t *testing.T) {
 		"chapter": 3,
 		"scope":   "chapter",
 		"dimensions": []map[string]any{{
-			"dimension": "dialogue_subtext", "score": 85, "verdict": "warning", "comment": "潜台词仍可加强",
+			"dimension": "dialogue_subtext", "score": 85, "verdict": "warning", "comment": "Hàm ý vẫn có thể tăng cường",
 		}},
 		"issues":  []map[string]any{},
 		"verdict": "accept",
@@ -254,24 +254,24 @@ func TestSaveReviewRejectsRewriteWithoutActionableIssue(t *testing.T) {
 		"chapter": 3,
 		"scope":   "chapter",
 		"dimensions": []map[string]any{
-			{"dimension": "consistency", "score": 85, "verdict": "pass", "comment": "基本一致"},
-			{"dimension": "character", "score": 82, "verdict": "pass", "comment": "人设稳定"},
-			{"dimension": "pacing", "score": 78, "verdict": "warning", "comment": "略慢"},
-			{"dimension": "continuity", "score": 84, "verdict": "pass", "comment": "连贯"},
-			{"dimension": "foreshadow", "score": 80, "verdict": "pass", "comment": "正常"},
-			{"dimension": "hook", "score": 76, "verdict": "warning", "comment": "钩子一般"},
-			{"dimension": "aesthetic", "score": 81, "verdict": "pass", "comment": "语言基本成立"},
+			{"dimension": "consistency", "score": 85, "verdict": "pass", "comment": "Nhất quán cơ bản"},
+			{"dimension": "character", "score": 82, "verdict": "pass", "comment": "Tính cách ổn định"},
+			{"dimension": "pacing", "score": 78, "verdict": "warning", "comment": "Hơi chậm"},
+			{"dimension": "continuity", "score": 84, "verdict": "pass", "comment": "Mạch lạc"},
+			{"dimension": "foreshadow", "score": 80, "verdict": "pass", "comment": "Bình thường"},
+			{"dimension": "hook", "score": 76, "verdict": "warning", "comment": "Móc câu bình thường"},
+			{"dimension": "aesthetic", "score": 81, "verdict": "pass", "comment": "Ngôn ngữ cơ bản ổn"},
 		},
 		"issues":  []map[string]any{},
 		"verdict": "rewrite",
-		"summary": "需要重写",
+		"summary": "Cần viết lại",
 	})
 	if err != nil {
 		t.Fatalf("Marshal: %v", err)
 	}
 
-	if _, err := tool.Execute(context.Background(), args); err == nil || !strings.Contains(err.Error(), "requires at least one issue") {
-		t.Fatalf("expected actionable issue validation error, got %v", err)
+	if _, err := tool.Execute(context.Background(), args); err == nil || !strings.Contains(err.Error(), "yêu cầu ít nhất một issue") {
+		t.Fatalf("mong đợi lỗi kiểm tra issue có thể thực hiện, nhận được %v", err)
 	}
 }
 
@@ -286,33 +286,33 @@ func TestSaveReviewRejectsIssueWithoutEvidence(t *testing.T) {
 		"chapter": 3,
 		"scope":   "chapter",
 		"dimensions": []map[string]any{
-			{"dimension": "consistency", "score": 85, "verdict": "pass", "comment": "基本一致"},
-			{"dimension": "character", "score": 82, "verdict": "pass", "comment": "人设稳定"},
-			{"dimension": "pacing", "score": 78, "verdict": "warning", "comment": "略慢"},
-			{"dimension": "continuity", "score": 84, "verdict": "pass", "comment": "连贯"},
-			{"dimension": "foreshadow", "score": 80, "verdict": "pass", "comment": "正常"},
-			{"dimension": "hook", "score": 76, "verdict": "warning", "comment": "钩子一般"},
-			{"dimension": "aesthetic", "score": 81, "verdict": "pass", "comment": "语言基本成立"},
+			{"dimension": "consistency", "score": 85, "verdict": "pass", "comment": "Nhất quán cơ bản"},
+			{"dimension": "character", "score": 82, "verdict": "pass", "comment": "Tính cách ổn định"},
+			{"dimension": "pacing", "score": 78, "verdict": "warning", "comment": "Hơi chậm"},
+			{"dimension": "continuity", "score": 84, "verdict": "pass", "comment": "Mạch lạc"},
+			{"dimension": "foreshadow", "score": 80, "verdict": "pass", "comment": "Bình thường"},
+			{"dimension": "hook", "score": 76, "verdict": "warning", "comment": "Móc câu bình thường"},
+			{"dimension": "aesthetic", "score": 81, "verdict": "pass", "comment": "Ngôn ngữ cơ bản ổn"},
 		},
 		"issues": []map[string]any{
-			{"type": "hook", "severity": "warning", "description": "章末钩子偏弱"},
+			{"type": "hook", "severity": "warning", "description": "Móc câu cuối chương còn yếu"},
 		},
 		"verdict": "polish",
-		"summary": "需要补强钩子。",
+		"summary": "Cần tăng cường móc câu.",
 	})
 	if err != nil {
 		t.Fatalf("Marshal: %v", err)
 	}
 
-	if _, err := tool.Execute(context.Background(), args); err == nil || !strings.Contains(err.Error(), "issue evidence is required") {
-		t.Fatalf("expected issue evidence validation error, got %v", err)
+	if _, err := tool.Execute(context.Background(), args); err == nil || !strings.Contains(err.Error(), "bằng chứng issue là bắt buộc") {
+		t.Fatalf("mong đợi lỗi kiểm tra bằng chứng issue, nhận được %v", err)
 	}
 }
 
-// TestSaveReviewDoesNotDirtyQueueOnIllegalFlowTransition 防回归：返工排空中途
-// （Flow=rewriting、PendingRewrites=[8,9]）对已重写章复审得到 polish 时，
-// Flow=polishing 与 rewriting 构成非法迁移。ApplyReviewOutcome 必须在同一次写锁中
-// 完成校验和写入，非法迁移时队列保持不变。
+// TestSaveReviewDoesNotDirtyQueueOnIllegalFlowTransition phòng hồi quy: giữa chừng dọn sạch hàng đợi sửa lại
+// (Flow=rewriting, PendingRewrites=[8,9]) khi đánh giá lại một chương đã viết lại và nhận polish,
+// Flow=polishing và rewriting tạo thành chuyển trạng thái không hợp lệ. ApplyReviewOutcome phải trong cùng một khóa ghi
+// hoàn tất kiểm tra và ghi, khi chuyển trạng thái không hợp lệ thì hàng đợi giữ nguyên.
 func TestSaveReviewDoesNotDirtyQueueOnIllegalFlowTransition(t *testing.T) {
 	s := store.NewStore(t.TempDir())
 	if err := s.Init(); err != nil {
@@ -326,7 +326,7 @@ func TestSaveReviewDoesNotDirtyQueueOnIllegalFlowTransition(t *testing.T) {
 			t.Fatalf("MarkChapterComplete(%d): %v", ch, err)
 		}
 	}
-	if err := s.Progress.SetPendingRewrites([]int{8, 9}, "返工"); err != nil {
+	if err := s.Progress.SetPendingRewrites([]int{8, 9}, "Sửa lại"); err != nil {
 		t.Fatalf("SetPendingRewrites: %v", err)
 	}
 	if err := s.Progress.SetFlow(domain.FlowRewriting); err != nil {
@@ -338,23 +338,23 @@ func TestSaveReviewDoesNotDirtyQueueOnIllegalFlowTransition(t *testing.T) {
 		"chapter": 8,
 		"scope":   "chapter",
 		"dimensions": []map[string]any{
-			{"dimension": "consistency", "score": 85, "verdict": "pass", "comment": "基本一致"},
-			{"dimension": "character", "score": 82, "verdict": "pass", "comment": "人设稳定"},
-			{"dimension": "pacing", "score": 78, "verdict": "warning", "comment": "略慢"},
-			{"dimension": "continuity", "score": 84, "verdict": "pass", "comment": "连贯"},
-			{"dimension": "foreshadow", "score": 80, "verdict": "pass", "comment": "正常"},
-			{"dimension": "hook", "score": 76, "verdict": "warning", "comment": "钩子一般"},
-			{"dimension": "aesthetic", "score": 81, "verdict": "pass", "comment": "语言基本成立"},
+			{"dimension": "consistency", "score": 85, "verdict": "pass", "comment": "Nhất quán cơ bản"},
+			{"dimension": "character", "score": 82, "verdict": "pass", "comment": "Tính cách ổn định"},
+			{"dimension": "pacing", "score": 78, "verdict": "warning", "comment": "Hơi chậm"},
+			{"dimension": "continuity", "score": 84, "verdict": "pass", "comment": "Mạch lạc"},
+			{"dimension": "foreshadow", "score": 80, "verdict": "pass", "comment": "Bình thường"},
+			{"dimension": "hook", "score": 76, "verdict": "warning", "comment": "Móc câu bình thường"},
+			{"dimension": "aesthetic", "score": 81, "verdict": "pass", "comment": "Ngôn ngữ cơ bản ổn"},
 		},
 		"issues": []map[string]any{{
-			"type": "contract", "severity": "error", "description": "漏项", "evidence": "契约未完成",
-			"suggestion": "补齐", "chapters": []int{8}, "requires_change": true,
+			"type": "contract", "severity": "error", "description": "Thiếu sót", "evidence": "Contract chưa hoàn thành",
+			"suggestion": "Bổ sung đầy đủ", "chapters": []int{8}, "requires_change": true,
 		}},
 		"contract_status": "partial",
-		"contract_misses": []string{"漏项"},
-		"contract_notes":  "复审仍有漏项。",
+		"contract_misses": []string{"Thiếu sót"},
+		"contract_notes":  "Đánh giá lại vẫn còn thiếu sót.",
 		"verdict":         "polish",
-		"summary":         "复审第 8 章需打磨。",
+		"summary":         "Chương 8 đánh giá lại cần mài giũa.",
 	})
 	if err != nil {
 		t.Fatalf("Marshal: %v", err)
@@ -366,10 +366,10 @@ func TestSaveReviewDoesNotDirtyQueueOnIllegalFlowTransition(t *testing.T) {
 
 	p, _ := s.Progress.Load()
 	if len(p.PendingRewrites) != 2 || p.PendingRewrites[0] != 8 || p.PendingRewrites[1] != 9 {
-		t.Fatalf("PendingRewrites 不应被脏写，期望 [8 9]，got %v", p.PendingRewrites)
+		t.Fatalf("PendingRewrites không được bị ghi bẩn, mong đợi [8 9], got %v", p.PendingRewrites)
 	}
 	if p.Flow != domain.FlowRewriting {
-		t.Fatalf("Flow 应保持 rewriting，got %s", p.Flow)
+		t.Fatalf("Flow phải giữ nguyên rewriting, got %s", p.Flow)
 	}
 }
 
@@ -385,25 +385,25 @@ func TestSaveReviewKeepsOutcomeWhenReviewArtifactWriteFails(t *testing.T) {
 	if err := s.Progress.MarkChapterComplete(3, 3000, "", ""); err != nil {
 		t.Fatalf("MarkChapterComplete: %v", err)
 	}
-	// 让目标文件路径成为目录，稳定触发原子 rename 失败。
+	// Để đường dẫn tệp mục tiêu trở thành thư mục, ổn định kích hoạt lỗi rename nguyên tử.
 	if err := os.MkdirAll(filepath.Join(dir, "reviews", "03.json"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 
 	args, err := json.Marshal(map[string]any{
-		"chapter": 3, "scope": "chapter", "verdict": "polish", "summary": "需要补足衔接",
+		"chapter": 3, "scope": "chapter", "verdict": "polish", "summary": "Cần bổ sung liên kết",
 		"issues": []map[string]any{{
-			"type": "continuity", "severity": "error", "description": "衔接不足", "evidence": "开篇缺少承接",
-			"suggestion": "补足衔接", "chapters": []int{3}, "requires_change": true,
+			"type": "continuity", "severity": "error", "description": "Thiếu liên kết", "evidence": "Đầu chương thiếu phần nối",
+			"suggestion": "Bổ sung liên kết", "chapters": []int{3}, "requires_change": true,
 		}},
 		"dimensions": []map[string]any{
-			{"dimension": "consistency", "score": 85, "comment": "一致"},
-			{"dimension": "character", "score": 82, "comment": "稳定"},
-			{"dimension": "pacing", "score": 78, "comment": "略快"},
-			{"dimension": "continuity", "score": 84, "comment": "连贯"},
-			{"dimension": "foreshadow", "score": 80, "comment": "正常"},
-			{"dimension": "hook", "score": 76, "comment": "可加强"},
-			{"dimension": "aesthetic", "score": 81, "comment": "语言成立"},
+			{"dimension": "consistency", "score": 85, "comment": "Nhất quán"},
+			{"dimension": "character", "score": 82, "comment": "Ổn định"},
+			{"dimension": "pacing", "score": 78, "comment": "Hơi nhanh"},
+			{"dimension": "continuity", "score": 84, "comment": "Mạch lạc"},
+			{"dimension": "foreshadow", "score": 80, "comment": "Bình thường"},
+			{"dimension": "hook", "score": 76, "comment": "Có thể tăng cường"},
+			{"dimension": "aesthetic", "score": 81, "comment": "Ngôn ngữ ổn"},
 		},
 	})
 	if err != nil {
@@ -418,7 +418,7 @@ func TestSaveReviewKeepsOutcomeWhenReviewArtifactWriteFails(t *testing.T) {
 		t.Fatal(err)
 	}
 	if p.Flow != domain.FlowPolishing || len(p.PendingRewrites) != 1 || p.PendingRewrites[0] != 3 {
-		t.Fatalf("审阅工件失败后返工意图必须保持可恢复，got flow=%s queue=%v", p.Flow, p.PendingRewrites)
+		t.Fatalf("Sau khi công cụ đánh giá thất bại, ý định sửa lại phải vẫn có thể khôi phục, got flow=%s queue=%v", p.Flow, p.PendingRewrites)
 	}
 }
 
@@ -434,8 +434,8 @@ func setupArcReviewStore(t *testing.T) *store.Store {
 	volumes := []domain.VolumeOutline{{
 		Index: 1,
 		Arcs: []domain.ArcOutline{
-			{Index: 1, Chapters: []domain.OutlineEntry{{Title: "一"}, {Title: "二"}}},
-			{Index: 2, Chapters: []domain.OutlineEntry{{Title: "三"}, {Title: "四"}}},
+			{Index: 1, Chapters: []domain.OutlineEntry{{Title: "Một"}, {Title: "Hai"}}},
+			{Index: 2, Chapters: []domain.OutlineEntry{{Title: "Ba"}, {Title: "Bốn"}}},
 		},
 	}}
 	if err := s.Outline.SaveLayeredOutline(volumes); err != nil {
@@ -452,11 +452,11 @@ func setupArcReviewStore(t *testing.T) *store.Store {
 			t.Fatal(err)
 		}
 	}
-	// 第一弧已经完整收尾，因此 Router 当前唯一待补工件是第二弧评审。
-	if err := s.World.SaveReview(domain.ReviewEntry{Chapter: 2, Scope: "arc", Verdict: "accept", Summary: "第一弧评审"}); err != nil {
+	// Cung một đã khép lại hoàn chỉnh, vì vậy công cụ duy nhất Router còn chờ là đánh giá cung hai.
+	if err := s.World.SaveReview(domain.ReviewEntry{Chapter: 2, Scope: "arc", Verdict: "accept", Summary: "Đánh giá cung một"}); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.Summaries.SaveArcSummary(domain.ArcSummary{Volume: 1, Arc: 1, Title: "第一弧", Summary: "完成", KeyEvents: []string{"事件"}}); err != nil {
+	if err := s.Summaries.SaveArcSummary(domain.ArcSummary{Volume: 1, Arc: 1, Title: "Cung một", Summary: "Hoàn tất", KeyEvents: []string{"Sự kiện"}}); err != nil {
 		t.Fatal(err)
 	}
 	return s
@@ -468,14 +468,14 @@ func arcReviewArgs(t *testing.T, issueChapter int) []byte {
 		"chapter": 4,
 		"scope":   "arc",
 		"dimensions": []map[string]any{{
-			"dimension": "pacing", "score": 70, "comment": "第三章节奏拖沓",
+			"dimension": "pacing", "score": 70, "comment": "Nhịp điệu chương ba còn lê thê",
 		}},
 		"issues": []map[string]any{{
-			"type": "pacing", "severity": "error", "description": "冲突进入过晚", "evidence": "第3章前半没有推进",
-			"suggestion": "压缩铺垫", "chapters": []int{issueChapter}, "requires_change": true,
+			"type": "pacing", "severity": "error", "description": "Xung đột vào quá muộn", "evidence": "Nửa đầu chương 3 không có tiến triển",
+			"suggestion": "Rút gọn phần dàn trải", "chapters": []int{issueChapter}, "requires_change": true,
 		}},
 		"verdict": "polish",
-		"summary": "第二弧需要压缩一处铺垫",
+		"summary": "Cung hai cần rút gọn một đoạn dàn trải",
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -485,8 +485,8 @@ func arcReviewArgs(t *testing.T, issueChapter int) []byte {
 
 func TestSaveReviewRejectsIssueOutsideArcSpan(t *testing.T) {
 	s := setupArcReviewStore(t)
-	if _, err := NewSaveReviewTool(s).Execute(context.Background(), arcReviewArgs(t, 2)); err == nil || !strings.Contains(err.Error(), "outside 3-4") {
-		t.Fatalf("expected arc range rejection, got %v", err)
+	if _, err := NewSaveReviewTool(s).Execute(context.Background(), arcReviewArgs(t, 2)); err == nil || !strings.Contains(err.Error(), "nằm ngoài phạm vi 3-4") {
+		t.Fatalf("mong đợi từ chối phạm vi cung, nhận được %v", err)
 	}
 	if p, _ := s.Progress.Load(); len(p.PendingRewrites) != 0 {
 		t.Fatalf("invalid review must not enqueue rewrites: %v", p.PendingRewrites)
@@ -542,7 +542,7 @@ func TestSaveReviewRetriesCheckpointWithoutReapplyingOutcome(t *testing.T) {
 
 func TestSaveArcReviewCanReplaceChapterReviewAtEndpoint(t *testing.T) {
 	s := setupArcReviewStore(t)
-	if err := s.World.SaveReview(domain.ReviewEntry{Chapter: 4, Scope: "chapter", Verdict: "accept", Summary: "末章单章评审"}); err != nil {
+	if err := s.World.SaveReview(domain.ReviewEntry{Chapter: 4, Scope: "chapter", Verdict: "accept", Summary: "Đánh giá đơn chương cuối"}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -569,8 +569,8 @@ func TestSaveReviewRejectsFutureArc(t *testing.T) {
 	volumes := []domain.VolumeOutline{{
 		Index: 1,
 		Arcs: []domain.ArcOutline{
-			{Index: 1, Chapters: []domain.OutlineEntry{{Title: "一"}, {Title: "二"}}},
-			{Index: 2, Chapters: []domain.OutlineEntry{{Title: "三"}, {Title: "四"}}},
+			{Index: 1, Chapters: []domain.OutlineEntry{{Title: "Một"}, {Title: "Hai"}}},
+			{Index: 2, Chapters: []domain.OutlineEntry{{Title: "Ba"}, {Title: "Bốn"}}},
 		},
 	}}
 	if err := s.Outline.SaveLayeredOutline(volumes); err != nil {
@@ -588,8 +588,8 @@ func TestSaveReviewRejectsFutureArc(t *testing.T) {
 		}
 	}
 
-	if _, err := NewSaveReviewTool(s).Execute(context.Background(), arcReviewArgs(t, 3)); err == nil || !strings.Contains(err.Error(), "must be completed") {
-		t.Fatalf("expected future arc rejection, got %v", err)
+	if _, err := NewSaveReviewTool(s).Execute(context.Background(), arcReviewArgs(t, 3)); err == nil || !strings.Contains(err.Error(), "review chapter 4 must be completed") {
+		t.Fatalf("mong đợi từ chối cung tương lai, nhận được %v", err)
 	}
 	if review, err := s.World.LoadReview(4); err != nil || review != nil {
 		t.Fatalf("future review must not be persisted, review=%+v err=%v", review, err)

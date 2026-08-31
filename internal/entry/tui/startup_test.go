@@ -14,7 +14,7 @@ func TestStartCommandLoadsPromptFile(t *testing.T) {
 		t.Fatal(err)
 	}
 	path := filepath.Join(dir, "story outline.md")
-	want := "世界设定\n\n第一卷大纲"
+	want := "Thiết lập thế giới\n\nDàn ý quyển một"
 	if err := os.WriteFile(path, []byte("  "+want+"  "), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -22,7 +22,7 @@ func TestStartCommandLoadsPromptFile(t *testing.T) {
 	m := NewModel(nil, "")
 	cmd, ok := parseSlashCommand("/start " + path)
 	if !ok {
-		t.Fatal("/start should parse as slash command")
+		t.Fatal("/start phải parse thành slash command")
 	}
 	prompt, err := prepareFileStart(cmd.args)
 	if err != nil {
@@ -45,24 +45,24 @@ func TestEnterStartingSwitchesToWorkbenchImmediately(t *testing.T) {
 	m.resizeTextarea()
 	m.updateViewportSize()
 
-	m.enterStarting("写一本东方玄幻长篇")
+	m.enterStarting("Viết một bộ truyện huyền huyễn phương Đông")
 
 	if m.mode != modeRunning {
 		t.Fatalf("mode = %v, want modeRunning", m.mode)
 	}
 	if !m.starting {
-		t.Fatal("starting should be true while host startup command is running")
+		t.Fatal("starting phải là true khi lệnh khởi động host đang chạy")
 	}
 	if !m.snapshot.IsRunning {
-		t.Fatal("snapshot should render as running during local startup")
+		t.Fatal("snapshot phải render là đang chạy trong lúc khởi động local")
 	}
-	if got := m.textarea.Placeholder; got != "正在初始化创作..." {
+	if got := m.textarea.Placeholder; got != "Đang khởi tạo sáng tác..." {
 		t.Fatalf("placeholder = %q", got)
 	}
 	if len(m.events) != 2 {
 		t.Fatalf("events = %+v, want startup user + system events", m.events)
 	}
-	if m.events[0].Category != "USER" || !strings.HasPrefix(m.events[0].Summary, "创作需求: ") {
+	if m.events[0].Category != "USER" || !strings.HasPrefix(m.events[0].Summary, "Yêu cầu sáng tác: ") {
 		t.Fatalf("first event = %+v, want USER prompt event", m.events[0])
 	}
 }
@@ -74,30 +74,30 @@ func TestStartupFailureStaysInWorkbench(t *testing.T) {
 	m.resizeTextarea()
 	m.updateViewportSize()
 
-	m.enterStarting("写一本东方玄幻长篇")
+	m.enterStarting("Viết một bộ truyện huyền huyễn phương Đông")
 
-	next, _ := m.handleStartResultMsg(startResultMsg{err: errors.New("模型账户未激活")})
+	next, _ := m.handleStartResultMsg(startResultMsg{err: errors.New("Tài khoản mô hình chưa được kích hoạt")})
 	got := next.(Model)
 	if got.mode != modeRunning {
-		t.Fatalf("启动失败后 mode = %v, want modeRunning", got.mode)
+		t.Fatalf("sau khi khởi động thất bại mode = %v, want modeRunning", got.mode)
 	}
 	if got.starting {
-		t.Fatal("启动失败后 starting 应复位")
+		t.Fatal("sau khi khởi động thất bại starting phải được đặt lại")
 	}
 	if got.snapshot.IsRunning {
-		t.Fatal("启动失败后 snapshot 不应仍显示运行中")
+		t.Fatal("sau khi khởi động thất bại snapshot không nên vẫn hiển thị đang chạy")
 	}
-	if !strings.Contains(got.textarea.Placeholder, "启动失败") {
+	if !strings.Contains(got.textarea.Placeholder, "Khởi động thất bại") {
 		t.Fatalf("placeholder = %q", got.textarea.Placeholder)
 	}
 	if len(got.events) == 0 || got.events[len(got.events)-1].Category != "ERROR" {
-		t.Fatalf("工作台应保留启动错误事件: %+v", got.events)
+		t.Fatalf("workbench phải giữ lại sự kiện lỗi khởi động: %+v", got.events)
 	}
 }
 
 func TestApplyStartupPromptEventTruncatesSummaryButKeepsDetail(t *testing.T) {
 	m := NewModel(nil, "")
-	prompt := strings.Repeat("设", maxPromptEventCols+50)
+	prompt := strings.Repeat("thiết lập", maxPromptEventCols+50)
 
 	m.applyStartupPromptEvent(prompt)
 
@@ -106,30 +106,30 @@ func TestApplyStartupPromptEventTruncatesSummaryButKeepsDetail(t *testing.T) {
 	}
 	ev := m.events[0]
 	if ev.Detail != prompt {
-		t.Fatalf("detail should keep full prompt, got len=%d want=%d", len([]rune(ev.Detail)), len([]rune(prompt)))
+		t.Fatalf("detail phải giữ prompt đầy đủ, nhận len=%d muốn %d", len([]rune(ev.Detail)), len([]rune(prompt)))
 	}
-	maxSummaryRunes := len([]rune("创作需求: ")) + maxPromptEventCols
+	maxSummaryRunes := len([]rune("Yêu cầu sáng tác: ")) + maxPromptEventCols
 	if got := len([]rune(ev.Summary)); got > maxSummaryRunes {
 		t.Fatalf("summary runes = %d, want <= %d", got, maxSummaryRunes)
 	}
 	if !strings.HasSuffix(ev.Summary, "...") {
-		t.Fatalf("summary should be truncated with ellipsis, got %q", ev.Summary)
+		t.Fatalf("summary phải được cắt bằng dấu lược, nhận %q", ev.Summary)
 	}
 }
 
 func TestStreamFlushTimerRunsOnlyForPendingData(t *testing.T) {
 	m := NewModel(nil, "")
-	next, cmd, handled := m.handleRuntimeMsg(streamDeltaMsg("正文"))
+	next, cmd, handled := m.handleRuntimeMsg(streamDeltaMsg("nội dung chính"))
 	if !handled || cmd == nil {
-		t.Fatal("流式增量应启动一次刷新")
+		t.Fatal("streaming delta phải khởi động một lần refresh")
 	}
 	got := next.(Model)
 	if !got.streamDirty || !got.flushPending {
-		t.Fatal("流式增量应标记待刷新")
+		t.Fatal("streaming delta phải đánh dấu chờ refresh")
 	}
 	next, cmd, handled = got.handleRuntimeMsg(streamFlushTickMsg{})
 	got = next.(Model)
 	if !handled || cmd != nil || got.streamDirty || got.flushPending {
-		t.Fatal("刷新完成后 timer 应停止")
+		t.Fatal("sau khi refresh hoàn tất timer phải dừng")
 	}
 }

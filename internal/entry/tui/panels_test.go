@@ -14,7 +14,7 @@ func TestRenderTopBarShowsVersion(t *testing.T) {
 	out := renderTopBar(host.UISnapshot{
 		Provider:  "openrouter",
 		ModelName: "test-model",
-		BookTitle: "测试小说",
+		BookTitle: "Tiểu thuyết kiểm thử",
 	}, 120, "", "v1.2.3")
 	if !strings.Contains(out, "ainovel-cli v1.2.3") {
 		t.Fatalf("top bar missing version: %q", out)
@@ -22,21 +22,21 @@ func TestRenderTopBarShowsVersion(t *testing.T) {
 }
 
 func TestRenderDetailContentShowsSynopsis(t *testing.T) {
-	out := ansi.Strip(renderDetailContent(host.UISnapshot{Synopsis: "少年在永夜中寻找黎明。"}, 40))
-	if !strings.Contains(out, "简介") || !strings.Contains(out, "少年在永夜中寻找黎明。") {
+	out := ansi.Strip(renderDetailContent(host.UISnapshot{Synopsis: "Thiếu niên đi tìm bình minh trong đêm vĩnh cửu."}, 80))
+	if !strings.Contains(out, "Giới thiệu") || !strings.Contains(out, "Thiếu niên đi tìm bình minh trong đêm vĩnh cửu.") {
 		t.Fatalf("detail panel missing synopsis: %q", out)
 	}
 }
 
 func TestSameDetailSnapshotDetectsOutlineStateChanges(t *testing.T) {
-	base := host.UISnapshot{Outline: []host.OutlineSnapshot{{Chapter: 1, Title: "第一章"}}}
+	base := host.UISnapshot{Outline: []host.OutlineSnapshot{{Chapter: 1, Title: "Chương một"}}}
 	if !sameDetailSnapshot(base, base) {
-		t.Fatal("相同详情不应触发重建")
+		t.Fatal("Chi tiết giống nhau không nên kích hoạt tạo lại")
 	}
 	changed := base
 	changed.InProgressChapter = 1
 	if sameDetailSnapshot(base, changed) {
-		t.Fatal("章节状态变化必须触发详情重建")
+		t.Fatal("Thay đổi trạng thái Chương phải kích hoạt tạo lại Chi tiết")
 	}
 }
 
@@ -44,18 +44,18 @@ func TestRenderErrorEventKeepsOneLineSummary(t *testing.T) {
 	out := ansi.Strip(renderEventLine(host.Event{
 		Time:     time.Date(2026, 8, 9, 12, 0, 0, 0, time.UTC),
 		Category: "ERROR",
-		Summary:  "commit_chapter 参数错误：" + strings.Repeat("秦越在材料中发现线索", 20),
+		Summary:  "lỗi tham số commit_chapter: " + strings.Repeat("Dấu vết hé lộ từ tài liệu", 20),
 	}, 60, 0))
 	if strings.Contains(out, "\n") {
-		t.Fatalf("ERROR 事件应保持单行摘要，got %q", out)
+		t.Fatalf("Sự kiện ERROR phải giữ tóm tắt một dòng, got %q", out)
 	}
 	if !strings.HasSuffix(out, "...") {
-		t.Fatalf("超宽 ERROR 摘要应在 TUI 截断，got %q", out)
+		t.Fatalf("Tóm tắt ERROR quá rộng phải bị cắt ngắn trong TUI, got %q", out)
 	}
 }
 
-// TestRenderStatusBar 守护底部状态栏的信息契约：模型身份（窗口+思考）、会话令牌、
-// 花费/预算、书目录都必须在（样式剥离后按纯文本断言）。
+// TestRenderStatusBar bảo vệ hợp đồng thông tin của thanh trạng thái dưới cùng: danh tính Mô hình (cửa sổ + suy nghĩ), token phiên,
+// chi phí/ngân sách, thư mục sách đều phải có (sau khi loại bỏ style thì assert theo văn bản thuần).
 func TestRenderStatusBar(t *testing.T) {
 	out := ansi.Strip(renderStatusBar(host.UISnapshot{
 		Provider:           "openrouter",
@@ -68,9 +68,9 @@ func TestRenderStatusBar(t *testing.T) {
 		BudgetLimitUSD:     5,
 		TotalSavedUSD:      0.12,
 	}, "/tmp/output", 120))
-	for _, want := range []string{"test-model(200K,med)", "↑1.2M", "↓89.3k", "$0.31/$5.00", "省$0.12", "./output"} {
+	for _, want := range []string{"test-model(200K,med)", "↑1.2M", "↓89.3k", "$0.31/$5.00", "tiết kiệm $0.12", "./output"} {
 		if !strings.Contains(out, want) {
-			t.Fatalf("状态栏缺少 %q：%q", want, out)
+			t.Fatalf("thanh trạng thái thiếu %q: %q", want, out)
 		}
 	}
 }
@@ -81,10 +81,10 @@ func TestRenderStatusBarAutoThinkingAndEmpty(t *testing.T) {
 		ModelContextWindow: 128000,
 	}, "", 120))
 	if !strings.Contains(out, "test-model(128K,auto)") {
-		t.Fatalf("缺思考等级 auto 括注：%q", out)
+		t.Fatalf("thiếu chú thích ngoặc về mức suy nghĩ auto: %q", out)
 	}
-	if out := ansi.Strip(renderStatusBar(host.UISnapshot{}, "", 120)); out != "READY" {
-		t.Fatalf("空快照应回退 READY，得 %q", out)
+	if out := ansi.Strip(renderStatusBar(host.UISnapshot{}, "", 120)); out != "SẴN SÀNG" {
+		t.Fatalf("snapshot rỗng phải fallback về SẴN SÀNG, got %q", out)
 	}
 }
 
@@ -96,40 +96,40 @@ func TestRenderUsageLineSeparatesFullWidthNameAndTokens(t *testing.T) {
 }
 
 func TestTruncateByDisplayWidth(t *testing.T) {
-	// 纯中文按视觉宽度截：10 列预算 = 3 个汉字(6列) + "..."(3列)，按 rune 截会溢出到 17 列
-	got := truncate("临港市公共算法伦理审计员", 10)
+	// Văn bản Trung bình thuần bị cắt theo độ rộng hiển thị: ngân sách 10 cột = 3 ký tự rộng (6 cột) + "..."(3 cột), cắt theo rune sẽ tràn tới 17 cột
+	got := truncate("kiểm toán viên đạo đức thuật toán công cộng thành phố Lâm Cảng", 10)
 	if w := lipgloss.Width(got); w > 10 {
-		t.Errorf("truncate 溢出列宽: %d > 10 (%q)", w, got)
+		t.Errorf("truncate tràn độ rộng cột: %d > 10 (%q)", w, got)
 	}
 	if !strings.HasSuffix(got, "...") {
-		t.Errorf("超宽截断应带省略号: %q", got)
+		t.Errorf("cắt ngắn quá rộng phải kèm dấu ba chấm: %q", got)
 	}
-	// ASCII 行为与旧实现一致
+	// Hành vi ASCII nhất quán với triển khai cũ
 	if got := truncate("abcdef", 6); got != "abcdef" {
-		t.Errorf("未超宽不应截断: %q", got)
+		t.Errorf("chưa quá rộng thì không nên cắt ngắn: %q", got)
 	}
 	if got := truncate("abcdefgh", 6); got != "abc..." {
-		t.Errorf("ASCII 截断: got %q want %q", got, "abc...")
+		t.Errorf("cắt ngắn ASCII: got %q want %q", got, "abc...")
 	}
 }
 
 func TestRenderDetailContentWrapsCJK(t *testing.T) {
-	long := "沈砚（主角；临港市公共算法伦理审计员，台风夜事故的调查负责人，坚持程序正义）"
+	long := "Thẩm Nghiễn (nhân vật chính; kiểm toán viên đạo đức thuật toán công cộng thành phố Lâm Cảng, người phụ trách điều tra sự cố đêm bão, kiên trì công lý thủ tục)"
 	const contentW = 40
 	out := renderDetailContent(host.UISnapshot{
 		Characters:       []string{long},
 		SupportingCount:  1,
 		RecentSupporting: []string{long},
-		RecentSummaries:  []string{"第6章：" + long},
+		RecentSummaries:  []string{"Chương 6: " + long},
 	}, contentW)
 	for line := range strings.SplitSeq(out, "\n") {
 		if w := lipgloss.Width(line); w > contentW {
-			t.Errorf("行溢出面板宽度: %d > %d (%q)", w, contentW, line)
+			t.Errorf("dòng tràn độ rộng panel: %d > %d (%q)", w, contentW, line)
 		}
 	}
-	// 长描述应折成多行（悬挂缩进续行），而不是截断丢信息
+	// Mô tả dài phải được gập thành nhiều dòng (dòng tiếp theo thụt lề treo), thay vì cắt ngắn làm mất thông tin
 	joined := strings.ReplaceAll(strings.ReplaceAll(out, "\n", ""), " ", "")
-	if !strings.Contains(joined, "坚持程序正义") {
-		t.Errorf("折行后应保留完整描述，实际输出:\n%s", out)
+	if !strings.Contains(joined, strings.ReplaceAll("kiên trì công lý thủ tục", " ", "")) {
+		t.Errorf("sau khi gập dòng phải giữ mô tả đầy đủ, Xuất thực tế:\n%s", out)
 	}
 }

@@ -1,10 +1,10 @@
 #!/bin/sh
 #
-# Generate AI-summarized release notes from git commits.
-# Usage: .github/scripts/gen-changelog.sh [previous_tag]
+# Tạo ghi chú phát hành được AI tóm tắt từ các commit git.
+# Cách dùng: .github/scripts/gen-changelog.sh [previous_tag]
 #
-# Requires GEMINI_API_KEY (preferred), ANTHROPIC_API_KEY, or OPENAI_API_KEY.
-# Falls back to raw commit list if no API key is set.
+# Yêu cầu GEMINI_API_KEY (ưu tiên), ANTHROPIC_API_KEY, hoặc OPENAI_API_KEY.
+# Nếu không có API key thì sẽ chuyển sang danh sách commit thô.
 #
 set -e
 
@@ -16,11 +16,11 @@ if [ -n "$PREV_TAG" ]; then
     RANGE="${PREV_TAG}..${CURR_TAG}"
 else
     COMMITS=$(git log --pretty=format:"- %s" --no-merges -50)
-    RANGE="last 50 commits"
+    RANGE="50 commit gần nhất"
 fi
 
 if [ -z "$COMMITS" ]; then
-    echo "No commits found in range ${RANGE}"
+    echo "Không tìm thấy commit trong phạm vi ${RANGE}"
     exit 0
 fi
 
@@ -28,36 +28,36 @@ TMPDIR=$(mktemp -d)
 trap 'rm -rf "$TMPDIR"' EXIT
 
 cat > "$TMPDIR/prompt.txt" <<PROMPT_EOF
-你是 Go 命令行工具 ainovel-cli（一款 AI 小说写作引擎）的发布说明撰写者。
-请根据下面的 Git 提交记录，生成简洁、清晰、面向用户的中文 Markdown 发布说明。
+Bạn là người viết ghi chú phát hành cho công cụ dòng lệnh Go ainovel-cli (một công cụ tạo tiểu thuyết bằng AI).
+Hãy dựa trên các commit Git dưới đây để tạo ghi chú phát hành bằng Markdown, ngắn gọn, rõ ràng và hướng đến người dùng, bằng tiếng Việt tự nhiên.
 
-规则：
-- 使用中文输出
-- 按以下分组组织内容：新功能、问题修复、性能优化、重构、其他；没有内容的分组不要输出
-- 每条内容一行，保持简洁，不要包含 commit hash 或作者名
-- 移除 conventional commit 前缀，例如 feat:、fix:、perf:、refactor: 等
-- 合并相近或重复的提交，避免逐条机械复述 commit
-- 使用面向用户的表达，突出实际变化和影响
-- 重点关注用户可感知的变化，例如发布流程、二进制打包、CLI/TUI 行为、写作流程、模型支持和文档
-- 只输出 Markdown 内容，不要输出开场白、解释或总结
+Quy tắc:
+- Trả về bằng tiếng Việt
+- Tổ chức nội dung theo các nhóm sau: Tính năng mới, Sửa lỗi, Tối ưu hiệu năng, Tái cấu trúc, Khác; không có nội dung thì không cần xuất nhóm đó
+- Mỗi ý viết trên một dòng, giữ ngắn gọn, không bao gồm commit hash hoặc tên tác giả
+- Loại bỏ tiền tố conventional commit, ví dụ feat:, fix:, perf:, refactor:, v.v.
+- Gộp các commit gần giống hoặc trùng lặp, tránh liệt kê máy móc từng commit
+- Dùng cách diễn đạt hướng đến người dùng, làm nổi bật thay đổi thực tế và ảnh hưởng của chúng
+- Tập trung vào những thay đổi người dùng có thể cảm nhận được, ví dụ quy trình phát hành, đóng gói nhị phân, hành vi CLI/TUI, quy trình viết, hỗ trợ mô hình và tài liệu
+- Chỉ xuất nội dung Markdown, không kèm lời mở đầu, giải thích hoặc tổng kết
 
-提交记录（${RANGE}）：
+Commit (nhật ký ${RANGE}):
 ${COMMITS}
 PROMPT_EOF
 
-# Build JSON body with jq (reads from file to handle special chars).
+# Tạo nội dung JSON bằng jq (đọc từ file để xử lý ký tự đặc biệt).
 build_body() { jq -Rs "$1" < "$TMPDIR/prompt.txt" > "$TMPDIR/body.json"; }
 
-# Extract text from JSON response (python3 handles control chars reliably).
+# Trích xuất văn bản từ phản hồi JSON (python3 xử lý ký tự điều khiển ổn định).
 extract() { python3 -c "import json,sys; d=json.load(open('$TMPDIR/result.json')); print($1)"; }
 
 fallback() {
-    echo "## What's Changed"
+    echo "## Những thay đổi"
     echo ""
     echo "$COMMITS"
 }
 
-# Try Gemini first, then Anthropic, then OpenAI.
+# Thử Gemini trước, rồi đến Anthropic, sau đó OpenAI.
 if [ -n "$GEMINI_API_KEY" ]; then
     API_URL="${GEMINI_BASE_URL:-https://generativelanguage.googleapis.com}/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}"
     build_body '{contents: [{parts: [{text: .}]}]}'

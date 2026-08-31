@@ -7,8 +7,8 @@ import (
 	"testing"
 )
 
-// TestEnsureRulesDirAt 验证备好目录 + README.txt：写入说明、始终覆盖为最新模板，
-// 且 README.txt（非 .md）不会被扫描当成规则。
+// TestEnsureRulesDirAt xác minh việc chuẩn bị thư mục + README.txt: ghi hướng dẫn và luôn ghi đè bằng mẫu mới nhất,
+// đồng thời README.txt (không phải .md) không bị quét như quy tắc.
 func TestEnsureRulesDirAt(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "rules")
 	if err := ensureRulesDirAt(dir); err != nil {
@@ -19,16 +19,16 @@ func TestEnsureRulesDirAt(t *testing.T) {
 	if err != nil {
 		t.Fatalf("README.txt should be written: %v", err)
 	}
-	// 砍 YAML 后引导改讲"大白话 + 自动归一化"，不再教 front matter。
-	if !strings.Contains(string(data), "归一化") {
-		t.Errorf("README.txt 应说明自然语言会被归一化，got %q", data)
+	// Sau khi bỏ YAML, hướng dẫn chuyển sang "ngôn ngữ tự nhiên + chuẩn hóa tự động", không còn dạy front matter.
+	if !strings.Contains(string(data), "chuẩn hóa") {
+		t.Errorf("README.txt phải nói rằng ngôn ngữ tự nhiên sẽ được chuẩn hóa, got %q", data)
 	}
 	if strings.Contains(string(data), "front matter") {
-		t.Errorf("README.txt 不应再教 YAML front matter，got %q", data)
+		t.Errorf("README.txt không nên dạy YAML front matter nữa, got %q", data)
 	}
 
-	// 始终覆盖为最新模板：旧版本写的过时文案再次 ensure 时被刷新
-	if err := os.WriteFile(readme, []byte("旧版本写的过时文案"), 0o644); err != nil {
+	// Luôn ghi đè bằng mẫu mới nhất: nội dung cũ từ phiên bản trước sẽ được làm mới khi ensure lại
+	if err := os.WriteFile(readme, []byte("Nội dung cũ từ phiên bản trước"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	if err := ensureRulesDirAt(dir); err != nil {
@@ -38,13 +38,13 @@ func TestEnsureRulesDirAt(t *testing.T) {
 		t.Errorf("README.txt should be refreshed to latest template, got %q", again)
 	}
 
-	// README.txt 不被当规则（扫描只认 .md）
+	// README.txt không bị xem là quy tắc (trình quét chỉ nhận .md)
 	if srcs := RawFileSources(LoadOptions{HomeRulesDir: dir}); len(srcs) != 0 {
 		t.Errorf("README.txt must not be scanned as a rule, got %d sources", len(srcs))
 	}
 }
 
-// TestDefaultProjectRulesDir 锁死项目级规则目录镜像全局：./.ainovel/rules/。
+// TestDefaultProjectRulesDir cố định thư mục rules cấp project đối xứng global: ./.ainovel/rules/.
 func TestDefaultProjectRulesDir(t *testing.T) {
 	proj := filepath.Join("/tmp", "demo-book")
 	want := filepath.Join(proj, ".ainovel", "rules")
@@ -52,12 +52,12 @@ func TestDefaultProjectRulesDir(t *testing.T) {
 		t.Errorf("DefaultProjectRulesDir=%q, want %q", got, want)
 	}
 	if got := DefaultProjectRulesDir(""); got != "" {
-		t.Errorf("空项目根应返回空串，得到 %q", got)
+		t.Errorf("project root rỗng phải trả về chuỗi rỗng, got %q", got)
 	}
 }
 
-// TestDefaultOptions_ScansProjectRulesFromDotAinovel 端到端验证：
-// DefaultOptions 把 cwd 下的 ./.ainovel/rules/ 接进 SourceProject 来源。
+// TestDefaultOptions_ScansProjectRulesFromDotAinovel xác minh end-to-end:
+// DefaultOptions đưa ./.ainovel/rules/ dưới cwd vào nguồn SourceProject.
 func TestDefaultOptions_ScansProjectRulesFromDotAinovel(t *testing.T) {
 	proj := t.TempDir()
 	t.Chdir(proj)
@@ -65,7 +65,7 @@ func TestDefaultOptions_ScansProjectRulesFromDotAinovel(t *testing.T) {
 	if err := os.MkdirAll(rulesDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(rulesDir, "book.md"), []byte("# 本书偏好\n每章 4000 字"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(rulesDir, "book.md"), []byte("# Sở thích của sách này\nMỗi chương 4000 chữ"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -77,12 +77,12 @@ func TestDefaultOptions_ScansProjectRulesFromDotAinovel(t *testing.T) {
 		}
 	}
 	if got == nil {
-		t.Fatalf("应从 ./.ainovel/rules/ 扫到项目规则来源，得到 %+v", srcs)
+		t.Fatalf("phải quét được nguồn rules project từ ./.ainovel/rules/, got %+v", srcs)
 	}
-	if !strings.Contains(got.Text, "本书偏好") {
-		t.Errorf("项目规则原文应被原样返回，得到 %q", got.Text)
+	if !strings.Contains(got.Text, "Sở thích của sách này") {
+		t.Errorf("nội dung gốc của rules project phải được trả nguyên dạng, got %q", got.Text)
 	}
 	if got.Label != "project:book.md" {
-		t.Errorf("来源标签应为 project:book.md，得到 %q", got.Label)
+		t.Errorf("nhãn nguồn phải là project:book.md, got %q", got.Label)
 	}
 }

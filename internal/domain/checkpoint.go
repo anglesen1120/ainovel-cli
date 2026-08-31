@@ -5,7 +5,7 @@ import (
 	"time"
 )
 
-// ScopeKind 标识 checkpoint 的作用域类型。
+// ScopeKind xác định loại phạm vi của checkpoint.
 type ScopeKind string
 
 const (
@@ -15,7 +15,7 @@ const (
 	ScopeGlobal  ScopeKind = "global"
 )
 
-// Scope 定位一条 checkpoint 所属的创作范围。
+// Scope xác định phạm vi sáng tác mà một checkpoint thuộc về.
 type Scope struct {
 	Kind    ScopeKind `json:"kind"`
 	Chapter int       `json:"chapter,omitempty"`
@@ -23,22 +23,22 @@ type Scope struct {
 	Arc     int       `json:"arc,omitempty"`
 }
 
-// ChapterScope 构造一个章节级 Scope。
+// ChapterScope tạo một Scope cấp chương.
 func ChapterScope(chapter int) Scope {
 	return Scope{Kind: ScopeChapter, Chapter: chapter}
 }
 
-// ArcScope 构造一个弧级 Scope。
+// ArcScope tạo một Scope cấp cung.
 func ArcScope(volume, arc int) Scope {
 	return Scope{Kind: ScopeArc, Volume: volume, Arc: arc}
 }
 
-// VolumeScope 构造一个卷级 Scope。
+// VolumeScope tạo một Scope cấp quyển.
 func VolumeScope(volume int) Scope {
 	return Scope{Kind: ScopeVolume, Volume: volume}
 }
 
-// GlobalScope 构造一个全局 Scope。
+// GlobalScope tạo một Scope toàn cục.
 func GlobalScope() Scope {
 	return Scope{Kind: ScopeGlobal}
 }
@@ -56,7 +56,7 @@ func (s Scope) String() string {
 	}
 }
 
-// Matches 判断两个 Scope 是否相同。
+// Matches kiểm tra hai Scope có giống nhau không.
 func (s Scope) Matches(other Scope) bool {
 	if s.Kind != other.Kind {
 		return false
@@ -73,8 +73,8 @@ func (s Scope) Matches(other Scope) bool {
 	}
 }
 
-// Checkpoint 记录某个 step 成功完成的事实。
-// 由工具在原子落盘后追加到 JSONL，是恢复和观察的唯一事实来源。
+// Checkpoint ghi lại việc một step hoàn thành thành công.
+// Được công cụ nối thêm vào JSONL sau khi ghi xuống đĩa một cách nguyên tử; đây là nguồn sự thật duy nhất cho khôi phục và quan sát.
 type Checkpoint struct {
 	Seq        int64     `json:"seq"`
 	Scope      Scope     `json:"scope"`

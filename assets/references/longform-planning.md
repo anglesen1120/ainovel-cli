@@ -1,121 +1,121 @@
-# 通用长篇规划参考
+# Tham khảo lập kế hoạch truyện dài thông dụng
 
-这份参考用于“适合长篇连载”的题材，不限定具体品类。
+Tài liệu tham khảo này dùng cho các đề tài “phù hợp với truyện dài nhiều kỳ”, không giới hạn ở một thể loại cụ thể.
 
-## 长篇不是把短篇拉长
+## Truyện dài không phải là kéo dài truyện ngắn
 
-长篇的核心不是章节更多，而是具备长期展开能力。判断一部作品能否写长，关键看它是否具备以下“故事引擎”：
+Cốt lõi của truyện dài không nằm ở việc có nhiều chương hơn, mà là có năng lực triển khai lâu dài. Để phán đoán một tác phẩm có thể viết dài hay không, mấu chốt là xem nó có các “động cơ câu chuyện” sau đây hay không:
 
-- **目标引擎**：主角会不断追求新的阶段目标
-- **世界引擎**：世界规则、势力格局、资源结构可以持续制造新问题
-- **关系引擎**：主要人物关系会持续演化，而不是定型后停滞
-- **身份引擎**：主角的位置、身份、阵营、责任会变化
-- **代价引擎**：每次成长都带来新的约束、损失或风险
+- **Động cơ mục tiêu**: nhân vật chính sẽ không ngừng theo đuổi các mục tiêu giai đoạn mới
+- **Động cơ thế giới**: quy tắc thế giới, cục diện thế lực, cấu trúc tài nguyên có thể liên tục tạo ra vấn đề mới
+- **Động cơ quan hệ**: quan hệ giữa các nhân vật chính sẽ liên tục diễn biến, chứ không đình trệ sau khi đã định hình
+- **Động cơ thân phận**: vị trí, thân phận, phe phái, trách nhiệm của nhân vật chính sẽ thay đổi
+- **Động cơ cái giá**: mỗi lần trưởng thành đều mang đến ràng buộc, mất mát hoặc rủi ro mới
 
-如果这几个引擎都很弱，再多章节也只会变成重复灌水。
+Nếu những động cơ này đều rất yếu, thì dù có thêm nhiều chương cũng chỉ biến thành lặp lại để kéo nước.
 
-## 长篇推荐规划顺序
+## Trình tự lập kế hoạch được khuyến nghị cho truyện dài
 
-### 1. 作品卖点
+### 1. Điểm bán của tác phẩm
 
-先明确：
+Trước hết hãy làm rõ:
 
-- 这本书最吸引读者的承诺是什么
-- 它和同题材常见写法最不同的点是什么
-- 读者为什么愿意跟随主角走到中后期
+- Lời hứa hấp dẫn độc giả nhất của cuốn sách này là gì
+- Điểm khác biệt lớn nhất giữa nó và lối viết thường gặp trong cùng đề tài là gì
+- Vì sao độc giả sẵn lòng đi cùng nhân vật chính đến giai đoạn giữa và sau
 
-### 2. 长期冲突
+### 2. Xung đột dài hạn
 
-不要只有一个“终极反派”。长篇更适合多阶段冲突：
+Đừng chỉ có một “phản diện cuối cùng”. Truyện dài phù hợp hơn với xung đột nhiều giai đoạn:
 
-- 近程冲突：当前生存、当前任务、当前阶段目标
-- 中程冲突：势力博弈、关系重组、身份变化
-- 远程冲突：世界真相、时代命题、终局选择
+- Xung đột ngắn hạn: sinh tồn hiện tại, nhiệm vụ hiện tại, mục tiêu giai đoạn hiện tại
+- Xung đột trung hạn:đấu trí giữa các thế lực, tái tổ chức quan hệ, thay đổi thân phận
+- Xung đột dài hạn: chân tướng thế giới, mệnh đề thời đại, lựa chọn chung cuộc
 
-### 3. 卷级设计
+### 3. Thiết kế cấp quyển
 
-每一卷至少要有一个明确功能，常见功能包括：
+Mỗi quyển ít nhất phải có một chức năng rõ ràng, các chức năng thường gặp gồm:
 
-- 立足
-- 扩张
-- 试错
-- 反噬
-- 失去
-- 转向
-- 收束
-- 终局
+- Đứng vững
+- Mở rộng
+- Thử sai
+- Phản phệ
+- Mất đi
+- Chuyển hướng
+- Khép lại
+- Chung cuộc
 
-每卷不只升级强度，还要升级问题类型。
+Mỗi quyển không chỉ nâng cấp cường độ, mà còn phải nâng cấp loại vấn đề.
 
-### 4. 弧级设计
+### 4. Thiết kế cấp arc
 
-每一弧都应该像“一个可独立成立的小故事”：
+Mỗi arc đều nên giống như “một câu chuyện nhỏ có thể tự đứng vững độc lập”:
 
-- 有明确目标
-- 有明确阻力
-- 有阶段转折
-- 有结果与代价
+- Có mục tiêu rõ ràng
+- Có lực cản rõ ràng
+- Có bước ngoặt giai đoạn
+- Có kết quả và cái giá
 
-### 5. 章节设计
+### 5. Thiết kế chương
 
-章节不是平均分配事件，而是为弧服务：
+Chương không phải là phân bổ sự kiện một cách đồng đều, mà là phục vụ arc:
 
-- 关键推进章
-- 关系变化章
-- 代价兑现章
-- 误判与反噬章
-- 转折章
-- 收束与引出下弧章
+- Chương thúc đẩy then chốt
+- Chương thay đổi quan hệ
+- Chươngthực hiện cái giá
+- Chương phán đoán sai và phản phệ
+- Chương bước ngoặt
+- Chương khép lại và dẫn ra arc tiếp theo
 
-## 避免长篇同质化
+## Tránh đồng chất hóa truyện dài
 
-### 错误做法
+### Cách làm sai
 
-- 每一卷都只是“换地图 + 换敌人”
-- 每次升级都只是“主角更强了”
-- 中期仍然重复前期的爽点结构
-- 配角只在需要时出现，没有独立动机
-- 世界规则只在设定里写，剧情中不产生压力
+- Mỗi quyển đều chỉ là “đổi bản đồ + đổi kẻ địch”
+- Mỗi lần nâng cấp đều chỉ là “nhân vật chính mạnh hơn”
+- Giai đoạn giữa vẫn lặp lại cấu trúc điểm sướng của giai đoạn đầu
+- Nhân vật phụ chỉ xuất hiện khi cần, không có động cơ độc lập
+- Quy tắc thế giới chỉ được viết trong thiết lập, không tạo ra áp lực trong cốt truyện
 
-### 正确做法
+### Cách làm đúng
 
-- 升级“冲突类型”，不只升级“敌人强度”
-- 升级“选择代价”，不只升级“资源规模”
-- 升级“关系复杂度”，不只升级“出场人数”
-- 升级“命题”，不只升级“舞台大小”
+- Nâng cấp “loại xung đột”, không chỉ nâng cấp “cường độ kẻ địch”
+- Nâng cấp “cái giá của lựa chọn”, không chỉ nâng cấp “quy mô tài nguyên”
+- Nâng cấp “độ phức tạp của quan hệ”, không chỉ nâng cấp “số người xuất hiện”
+- Nâng cấp “mệnh đề”, không chỉ nâng cấp “độ lớn sân khấu”
 
-## 中期转向必须提前规划
+## Chuyển hướng giữa kỳ phải được lập kế hoạch trước
 
-很多作品前 20 章能写，50 章后就开始重复，根因是没有中期转向。
+Rất nhiều tác phẩm có thể viết được 20 chương đầu, nhưng sau 50 chương thì bắt đầu lặp lại; căn nguyên là không có chuyển hướng giữa kỳ.
 
-在规划时必须提前想清楚：
+Khi lập kế hoạch, bắt buộc phải nghĩ rõ trước:
 
-- 第一次结构转向发生在什么时候
-- 为什么前期方法在中期失效
-- 主角到中期后必须学会什么新的思维方式
-- 中后期的核心吸引力与前期有什么不同
+- Lần chuyển hướng cấu trúc đầu tiên xảy ra vào lúc nào
+- Vì sao phương pháp giai đoạn đầu mất hiệu lực ở giai đoạn giữa
+- Sau khi đến giai đoạn giữa, nhân vật chính bắt buộc phải học cách tư duy mới nào
+- Sức hấp dẫn cốt lõi ở giai đoạn giữa và sau khác gì so với giai đoạn đầu
 
-## 弧级节奏密度
+## Mật độ tiết tấu cấp arc
 
-每个弧应遵循”铺垫→积累→爆发→收获”的节奏循环。以下是通用弧型的参考密度（根据题材自行映射）：
+Mỗi arc nên tuân theo vòng tiết tấu “làm nền→tích lũy→bùng nổ→thu hoạch”. Dưới đây là mật độ tham khảo của các loại arc thông dụng (tự ánh xạ theo đề tài):
 
-- **成长突破弧**（10-15 章）：3-4 章能力不足/准备 → 2-3 章外部考验/试炼 → 2-3 章关键突破 → 1-2 章展示+收获。适用于：修炼升级、技能习得、破案突破、职场晋升等
-- **竞技对抗弧**（12-20 章）：2-3 章赛前准备/情报 → 6-10 章多轮对决（穿插角色互动和意外） → 2-3 章决胜+奖惩。适用于：比武大会、商业竞标、法庭辩论、选拔赛等
-- **探索发现弧**（15-25 章）：2-3 章情报收集+组队 → 8-15 章层层深入（每层新挑战） → 2-3 章最终发现+收获。适用于：秘境探险、调查真相、解谜寻宝、深入敌后等
-- **恩怨冲突弧**（8-12 章）：2-3 章矛盾积累 → 1-2 章冲突爆发 → 3-5 章多方博弈 → 1-2 章解决+后果。适用于：仇敌对决、派系斗争、情感纠葛、权力争夺等
-- **日常过渡弧**（5-8 章）：角色发展/社交/伏笔布局/休整，为下一高潮弧蓄势
+- **Arc trưởng thành đột phá**（10-15 chương）：3-4 chương năng lực chưa đủ/chuẩn bị → 2-3 chương khảo nghiệm/thử luyện bên ngoài → 2-3 chương đột phá then chốt → 1-2 chương thể hiện+thu hoạch. Phù hợp với: tu luyện thăng cấp, học được kỹ năng, đột phá phá án, thăng tiến nơi công sở, v.v.
+- **Arc cạnh tranh đối kháng**（12-20 chương）：2-3 chương chuẩn bị trước trận/thông tin tình báo → 6-10 chương nhiều vòng đối quyết（xen kẽ tương tác nhân vật và bất ngờ） → 2-3 chương quyết thắng+thưởng phạt. Phù hợp với: đại hộitỉ thí võ thuật, đấu thầu thương mại, tranh luận pháp đình, cuộc thi tuyển chọn, v.v.
+- **Arc khám phá phát hiện**（15-25 chương）：2-3 chương thu thập tình báo+lập đội → 8-15 chương tiến sâu từng tầng（mỗi tầng có thử thách mới） → 2-3 chương phát hiện cuối cùng+thu hoạch. Phù hợp với: thám hiểm bí cảnh, điều tra chân tướng, giải đố tìm kho báu,đi sâu sau lưng địch, v.v.
+- **Arc ânoán xung đột**（8-12 chương）：2-3 chương tích lũy mâu thuẫn → 1-2 chương xung đột bùng nổ → 3-5 chương nhiều bênđấu trí → 1-2 chương giải quyết+hậu quả. Phù hợp với: đối quyết kẻ thù, đấu tranh phe phái,vướng mắc tình cảm, tranh đoạt quyền lực, v.v.
+- **Arc chuyển tiếp đời thường**（5-8 chương）：phát triển nhân vật/xã giao/bố cụcmanh mối/nghỉ chỉnh đốn, tích thế cho arc cao trào tiếp theo
 
-关键原则：
-- 每次重大转折不是一章的事，而是整个弧的高潮
-- 弧的 estimated_chapters 不低于 8（太短无法展开节奏循环）
-- 弧内章节要有起伏，不是匀速推进
-- 不同类型的弧交替使用，避免节奏单调
+Nguyên tắc then chốt:
+- Mỗi lần bước ngoặt lớn không phải là chuyện của một chương, mà là cao trào của cả arc
+- estimated_chapters của arc không thấp hơn 8（quá ngắn sẽ không thể triển khai vòng tiết tấu）
+- Các chương trong arc phải có lên xuống, không phảitiến triển với tốc độ đều
+- Sử dụng luân phiên các loại arc khác nhau, tránh tiết tấu đơn điệu
 
-## 长篇通用检查清单
+## Danh sách kiểm tra thông dụng cho truyện dài
 
-- 这本书是否具备至少 3 个阶段性主矛盾？
-- 前 3 卷是否各自承担不同功能？
-- 主角的”得到”和”失去”是否同步增长？
-- 主要配角是否会改变主线，而不是只被主角改变？
-- 世界规则是否真的限制了剧情决策？
-- 中期转向后，作品是否仍然成立？
+- Cuốn sách này có ít nhất 3 mâu thuẫn chính mang tính giai đoạn không?
+- 3 quyển đầu có từng quyển đảm nhiệm chức năng khác nhau không?
+- “có được” và “mất đi” của nhân vật chính có tăng trưởng đồng bộ không?
+- Nhân vật phụ chính có làm thay đổi tuyến chính, chứ không chỉ bị nhân vật chính thay đổi không?
+- Quy tắc thế giới có thật sự giới hạn quyết sách cốt truyện không?
+- Sau chuyển hướng giữa kỳ, tác phẩm có còn đứng vững không?

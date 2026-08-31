@@ -1,66 +1,66 @@
-# 内容扩充技巧
+# Kỹ thuật mở rộng nội dung
 
-当章节内容不足时，使用以下技巧自然扩充。
+Khi nội dung chương chưa đủ, hãy sử dụng các kỹ thuật sau để mở rộng một cách tự nhiên.
 
-## 1. 场景细节描写
+## 1. Miêu tả chi tiết bối cảnh
 
-不要只说"他走进房间"，描写：
-- 房间的布局、光线、气味
-- 物品的细节和质感
-- 环境对人物的影响
-- 人物在空间中的移动
+Đừng chỉ nói "anh ta bước vào phòng", hãy miêu tả:
+- Bố cục, ánh sáng, mùi hương của căn phòng
+- Chi tiết và chất liệu của đồ vật
+- Ảnh hưởng của môi trường đối với nhân vật
+- Sự di chuyển của nhân vật trong không gian
 
-## 2. 人物内心活动
+## 2. Hoạt động nội tâm của nhân vật
 
-展示而非讲述内心世界：
-- 角色的犹豫和纠结
-- 过去记忆的闪回（1-2段）
-- 对未来的担忧和期待
-- 道德选择的内心辩论
+Thể hiện thay vì kể lể thế giới nội tâm:
+- Sự do dự và giằng xé của nhân vật
+- Hồi tưởng về ký ức quá khứ（1-2 đoạn）
+- Nỗi lo lắng và kỳ vọng về tương lai
+- Cuộc tranh luận nội tâm khi lựa chọn đạo đức
 
-## 3. 对话扩展
+## 3. Mở rộng đối thoại
 
-不要只推进剧情，让对话：
-- 展现人物性格和说话方式
-- 包含潜台词和暗示
-- 有来回交锋和试探
-- 偶尔跑题再拉回（更真实）
+Đừng chỉ thúc đẩy cốt truyện, hãy để đối thoại:
+- Thể hiện tính cách và cách nói chuyện của nhân vật
+- Chứa ẩn ý và gợi ý
+- Có sự đối đáp, giao phong và thăm dò
+- Thỉnh thoảng lạc đề rồi kéo trở lại（chân thực hơn）
 
-## 4. 感官体验
+## 4. Trải nghiệm giác quan
 
-调动五感描写：
-- 视觉：颜色、光影、形状
-- 听觉：声音、音乐、沉默
-- 触觉：温度、质感、疼痛
-- 嗅觉：气味、香味、腐臭
-- 味觉：食物、饮料、血腥味
+Huy động năm giác quan để miêu tả:
+- Thị giác: màu sắc, ánh sáng và bóng tối, hình dạng
+- Thính giác: âm thanh, âm nhạc, sự im lặng
+- Xúc giác: nhiệt độ, chất liệu, đau đớn
+- Khứu giác: mùi, hương thơm, mùi thối rữa
+- Vị giác: thức ăn, đồ uống, vị máu tanh
 
-## 5. 次要情节线
+## 5. Tuyến tình tiết phụ
 
-在主剧情中穿插：
-- 配角的小故事
-- 暗线的发展
-- 伏笔的埋设
-- 人物关系的微妙变化
+Xen kẽ trong cốt truyện chính:
+- Câu chuyện nhỏ của nhân vật phụ
+- Sự phát triển của tuyến ngầm
+- Việc cài cắm điềm báo
+- Những thay đổi tinh tế trong quan hệ nhân vật
 
-## 6. 节奏放慢
+## 6. Làm chậm nhịp độ
 
-关键时刻慢下来描写：
-- 动作场景的分解
-- 情感转变的过程
-- 发现真相的时刻
-- 紧张对峙的延展
+Miêu tả chậm lại ở những thời khắc then chốt:
+- Phân giải cảnh hành động
+- Quá trình chuyển biến cảm xúc
+- Khoảnh khắc phát hiện sự thật
+- Kéo dài cuộc đối đầu căng thẳng
 
-## 7. 环境烘托
+## 7. Dùng môi trường để làm nổi bật
 
-用环境反映情绪：
-- 天气和氛围
-- 社会环境背景
-- 文化习俗细节
-- 时代特征展现
+Dùng môi trường phản ánh cảm xúc:
+- Thời tiết và bầu không khí
+- Bối cảnh môi trường xã hội
+- Chi tiết phong tục văn hóa
+- Thể hiện đặc trưng thời đại
 
-## 扩充原则
+## Nguyên tắc mở rộng
 
-- **自然融入** - 扩充内容要服务于故事，不要注水
-- **保持张力** - 即使扩充场景也不能失去冲突
-- **推进主线** - 所有扩充最终都要指向核心剧情
+- **Hòa nhập tự nhiên** - Nội dung mở rộng phải phục vụ câu chuyện, đừng thêm cho đủ chữ
+- **Giữ sức căng** - Ngay cả khi mở rộng bối cảnh cũng không được mất đi xung đột
+- **Thúc đẩy mạch chính** - Tất cả phần mở rộng cuối cùng đều phải hướng đến cốt truyện cốt lõi

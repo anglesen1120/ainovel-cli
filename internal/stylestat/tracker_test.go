@@ -9,15 +9,15 @@ import (
 
 func TestTrackerMatchesComputeAcrossUpdates(t *testing.T) {
 	allChapters := map[int]string{
-		1: chapterWith("夜里，他不是迟疑，而是恐惧。青云山巅风声渐紧。\n此生未能远行，望你替我看看远方的山海。\n他走了。"),
-		2: chapterWith("清晨，她沉默了几息，青云山巅云海翻涌。\n此生未能远行，望你替我看看远方的山海。\n天色渐亮。"),
-		3: chapterWith("陆九渊站在青云山巅，眼中闪过寒意。\n此生未能远行，望你替我看看远方的山海。\n无人回答。"),
-		4: chapterWith("众人望向青云山巅，觉得风雨将至。\n长街尽头传来钟声。\n门开了。"),
-		5: chapterWith("仿佛一场旧梦压在青云山巅。\n一种说不出的寒意沿石阶蔓延。\n灯灭了。"),
-		6: chapterWith("他心头一紧，却没有回头。\n青云山巅仍旧沉在云里。\n故事仍要继续向前延伸。"),
+		1: chapterWith("Trong đêm, anh không phải do dự mà là sợ hãi. Gió trên đỉnh Núi Xanh dần gấp.\nĐời này chưa thể đi xa, mong con thay ta ngắm núi biển phương xa.\nAnh rời đi."),
+		2: chapterWith("Sáng sớm, cô im lặng vài nhịp thở, biển mây trên đỉnh Núi Xanh cuồn cuộn.\nĐời này chưa thể đi xa, mong con thay ta ngắm núi biển phương xa.\nTrời dần sáng."),
+		3: chapterWith("Lục Cửu Uyên đứng trên đỉnh Núi Xanh, ánh mắt thoáng qua hơi lạnh.\nĐời này chưa thể đi xa, mong con thay ta ngắm núi biển phương xa.\nKhông ai đáp."),
+		4: chapterWith("Mọi người nhìn về đỉnh Núi Xanh, cảm thấy giông bão sắp tới.\nCuối phố dài vang tiếng chuông.\nCửa mở."),
+		5: chapterWith("Như thể một giấc mộng cũ đè lên đỉnh Núi Xanh.\nNỗi lạnh khó nói thành lời lan theo bậc đá.\nĐèn tắt."),
+		6: chapterWith("Tim anh thắt lại nhưng không quay đầu.\nĐỉnh Núi Xanh vẫn chìm trong mây.\nCâu chuyện vẫn phải tiếp tục tiến về phía trước."),
 	}
-	titles := []string{"第一章 风起", "云涌", "第3章 雷动", "暗潮", "归途", "山门"}
-	stopwords := []string{"陆九渊"}
+	titles := []string{"Chương 1 Gió nổi", "Mây cuộn", "chapter 3 Sấm động", "Sóng ngầm", "Đường về", "Cổng núi"}
+	stopwords := []string{"Lục Cửu Uyên"}
 
 	tracker := NewTracker()
 	chapters := make(map[int]string)
@@ -27,7 +27,7 @@ func TestTrackerMatchesComputeAcrossUpdates(t *testing.T) {
 		assertTrackerMatchesCompute(t, tracker, chapters, titles, stopwords)
 	}
 
-	chapters[2] = chapterWith("黎明时，她心头一沉，宛如旧梦惊醒。\n改写后的长句只在这一章出现，不应成为跨章复读。\n风停了。")
+	chapters[2] = chapterWith("Lúc bình minh, tim cô chùng xuống, hệt như tỉnh khỏi mộng cũ.\nCâu dài sau khi viết lại chỉ xuất hiện trong chương này, không nên thành lặp lại qua chương.\nGió ngừng.")
 	tracker.Upsert(2, chapters[2])
 	assertTrackerMatchesCompute(t, tracker, chapters, titles, stopwords)
 
@@ -39,7 +39,7 @@ func TestTrackerMatchesComputeAcrossUpdates(t *testing.T) {
 func TestTrackerSnapshotReturnsIndependentCopy(t *testing.T) {
 	tracker := NewTracker()
 	for chapter := 1; chapter <= 5; chapter++ {
-		tracker.Upsert(chapter, chapterWith("他不是退缩，而是在等待。"))
+		tracker.Upsert(chapter, chapterWith("Anh không phải lùi bước mà là đang chờ đợi."))
 	}
 
 	first := tracker.Snapshot(nil, nil)
@@ -57,7 +57,7 @@ func TestTrackerSnapshotReturnsIndependentCopy(t *testing.T) {
 func TestTrackerConcurrentSnapshotAndUpdate(t *testing.T) {
 	tracker := NewTracker()
 	for chapter := 1; chapter <= 8; chapter++ {
-		tracker.Upsert(chapter, chapterWith("他不是退缩，而是在等待。"))
+		tracker.Upsert(chapter, chapterWith("Anh không phải lùi bước mà là đang chờ đợi."))
 	}
 
 	var wg sync.WaitGroup
@@ -67,9 +67,9 @@ func TestTrackerConcurrentSnapshotAndUpdate(t *testing.T) {
 			defer wg.Done()
 			for i := 0; i < 50; i++ {
 				if worker%2 == 0 {
-					tracker.Upsert(8, chapterWith("他不是退缩，而是在等待。"))
+					tracker.Upsert(8, chapterWith("Anh không phải lùi bước mà là đang chờ đợi."))
 				} else {
-					_ = tracker.Snapshot([]string{"第一章"}, []string{"林砚"})
+					_ = tracker.Snapshot([]string{"Chương 1"}, []string{"Lâm Nghiên"})
 				}
 			}
 		}(worker)

@@ -22,15 +22,15 @@ func TestStoreSummaryCompactApplyUsesPersistentStoreData(t *testing.T) {
 	})
 
 	msgs := []agentcore.AgentMessage{
-		agentcore.UserMsg(strings.Repeat("旧上下文", 80)),
+		agentcore.UserMsg(strings.Repeat("ngữ cảnh cũ ", 200)),
 		agentcore.Message{
 			Role:    agentcore.RoleAssistant,
-			Content: []agentcore.ContentBlock{agentcore.TextBlock(strings.Repeat("旧回复", 80))},
+			Content: []agentcore.ContentBlock{agentcore.TextBlock(strings.Repeat("phản hồi cũ ", 200))},
 		},
-		agentcore.UserMsg("继续写第三章，注意承接第二章结尾。"),
+		agentcore.UserMsg("Tiếp tục viết chương ba, chú ý nối tiếp đoạn kết chương hai."),
 		agentcore.Message{
 			Role:    agentcore.RoleAssistant,
-			Content: []agentcore.ContentBlock{agentcore.TextBlock("收到，我先梳理当前场景。")},
+			Content: []agentcore.ContentBlock{agentcore.TextBlock("Đã rõ, tôi sẽ sắp xếp cảnh hiện tại trước.")},
 		},
 	}
 
@@ -43,35 +43,35 @@ func TestStoreSummaryCompactApplyUsesPersistentStoreData(t *testing.T) {
 		t.Fatalf("Apply: %v", err)
 	}
 	if !result.Applied {
-		t.Fatal("expected store summary strategy to apply")
+		t.Fatal("chiến lược tóm tắt kho dữ liệu phải được áp dụng")
 	}
 	if result.Name != storeSummaryStrategyName {
-		t.Fatalf("unexpected strategy name: %q", result.Name)
+		t.Fatalf("tên chiến lược không đúng: %q", result.Name)
 	}
 	if len(out) < 2 {
-		t.Fatalf("expected summary + kept messages, got %d", len(out))
+		t.Fatalf("cần bản tóm tắt cùng các tin nhắn được giữ lại, nhận %d", len(out))
 	}
 	summary, ok := out[0].(corecontext.ContextSummary)
 	if !ok {
-		t.Fatalf("expected ContextSummary, got %T", out[0])
+		t.Fatalf("cần ContextSummary, nhận %T", out[0])
 	}
-	if !strings.Contains(summary.Summary, "最近章节摘要") {
-		t.Fatalf("expected persistent summaries in checkpoint, got %q", summary.Summary)
+	if !strings.Contains(summary.Summary, "Tóm tắt chương gần đây") {
+		t.Fatalf("cần các bản tóm tắt lâu dài trong checkpoint, nhận %q", summary.Summary)
 	}
-	if !strings.Contains(summary.Summary, "当前章节计划") {
-		t.Fatalf("expected chapter plan in checkpoint, got %q", summary.Summary)
+	if !strings.Contains(summary.Summary, "Kế hoạch chương hiện tại") {
+		t.Fatalf("cần kế hoạch chương trong checkpoint, nhận %q", summary.Summary)
 	}
-	if !strings.Contains(summary.Summary, "活跃伏笔") {
-		t.Fatalf("expected foreshadow data in checkpoint, got %q", summary.Summary)
+	if !strings.Contains(summary.Summary, "Foreshadowing đang hoạt động") {
+		t.Fatalf("cần dữ liệu foreshadow trong checkpoint, nhận %q", summary.Summary)
 	}
-	if !strings.Contains(summary.Summary, "待修审稿问题") {
-		t.Fatalf("expected pending review section in checkpoint, got %q", summary.Summary)
+	if !strings.Contains(summary.Summary, "Vấn đề rà soát chờ sửa") {
+		t.Fatalf("cần mục rà soát đang chờ trong checkpoint, nhận %q", summary.Summary)
 	}
-	if !strings.Contains(summary.Summary, "仓库线索需要再蓄压一拍") {
-		t.Fatalf("expected pending review details in checkpoint, got %q", summary.Summary)
+	if !strings.Contains(summary.Summary, "Manh mối nhà kho") {
+		t.Fatalf("cần chi tiết rà soát đang chờ trong checkpoint, nhận %q", summary.Summary)
 	}
 	if result.Info == nil || result.Info.CompactedCount <= 0 {
-		t.Fatalf("expected compaction info, got %+v", result.Info)
+		t.Fatalf("cần thông tin nén, nhận %+v", result.Info)
 	}
 }
 
@@ -83,10 +83,10 @@ func TestWriterRestoreIncludesOptionalDataWarnings(t *testing.T) {
 
 	text, ok, err := buildWriterRestoreText(s, restoreBudgetTokens)
 	if err != nil {
-		t.Fatalf("辅助数据损坏不应阻止恢复上下文: %v", err)
+		t.Fatalf("Dữ liệu phụ bị hỏng không được ngăn khôi phục ngữ cảnh: %v", err)
 	}
-	if !ok || !strings.Contains(text, "数据告警") || !strings.Contains(text, "style_rules") {
-		t.Fatalf("恢复上下文应向模型暴露读取告警: %q", text)
+	if !ok || !strings.Contains(text, "Cảnh báo dữ liệu") || !strings.Contains(text, "style_rules") {
+		t.Fatalf("Ngữ cảnh khôi phục phải hiển thị cảnh báo đọc cho mô hình: %q", text)
 	}
 }
 
@@ -107,10 +107,10 @@ func TestStoreSummaryCompactApplyFallsBackWhenStoreDataInsufficient(t *testing.T
 
 	strategy := NewStoreSummaryCompact(StoreSummaryCompactConfig{Store: s, KeepRecentTokens: 20})
 	msgs := []agentcore.AgentMessage{
-		agentcore.UserMsg(strings.Repeat("旧上下文", 40)),
+		agentcore.UserMsg(strings.Repeat("ngữ cảnh cũ", 40)),
 		agentcore.Message{
 			Role:    agentcore.RoleAssistant,
-			Content: []agentcore.ContentBlock{agentcore.TextBlock(strings.Repeat("旧回复", 40))},
+			Content: []agentcore.ContentBlock{agentcore.TextBlock(strings.Repeat("phản hồi cũ", 40))},
 		},
 	}
 
@@ -123,10 +123,10 @@ func TestStoreSummaryCompactApplyFallsBackWhenStoreDataInsufficient(t *testing.T
 		t.Fatalf("Apply: %v", err)
 	}
 	if result.Applied {
-		t.Fatal("expected no-op when persistent memory is insufficient")
+		t.Fatal("không được áp dụng khi bộ nhớ lâu dài không đủ")
 	}
 	if len(out) != len(msgs) {
-		t.Fatalf("expected messages unchanged, got %d", len(out))
+		t.Fatalf("tin nhắn phải giữ nguyên, nhận %d", len(out))
 	}
 }
 
@@ -140,21 +140,21 @@ func TestWriterRestorePackRefreshReusesStoreBuilder(t *testing.T) {
 		t.Fatalf("buildMessage: %v", err)
 	}
 	if !ok {
-		t.Fatal("expected restore pack message")
+		t.Fatal("cần tin nhắn gói khôi phục")
 	}
 	text := msg.TextContent()
 	if !strings.Contains(text, "<post-compact-context>") {
-		t.Fatalf("expected wrapped restore context, got %q", text)
+		t.Fatalf("cần ngữ cảnh khôi phục được bao bọc, nhận %q", text)
 	}
-	if !strings.Contains(text, "待修审稿问题") {
-		t.Fatalf("expected pending review section, got %q", text)
+	if !strings.Contains(text, "Vấn đề rà soát chờ sửa") {
+		t.Fatalf("cần mục rà soát đang chờ, nhận %q", text)
 	}
-	if !strings.Contains(text, "当前章节计划") {
-		t.Fatalf("expected chapter plan section, got %q", text)
+	if !strings.Contains(text, "Kế hoạch chương hiện tại") {
+		t.Fatalf("cần mục kế hoạch chương, nhận %q", text)
 	}
 
 	if _, _, err := pack.buildMessage(0); err == nil {
-		t.Fatal("expected an explicit error when the restore pack does not fit")
+		t.Fatal("cần lỗi rõ ràng khi gói khôi phục không vừa")
 	}
 }
 
@@ -175,51 +175,51 @@ func seededWriterStore(t *testing.T) *storepkg.Store {
 		t.Fatalf("Save progress: %v", err)
 	}
 	if err := s.Outline.SaveOutline([]domain.OutlineEntry{
-		{Chapter: 1, Title: "第一章", CoreEvent: "开场"},
-		{Chapter: 2, Title: "第二章", CoreEvent: "冲突升级"},
-		{Chapter: 3, Title: "第三章", CoreEvent: "追查线索", Scenes: []string{"主角追查失踪案", "发现旧仓库线索"}},
+		{Chapter: 1, Title: "Chương một", CoreEvent: "Mở đầu"},
+		{Chapter: 2, Title: "Chương hai", CoreEvent: "Xung đột leo thang"},
+		{Chapter: 3, Title: "Chương ba", CoreEvent: "Truy tìm manh mối", Scenes: []string{"Nhân vật chính điều tra vụ mất tích", "Phát hiện manh mối nhà kho cũ"}},
 	}); err != nil {
 		t.Fatalf("SaveOutline: %v", err)
 	}
 	if err := s.Drafts.SaveChapterPlan(domain.ChapterPlan{
 		Chapter:    3,
-		Title:      "第三章",
-		Goal:       "推进失踪案调查",
-		Conflict:   "主角与搭档对调查方向分歧",
-		Hook:       "仓库中发现可疑录音",
-		EmotionArc: "怀疑到紧张",
+		Title:      "Chương ba",
+		Goal:       "Đẩy tiến điều tra vụ mất tích",
+		Conflict:   "Nhân vật chính và cộng sự bất đồng về hướng điều tra",
+		Hook:       "Phát hiện bản ghi âm đáng ngờ trong nhà kho",
+		EmotionArc: "từ nghi ngờ tới căng thẳng",
 	}); err != nil {
 		t.Fatalf("SaveChapterPlan: %v", err)
 	}
 	if err := s.Summaries.SaveSummary(domain.ChapterSummary{
 		Chapter:    1,
-		Summary:    "主角接下委托，发现失踪案并不简单。",
-		Characters: []string{"林岚", "周策"},
-		KeyEvents:  []string{"委托成立"},
+		Summary:    "Nhân vật chính nhận ủy thác, phát hiện vụ mất tích không đơn giản.",
+		Characters: []string{"Lâm Lam", "Chu Sách"},
+		KeyEvents:  []string{"Ủy thác được xác lập"},
 	}); err != nil {
 		t.Fatalf("SaveSummary 1: %v", err)
 	}
 	if err := s.Summaries.SaveSummary(domain.ChapterSummary{
 		Chapter:    2,
-		Summary:    "两人追查旧码头，线索指向废弃仓库。",
-		Characters: []string{"林岚", "周策", "沈叔"},
-		KeyEvents:  []string{"旧码头冲突", "仓库线索出现"},
+		Summary:    "Hai người điều tra bến tàu cũ, manh mối chỉ tới nhà kho bỏ hoang.",
+		Characters: []string{"Lâm Lam", "Chu Sách", "Chú Thẩm"},
+		KeyEvents:  []string{"Xung đột ở bến tàu cũ", "Manh mối nhà kho xuất hiện"},
 	}); err != nil {
 		t.Fatalf("SaveSummary 2: %v", err)
 	}
 	if err := s.World.SaveForeshadowLedger([]domain.ForeshadowEntry{
-		{ID: "tape", Description: "失踪者留下的录音带", PlantedAt: 2, Status: "planted"},
+		{ID: "tape", Description: "Cuộn băng ghi âm người mất tích để lại", PlantedAt: 2, Status: "planted"},
 	}); err != nil {
 		t.Fatalf("SaveForeshadowLedger: %v", err)
 	}
 	if err := s.World.SaveTimeline([]domain.TimelineEvent{
-		{Chapter: 2, Time: "夜晚", Event: "旧码头交锋", Characters: []string{"林岚", "周策"}},
+		{Chapter: 2, Time: "ban đêm", Event: "Đối đầu ở bến tàu cũ", Characters: []string{"Lâm Lam", "Chu Sách"}},
 	}); err != nil {
 		t.Fatalf("SaveTimeline: %v", err)
 	}
 	if err := s.World.SaveStyleRules(domain.WritingStyleRules{
-		Prose:  []string{"句子偏短，保持压迫感"},
-		Taboos: []string{"避免直白解释谜团"},
+		Prose:  []string{"Câu hơi ngắn, giữ cảm giác áp bức"},
+		Taboos: []string{"Tránh giải thích bí ẩn quá trực diện"},
 	}); err != nil {
 		t.Fatalf("SaveStyleRules: %v", err)
 	}
@@ -227,16 +227,16 @@ func seededWriterStore(t *testing.T) *storepkg.Store {
 		Chapter: 2,
 		Scope:   "chapter",
 		Verdict: "polish",
-		Summary: "第二章结尾铺垫偏急，需要补一拍仓库前的压迫感。",
+		Summary: "Phần cài cắm cuối chương hai hơi gấp, cần thêm một nhịp áp bức trước nhà kho.",
 		Issues: []domain.ConsistencyIssue{
 			{
 				Type:        "pacing",
 				Severity:    "warning",
-				Description: "仓库线索出现过快，悬疑蓄压不够。",
-				Suggestion:  "在进入仓库前增加一段迟疑与环境压迫描写。",
+				Description: "Manh mối nhà kho xuất hiện quá nhanh, phần trinh thám chưa đủ nén áp lực.",
+				Suggestion:  "Thêm một đoạn do dự và miêu tả áp lực môi trường trước khi vào nhà kho.",
 			},
 		},
-		ContractMisses: []string{"章末钩子不够强"},
+		ContractMisses: []string{"Hook cuối chương chưa đủ mạnh"},
 	}); err != nil {
 		t.Fatalf("Save chapter review: %v", err)
 	}
@@ -244,7 +244,7 @@ func seededWriterStore(t *testing.T) *storepkg.Store {
 		Chapter: 2,
 		Scope:   "global",
 		Verdict: "polish",
-		Summary: "第二章尾声节奏偏快，仓库线索需要再蓄压一拍。",
+		Summary: "Nhịp đoạn kết chương hai hơi nhanh, manh mối nhà kho cần được nén thêm một nhịp.",
 	}); err != nil {
 		t.Fatalf("SaveReview: %v", err)
 	}

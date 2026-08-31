@@ -2,16 +2,16 @@ package domain
 
 import "time"
 
-// UsageSchemaVersion 是 meta/usage.json 的兼容版本号。
-// 未来若 AgentUsageTotals 字段语义变化，递增此值；UsageStore.Load 见到不同版本应忽略并触发 replay 重建。
+// UsageSchemaVersion là phiên bản tương thích của meta/usage.json.
+// Trong tương lai nếu ngữ nghĩa các trường AgentUsageTotals thay đổi, hãy tăng giá trị này; khi UsageStore.Load thấy phiên bản khác, nên bỏ qua và kích hoạt replay để dựng lại.
 const UsageSchemaVersion = 2
 
-// UsageState 是累计 token / cost 用量的可持久化快照。
-// 内存中由 UsageTracker 维护，定期 debounce 落盘到 meta/usage.json。
+// UsageState là snapshot có thể lưu bền vững của lượng sử dụng token / cost tích lũy.
+// Trong bộ nhớ, nó được UsageTracker duy trì và định kỳ debounce ghi xuống meta/usage.json.
 //
-// 注意：UsageTracker 内部的滑动窗 samples（"近 N 次命中率"）**不持久化**——
-// 它只服务 UI 短期诊断，进程重启从空开始重新积累几轮即可恢复语义。
-// MissingAssistantUsage 保留持久化，跨重启累积更有诊断价值。
+// Lưu ý: các samples cửa sổ trượt bên trong UsageTracker ("tỷ lệ trúng trong N lần gần nhất") **không được lưu bền vững**——
+// nó chỉ phục vụ chẩn đoán ngắn hạn trên UI; sau khi tiến trình khởi động lại, bắt đầu tích lũy lại vài vòng từ rỗng là đủ để khôi phục ngữ nghĩa.
+// MissingAssistantUsage vẫn được lưu bền vững; tích lũy qua các lần khởi động lại có giá trị chẩn đoán hơn.
 type UsageState struct {
 	Schema       int                         `json:"schema"`
 	UpdatedAt    time.Time                   `json:"updated_at"`
@@ -21,7 +21,7 @@ type UsageState struct {
 	MissingUsage int                         `json:"missing_assistant_usage"`
 }
 
-// AgentUsageTotals 是单个角色（或 overall）累计计数的可持久化形态。
+// AgentUsageTotals là dạng có thể lưu bền vững của các bộ đếm tích lũy cho một vai trò đơn lẻ (hoặc overall).
 type AgentUsageTotals struct {
 	Input        int     `json:"input"`
 	Output       int     `json:"output"`
@@ -30,7 +30,7 @@ type AgentUsageTotals struct {
 	Cost         float64 `json:"cost_usd"`
 	Saved        float64 `json:"saved_usd"`
 	CacheCapable bool    `json:"cache_capable"`
-	// CacheBreaks 是 live 检测到的缓存链断裂次数（前缀未缩短而命中骤降）。
-	// 只在实时路径累计，session replay 不重放检测。
+	// CacheBreaks là số lần đứt chuỗi cache được phát hiện live (tiền tố chưa ngắn lại nhưng số lần trúng giảm mạnh).
+	// Chỉ tích lũy trên đường dẫn thời gian thực; session replay không phát lại việc phát hiện.
 	CacheBreaks int `json:"cache_breaks,omitempty"`
 }

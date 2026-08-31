@@ -5,12 +5,12 @@ import (
 	"strings"
 )
 
-// Lint 内置产品底线检查：扫描正文中的机制残留，与用户规则无关，commit 时始终执行。
-// 与 Check 同契约——仅返事实（铁律一），不阻断流程，由评审/用户裁定。
+// Lint kiểm tra các giới hạn tích hợp sẵn của sản phẩm: quét phần văn bản để tìm dấu vết cơ chế, không liên quan đến quy tắc người dùng; luôn chạy khi commit.
+// Cùng hợp đồng với Check — chỉ trả về dữ kiện (nguyên tắc sắt một), không chặn luồng; để người đánh giá/người dùng quyết định.
 //
-// 当前三类（全部来自真实长跑产物的实证缺陷）：
-//   - markdown_residue：正文残留 ** 加粗、首行之外的 # 标题行（导出 txt 会裸露符号）
-//   - non_cjk_fragments：连续拉丁字母片段（模型语言混杂，如中文正文裸混 "pattern"）
+// Hiện có ba loại (đều là các khiếm khuyết đã được kiểm chứng từ sản phẩm chạy dài thực tế):
+//   - markdown_residue: phần văn bản còn ** in đậm, hoặc dòng tiêu đề # nằm sau dòng đầu (khi xuất txt sẽ làm lộ ký hiệu)
+//   - non_cjk_fragments: các đoạn chữ cái Latin liên tiếp (ngôn ngữ bị trộn bởi model, chẳng hạn phần văn bản tiếng Trung lẫn "pattern")
 func Lint(text string) []Violation {
 	var vs []Violation
 	vs = appendMarkdownResidue(vs, text)
@@ -34,7 +34,7 @@ func appendMarkdownResidue(vs []Violation, text string) []Violation {
 		if t == "" {
 			continue
 		}
-		// 第一个非空行的 # 标题是章文件的合法格式（不按行号写死，容忍前导空行）
+		// Tiêu đề # ở dòng không trống đầu tiên là định dạng hợp lệ của tệp chương (không cố định theo số dòng, cho phép các dòng trống ở đầu)
 		first := !seenContent
 		seenContent = true
 		if !first && strings.HasPrefix(t, "#") {
@@ -54,8 +54,8 @@ func appendMarkdownResidue(vs []Violation, text string) []Violation {
 
 var latinFragmentRe = regexp.MustCompile(`[A-Za-z]{2,}`)
 
-// appendNonCJKFragments 报告拉丁字母片段的总次数与去重示例。
-// 现代题材的合法英文（品牌名/缩写）也会命中——warning 级事实，由评审按题材裁定。
+// appendNonCJKFragments báo cáo tổng số lần xuất hiện của các đoạn chữ cái Latin và các ví dụ không trùng lặp.
+// Tiếng Anh hợp lệ trong chủ đề hiện đại (tên thương hiệu/viết tắt) cũng sẽ khớp — đây là dữ kiện cấp warning, người đánh giá quyết định theo chủ đề.
 func appendNonCJKFragments(vs []Violation, text string) []Violation {
 	matches := latinFragmentRe.FindAllString(text, -1)
 	if len(matches) == 0 {

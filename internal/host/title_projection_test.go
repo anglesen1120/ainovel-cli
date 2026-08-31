@@ -16,8 +16,8 @@ func TestFillDetailsUsesCommittedTitleOnlyForCompletedChapters(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := s.Outline.SaveOutline([]domain.OutlineEntry{
-		{Chapter: 1, Title: "计划一"},
-		{Chapter: 2, Title: "计划二"},
+		{Chapter: 1, Title: "Kế hoạch một"},
+		{Chapter: 2, Title: "Kế hoạch hai"},
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -25,7 +25,7 @@ func TestFillDetailsUsesCommittedTitleOnlyForCompletedChapters(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := s.Summaries.SaveSummary(domain.ChapterSummary{
-		Chapter: 1, Title: "终稿一", Summary: "摘要",
+		Chapter: 1, Title: "Bản cuối một", Summary: "Tóm tắt",
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -40,10 +40,10 @@ func TestFillDetailsUsesCommittedTitleOnlyForCompletedChapters(t *testing.T) {
 	if len(snapshot.Outline) != 2 {
 		t.Fatalf("outline snapshot = %+v", snapshot.Outline)
 	}
-	if snapshot.Outline[0].Title != "终稿一" {
+	if snapshot.Outline[0].Title != "Bản cuối một" {
 		t.Fatalf("completed title = %q, want committed title", snapshot.Outline[0].Title)
 	}
-	if snapshot.Outline[1].Title != "计划二" {
+	if snapshot.Outline[1].Title != "Kế hoạch hai" {
 		t.Fatalf("future title = %q, want planned title", snapshot.Outline[1].Title)
 	}
 }

@@ -6,7 +6,7 @@ import (
 )
 
 func chapterWith(body string) string {
-	return "# 标题\n" + body
+	return "# Tiêu đề\n" + body
 }
 
 func TestComputeBelowMinChapters(t *testing.T) {
@@ -17,7 +17,7 @@ func TestComputeBelowMinChapters(t *testing.T) {
 }
 
 func TestComputePatterns(t *testing.T) {
-	body := "他不是愤怒，而是恐惧。沉默了几息。像一盏灯。她眼中闪过慌乱，心头一紧。他觉得这是一种说不出的寒意。\n正文。\n"
+	body := "Anh không phải giận dữ mà là sợ hãi. Im lặng vài nhịp thở. Như thể một ngọn đèn. Ánh mắt cô thoáng qua hoảng loạn, tim thắt lại. Anh cảm thấy đó là nỗi lạnh khó nói thành lời.\nNội dung.\n"
 	chapters := make([]string, 6)
 	for i := range chapters {
 		chapters[i] = chapterWith(body)
@@ -27,14 +27,14 @@ func TestComputePatterns(t *testing.T) {
 		t.Fatal("expected stats")
 	}
 	want := map[string]int{
-		"矫正句『不是…(而)是…』":        6,
-		"计时量词『X息/X瞬』":          6,
-		"明喻『像一/仿佛/如同/宛如』":      6,
-		"沉默节拍『沉默了/没有说话/没有回头』":  6,
-		"神态模板『眼中闪过/嘴角勾起/咬了咬唇』": 6,
-		"躯体反应『心头一紧/身子一颤/倒吸凉气』": 6,
-		"思维标记『心想/意识到/感到/觉得』":   6,
-		"抽象套话『一种说不出的/的意义在于』":   6,
+		"Câu chỉnh hướng 'không phải... mà là...'": 6,
+		"Nhịp đếm thời gian ngắn":                  6,
+		"So sánh lộ kiểu 'như thể/tựa như'":        6,
+		"Nhịp im lặng lặp lại":                     6,
+		"Khuôn nét mặt lặp lại":                    6,
+		"Phản ứng cơ thể rập khuôn":                6,
+		"Dấu hiệu suy nghĩ lộ":                     6,
+		"Cụm trừu tượng sáo rỗng":                  6,
 	}
 	for _, p := range s.Patterns {
 		if w, ok := want[p.Name]; ok && p.Total != w {
@@ -50,27 +50,27 @@ func TestComputePatterns(t *testing.T) {
 }
 
 func TestComputeTopPhrasesWithStopwords(t *testing.T) {
-	// 「青云山巅」高频出现；「陆九渊」是角色名应被过滤
-	line := "众人望向青云山巅，陆九渊负手而立。\n"
+	// "Núi" xuất hiện thường xuyên; tên nhân vật phải bị lọc.
+	line := "Núi đá. Lục Cửu Uyên đứng chắp tay sau lưng.\n"
 	chapters := make([]string, 10)
 	for i := range chapters {
 		chapters[i] = chapterWith(strings.Repeat(line, 3))
 	}
-	s := Compute(Input{Chapters: chapters, Stopwords: []string{"陆九渊"}})
+	s := Compute(Input{Chapters: chapters, Stopwords: []string{"Lục Cửu Uyên"}})
 	if s == nil {
 		t.Fatal("expected stats")
 	}
 	var hasMountain, hasName bool
 	for _, p := range s.TopPhrases {
-		if strings.Contains(p.Text, "青云山") {
+		if strings.Contains(p.Text, "Núi") {
 			hasMountain = true
 		}
-		if strings.Contains(p.Text, "九渊") || strings.Contains(p.Text, "陆九") {
+		if strings.Contains(p.Text, "Cửu") || strings.Contains(p.Text, "Lục") {
 			hasName = true
 		}
 	}
 	if !hasMountain {
-		t.Errorf("expected 青云山 phrase mined, got %+v", s.TopPhrases)
+		t.Errorf("expected Núi phrase mined, got %+v", s.TopPhrases)
 	}
 	if hasName {
 		t.Errorf("character name should be filtered, got %+v", s.TopPhrases)
@@ -78,10 +78,10 @@ func TestComputeTopPhrasesWithStopwords(t *testing.T) {
 }
 
 func TestComputeRepeatedSentences(t *testing.T) {
-	motto := "此生未能远行，望你替我看看远方的山海。"
+	motto := "Đời này chưa thể đi xa, mong con thay ta ngắm núi biển phương xa."
 	chapters := make([]string, 6)
 	for i := range chapters {
-		body := "平常正文，没有什么重复。\n"
+		body := "Nội dung.\n"
 		if i%2 == 0 {
 			body += motto + "\n"
 		}
@@ -98,14 +98,13 @@ func TestComputeRepeatedSentences(t *testing.T) {
 	if got.Chapters != 3 || got.Count != 3 {
 		t.Errorf("repeated sentence: %+v", got)
 	}
-	if !strings.HasPrefix(got.Text, "此生未能远行") {
+	if !strings.HasPrefix(got.Text, "Đời này chưa thể đi xa") {
 		t.Errorf("text: %q", got.Text)
 	}
 }
-
 func TestComputeEndingAndOpening(t *testing.T) {
-	short := chapterWith("一整夜没有睡。\n正文很长很长很长。\n他走了。")
-	long := chapterWith("白天的事。\n正文。\n这是一个非常非常非常长的结尾句子，远远超过三十个字符的阈值长度，用来测试中位数。")
+	short := chapterWith("Suốt đêm không ngủ.\nNội dung rất dài rất dài rất dài.\nAnh rời đi.")
+	long := chapterWith("Chuyện ban ngày.\nNội dung.\nĐây là một câu kết rất rất rất dài, vượt xa ngưỡng ba mươi ký tự để kiểm tra trung vị.")
 	chapters := []string{short, short, short, long, long}
 	s := Compute(Input{Chapters: chapters})
 	if s == nil {
@@ -122,15 +121,15 @@ func TestComputeEndingAndOpening(t *testing.T) {
 func TestComputeTitleFormats(t *testing.T) {
 	chapters := make([]string, 5)
 	for i := range chapters {
-		chapters[i] = chapterWith("正文。")
+		chapters[i] = chapterWith("Nội dung.")
 	}
-	// 混用 → 上报
-	s := Compute(Input{Chapters: chapters, Titles: []string{"第一章 风起", "云涌", "第3章 雷动"}})
+	// Trộn lẫn thì báo cáo
+	s := Compute(Input{Chapters: chapters, Titles: []string{"Chương 1 Gió nổi", "Mây cuộn", "chapter 3 Sấm động"}})
 	if s.TitleFormats == nil || s.TitleFormats.WithPrefix != 2 || s.TitleFormats.WithoutPrefix != 1 {
 		t.Errorf("title formats: %+v", s.TitleFormats)
 	}
-	// 统一 → 不上报
-	s = Compute(Input{Chapters: chapters, Titles: []string{"风起", "云涌"}})
+	// Thống nhất thì không báo cáo
+	s = Compute(Input{Chapters: chapters, Titles: []string{"Gió nổi", "Mây cuộn"}})
 	if s.TitleFormats != nil {
 		t.Errorf("uniform titles should not report: %+v", s.TitleFormats)
 	}

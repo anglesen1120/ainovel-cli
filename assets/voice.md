@@ -1,14 +1,14 @@
-## 写作标准
+## Tiêu chuẩn viết
 
-这些是质量准则，不要逐条生硬打卡。章节首先要自然成立，其次才是检查项齐全。
+Đây là các nguyên tắc chất lượng, đừng kiểm tra máy móc từng mục một. Trước hết chương phải tự nhiên và đứng vững, sau đó mới xét đến việc các tiêu chí có đầy đủ hay không.
 
-- 开头尽快建立冲突、悬念、欲望或异常感，少用抽象回顾。
-- 用动作、对话、感官细节推进情节，少用概述和总结。
-- 角色对话要有身份差异、潜台词和行动目的，不要说教。
-- 情绪用身体反应和选择呈现，不直接贴标签。
-- 关系变化要有事件触发，不要一章内从陌生跃迁到绝对信任。
-- 秘密分批释放，不提前解释大纲未要求的重大谜底。
-- 章末钩子可以是危机、选择、情绪余波、关系变化或未完成目标，不必每章都做夸张悬念。
-- **去 AI 味**：写作时规避 `reference_pack.references.anti_ai_tone` 列出的全部模式（结构/用词/描写/对话/节奏五类）。其中可机械枚举的疲劳词、套句阈值见 `working_memory.user_rules.structured`，commit 时强制检查。
-- **句式多样性**：`episodic_memory.style_stats`（如有）是代码对你已写正文的统计——你自己的口头禅镜像。本章主动压低其中的高频项；最常见的固化源是矫正句（"不是…而是…"）、单一计时量词（"几息/数息"）和同型明喻连用。章末收束形式（短句斩断/对话余音/场景余像/悬念提问）与近期章节轮换，开篇避免每章都用"夜里/清晨/醒来"式时间起手。
-- **前情不复述**：`episodic_memory` 中的摘要、伏笔、状态是已写入正文的备忘，用于对照衔接，不是本章待写素材；上一章已交代的信息，新章只在剧情需要时以新视角触及，禁止前情提要式重写（跨章逐字复读会被 style_stats 的 repeated_sentences 记录在案）。
+- Mở đầu cần nhanh chóng thiết lập xung đột, hồi hộp, ham muốn hoặc cảm giác bất thường, hạn chế dùng hồi tưởng trừu tượng.
+- Dùng hành động, đối thoại, chi tiết cảm quan để đẩy tình tiết tiến lên, hạn chế khái quát và tổng kết.
+- Đối thoại của nhân vật cần có khác biệt thân phận, hàm ý và mục đích hành động, không thuyết giáo.
+- Cảm xúc nên được thể hiện bằng phản ứng cơ thể và lựa chọn, không dán nhãn trực tiếp.
+- Sự thay đổi quan hệ cần có sự kiện kích hoạt, không để trong một chương nhảy từ xa lạ sang tin tưởng tuyệt đối.
+- Bí mật được hé lộ theo từng đợt, không giải thích trước những lời giải lớn mà dàn ý chưa yêu cầu.
+- Móc câu cuối chương có thể là khủng hoảng, lựa chọn, dư âm cảm xúc, thay đổi quan hệ hoặc mục tiêu chưa hoàn thành, không nhất thiết chương nào cũng phải tạo hồi hộp phóng đại.
+- **Khử mùi AI**: khi viết, tránh toàn bộ các mẫu được liệt kê trong `reference_pack.references.anti_ai_tone` (năm nhóm: cấu trúc/cách dùng từ/miêu tả/đối thoại/nhịp điệu). Trong đó, ngưỡng cho các từ gây mệt mỏi và câu khuôn sáo có thể liệt kê cơ học nằm ở `working_memory.user_rules.structured`, khi commit sẽ bắt buộc kiểm tra.
+- **Đa dạng câu thức**: `episodic_memory.style_stats` (nếu có) là thống kê của mã đối với phần chính văn bạn đã viết — tấm gương phản chiếu thói quen diễn đạt của chính bạn. Chương này chủ động hạ tần suất các mục xuất hiện cao trong đó; nguồn cố định hóa thường gặp nhất là câu đính chính ("không phải… mà là…"), lượng từ thời gian đơn nhất ("vài hơi thở/mấy hơi thở") và chuỗi so sánh trực tiếp cùng kiểu. Hình thức kết thúc cuối chương (câu ngắn chém đứt/dư âm đối thoại/dư ảnh cảnh vật/câu hỏi hồi hộp) cần luân phiên với các chương gần đây, mở đầu tránh chương nào cũng bắt đầu kiểu thời gian như "ban đêm/sáng sớm/tỉnh dậy".
+- **Không thuật lại tiền tình**: các tóm tắt, phục bút, trạng thái trong `episodic_memory` là ghi nhớ về nội dung đã viết vào chính văn, dùng để đối chiếu và nối tiếp, không phải tư liệu chờ viết của chương này; thông tin chương trước đã nói rõ, chương mới chỉ chạm tới bằng góc nhìn mới khi cốt truyện cần, cấm viết lại kiểu tóm tắt tiền tình (việc lặp nguyên văn xuyên chương sẽ bị ghi vào repeated_sentences của style_stats).

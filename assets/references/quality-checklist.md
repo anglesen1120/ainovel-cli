@@ -1,262 +1,262 @@
-# 质量检查清单
+# Danh sách kiểm tra chất lượng
 
-交付章节前使用此清单确保质量。
+Dùng danh sách này để đảm bảo chất lượng trước khi bàn giao chương.
 
-## 整体检查
+## Kiểm tra tổng thể
 
-### 基础要素
+### Các yếu tố cơ bản
 
-- [ ] **章节有明确标题**
-  - 标题与内容相关
-  - 吸引人但不过度透露
+- [ ] **Chương có tiêu đề rõ ràng**
+  - Tiêu đề liên quan đến nội dung
+  - Hấp dẫn nhưng không tiết lộ quá nhiều
 
-- [ ] **字数符合预期**
-  - 短章节：800-1500 字
-  - 标准章节：1500-3000 字
-  - 长章节：3000-6000 字
+- [ ] **Số lượng từ phù hợp với kỳ vọng**
+  - Chương ngắn: 800-1500 từ
+  - Chương tiêu chuẩn: 1500-3000 từ
+  - Chương dài: 3000-6000 từ
 
-- [ ] **章节完整性**
-  - 有开头、发展、高潮
-  - 不是片段，是完整叙事单元
+- [ ] **Tính hoàn chỉnh của chương**
+  - Có mở đầu, phát triển, cao trào
+  - Không phải một đoạn rời, mà là một đơn vị tự sự hoàn chỉnh
 
-- [ ] **时间地点清晰**
-  - 读者知道何时何地
-  - 转换时有明确标记
-
----
-
-## 开头检查
-
-- [ ] **前 3 段内抓住读者**
-  - 有行动/冲突/悬念
-  - 不是天气或日常流程
-
-- [ ] **与上一章有连接**
-  - 回应上一章结尾
-  - 或明确时间/地点跳跃
-
-- [ ] **背景信息不过量**
-  - 没有大段信息倾倒
-  - 信息自然融入动作
+- [ ] **Thời gian và địa điểm rõ ràng**
+  - Người đọc biết khi nào, ở đâu
+  - Khi chuyển cảnh có đánh dấu rõ ràng
 
 ---
 
-## 内容检查
+## Kiểm tra phần mở đầu
 
-### 情节推进
+- [ ] **Thu hút người đọc trong 3 đoạn đầu**
+  - Có hành động/xung đột/hồi hộp
+  - Không phải thời tiết hay quy trình sinh hoạt thường ngày
 
-- [ ] **本章有核心事件**
-  - 发生了不可删除的事
-  - 不是"什么都没发生"的过渡章
+- [ ] **Có liên kết với chương trước**
+  - Đáp lại phần kết của chương trước
+  - Hoặc có bước nhảy thời gian/địa điểm rõ ràng
 
-- [ ] **推动主线剧情**
-  - 揭示新信息
-  - 或改变人物关系
-  - 或升级冲突
-
-- [ ] **逻辑自洽**
-  - 事件因果关系合理
-  - 没有巧合驱动剧情
-  - 人物行为符合动机
-
-### 冲突与张力
-
-- [ ] **有明确冲突**
-  - 人与人、人与环境、人与自己
-  - 冲突推动本章事件
-
-- [ ] **张力有变化**
-  - 不是平铺直叙
-  - 有紧张和缓解的交替
-
-- [ ] **有转折或新信息**
-  - 不是线性可预测
-  - 有意外或新发现
+- [ ] **Thông tin bối cảnh không quá nhiều**
+  - Không có đoạn đổ thông tin dài
+  - Thông tin được lồng tự nhiên vào hành động
 
 ---
 
-## 人物检查
+## Kiểm tra nội dung
 
-- [ ] **人物行为一致**
-  - 符合已建立的性格
-  - 如不一致，有解释
+### Tiến triển cốt truyện
 
-- [ ] **人物有反应**
-  - 对事件有情绪/行动
-  - 不是被动道具
+- [ ] **Chương này có sự kiện cốt lõi**
+  - Có điều gì đó không thể bị xóa bỏ đã xảy ra
+  - Không phải chương chuyển tiếp kiểu "không có gì xảy ra"
 
-- [ ] **人物有声音**
-  - 对话能区分角色
-  - 每人说话方式不同
+- [ ] **Thúc đẩy tuyến truyện chính**
+  - Hé lộ thông tin mới
+  - Hoặc thay đổi quan hệ nhân vật
+  - Hoặc nâng cấp xung đột
 
-- [ ] **人物展示而非讲述**
-  - 通过行动/对话表现性格
-  - 不是直接陈述"他很勇敢"
+- [ ] **Hợp lý về mặt logic**
+  - Quan hệ nhân quả của sự kiện hợp lý
+  - Không có tình tiết được thúc đẩy bởi sự tình cờ
+  - Hành vi nhân vật phù hợp với động cơ
 
----
+### Xung đột và căng thẳng
 
-## 对话检查
+- [ ] **Có xung đột rõ ràng**
+  - Người với người, người với môi trường, người với chính mình
+  - Xung đột thúc đẩy sự kiện của chương này
 
-- [ ] **每句对话有目的**
-  - 推动情节/揭示人物/制造冲突
-  - 没有"你好""吃了吗"等无意义对话
+- [ ] **Căng thẳng có biến đổi**
+  - Không kể theo kiểu đều đều
+  - Có xen kẽ giữa căng thẳng và thư giãn
 
-- [ ] **对话简洁自然**
-  - 删除冗余词语
-  - 符合真实说话方式
-
-- [ ] **有潜台词**
-  - 不是所有话都直说
-  - 有言外之意
-
-- [ ] **标签使用正确**
-  - 能辨识时省略标签
-  - 不过度使用副词
+- [ ] **Có bước ngoặt hoặc thông tin mới**
+  - Không tuyến tính, có thể đoán trước
+  - Có bất ngờ hoặc phát hiện mới
 
 ---
 
-## 悬念检查
+## Kiểm tra nhân vật
 
-- [ ] **结尾有钩子**
-  - 使用至少一种悬念技巧
-  - 让读者想看下一章
+- [ ] **Hành vi nhân vật nhất quán**
+  - Phù hợp với tính cách đã được xây dựng
+  - Nếu không nhất quán, phải có lời giải thích
 
-- [ ] **悬念强度适当**
-  - 与故事位置匹配
-  - 高潮章节悬念更强
+- [ ] **Nhân vật có phản ứng**
+  - Có cảm xúc/hành động trước sự kiện
+  - Không phải là đạo cụ bị động
 
-- [ ] **不是虚假悬念**
-  - 不是机械误会
-  - 不是无意义的"突然"
+- [ ] **Nhân vật có giọng điệu riêng**
+  - Đối thoại phân biệt được từng nhân vật
+  - Mỗi người có cách nói khác nhau
 
-- [ ] **为下一章铺垫**
-  - 设置下一章的冲突
-  - 埋下伏笔
+- [ ] **Thể hiện nhân vật thay vì kể lể**
+  - Thông qua hành động/đối thoại để bộc lộ tính cách
+  - Không trực tiếp nói "anh ấy rất dũng cảm"
 
 ---
 
-## 展示而非讲述检查
+## Kiểm tra đối thoại
 
-### 常见"讲述"标记
+- [ ] **Mỗi câu thoại đều có mục đích**
+  - Thúc đẩy tình tiết/hé lộ nhân vật/tạo xung đột
+  - Không có đối thoại vô nghĩa kiểu "Xin chào""Ăn cơm chưa"
 
-检查并修正以下模式：
+- [ ] **Đối thoại ngắn gọn tự nhiên**
+  - Loại bỏ từ ngữ thừa
+  - Phù hợp với cách nói chuyện thực tế
 
-| 讲述（避免） | 展示（使用） |
+- [ ] **Có hàm ý ngầm**
+  - Không phải mọi thứ đều nói thẳng
+  - Có ý tại ngôn ngoại
+
+- [ ] **Sử dụng nhãn đúng cách**
+  - Khi có thể nhận ra thì lược bỏ nhãn
+  - Không lạm dụng trạng từ
+
+---
+
+## Kiểm tra độ hồi hộp
+
+- [ ] **Phần kết có móc câu**
+  - Dùng ít nhất một kỹ thuật tạo hồi hộp
+  - Khiến người đọc muốn xem chương tiếp theo
+
+- [ ] **Cường độ hồi hộp phù hợp**
+  - Phù hợp với vị trí của câu chuyện
+  - Chương cao trào có hồi hộp mạnh hơn
+
+- [ ] **Không phải hồi hộp giả**
+  - Không phải hiểu lầm máy móc
+  - Không phải kiểu "đột nhiên" vô nghĩa
+
+- [ ] **Tạo nền cho chương tiếp theo**
+  - Thiết lập xung đột của chương sau
+  - Gieo mầm cho các chi tiết sau này
+
+---
+
+## Kiểm tra thể hiện thay vì kể
+
+### Dấu hiệu "kể" thường gặp
+
+Kiểm tra và sửa các mẫu sau:
+
+| Kể (tránh) | Thể hiện (dùng) |
 |-------------|-------------|
-| 他很愤怒 | 他握紧拳头，指节发白 |
-| 她很美丽 | 他凝视着她，忘记说话 |
-| 他很紧张 | 他反复调整领带 |
-| 房间很乱 | 衣服扔在沙发上，外卖盒堆在桌上 |
-| 他很富有 | 他从口袋里掏出一叠现金 |
+| Anh ấy rất tức giận | Anh ấy siết chặt nắm tay, khớp ngón tay trắng bệch |
+| Cô ấy rất đẹp | Anh ấy nhìn cô, quên cả nói chuyện |
+| Anh ấy rất căng thẳng | Anh ấy liên tục chỉnh lại cà vạt |
+| Căn phòng rất bừa bộn | Quần áo ném trên ghế sofa, hộp đồ ăn ngoài chất trên bàn |
+| Anh ấy rất giàu | Anh ấy rút ra một xấp tiền mặt từ túi |
 
-### 自查问题
+### Câu hỏi tự kiểm tra
 
-- [ ] 是否直接陈述情绪？（改为身体反应）
-- [ ] 是否用形容词总结？（改为具体描写）
-- [ ] 是否跳过了关键场景？（补充展示）
-
----
-
-## 节奏检查
-
-- [ ] **句子长度有变化**
-  - 没有连续 3 句长度相同
-  - 长短交错
-
-- [ ] **段落长度适当**
-  - 避免大段文字墙
-  - 动作场景用短段落
-
-- [ ] **信息密度有变化**
-  - 高密度（动作/对话）
-  - 低密度（描写/内心）
+- [ ] Có trực tiếp nói ra cảm xúc không? (Hãy đổi thành phản ứng cơ thể)
+- [ ] Có dùng tính từ để tổng kết không? (Hãy đổi thành miêu tả cụ thể)
+- [ ] Có bỏ qua cảnh quan trọng không? (Bổ sung phần thể hiện)
 
 ---
 
-## 语言检查
+## Kiểm tra nhịp điệu
 
-- [ ] **没有 AI 写作痕迹**
-  - 避免"此外""然而""强调"等 AI 词汇
-  - 避免四字成语堆砌
-  - 句式多样化
+- [ ] **Độ dài câu có thay đổi**
+  - Không có 3 câu liên tiếp cùng độ dài
+  - Xen kẽ câu dài ngắn
 
-- [ ] **"的"字不密集**
-  - 没有连续多个"的"
-  - 简化修饰结构
+- [ ] **Độ dài đoạn phù hợp**
+  - Tránh những khối văn quá lớn
+  - Cảnh hành động dùng đoạn ngắn
 
-- [ ] **用词精确**
-  - 避免模糊词（"一些""某种"）
-  - 使用具体词汇
-
----
-
-## 连贯性检查
-
-- [ ] **与前文连贯**
-  - 上一章的悬念有回应
-  - 已知信息一致
-
-- [ ] **伏笔有呼应**
-  - 早期埋下的线索有进展
-  - 或即将揭示
-
-- [ ] **时间线一致**
-  - 时间流逝合理
-  - 事件顺序正确
+- [ ] **Mật độ thông tin có biến đổi**
+  - Mật độ cao (hành động/đối thoại)
+  - Mật độ thấp (miêu tả/nội tâm)
 
 ---
 
-## 类型特定检查
+## Kiểm tra ngôn ngữ
 
-### 悬疑类
+- [ ] **Không có dấu vết viết bằng AI**
+  - Tránh các từ như "ngoài ra""tuy nhiên""nhấn mạnh" v.v.
+  - Tránh chồng chất thành ngữ bốn chữ
+  - Câu văn đa dạng
 
-- [ ] 有线索揭示
-- [ ] 有新谜题提出
-- [ ] 逻辑无漏洞
+- [ ] **Mật độ từ "của" không dày**
+  - Không có nhiều "của" liên tiếp
+  - Đơn giản hóa cấu trúc bổ nghĩa
 
-### 言情类
-
-- [ ] 关系有进展
-- [ ] 有情感张力
-- [ ] 读者在意配对
-
-### 奇幻/科幻类
-
-- [ ] 世界观一致
-- [ ] 规则设定不破坏
-- [ ] 解释不过度
-
-### 动作类
-
-- [ ] 动作场面清晰
-- [ ] 节奏快速
-- [ ] 地理空间明确
+- [ ] **Dùng từ chính xác**
+  - Tránh từ mơ hồ ("một ít""một loại nào đó")
+  - Dùng từ vựng cụ thể
 
 ---
 
-## 交付前最终检查
+## Kiểm tra tính liên tục
 
-- [ ] 通读全文，无错别字
-- [ ] 标点符号正确
-- [ ] 对话标签正确
-- [ ] 段落划分清晰
-- [ ] 格式一致
-- [ ] 如果是续章，确认与前文的连贯性
+- [ ] **Liên tục với phần trước**
+  - Hồi hộp của chương trước có được đáp lại
+  - Thông tin đã biết nhất quán
+
+- [ ] **Các chi tiết gợi mở có được hồi đáp**
+  - Các manh mối được gieo từ trước có tiến triển
+  - Hoặc sắp được tiết lộ
+
+- [ ] **Dòng thời gian nhất quán**
+  - Thời gian trôi qua hợp lý
+  - Trình tự sự kiện chính xác
 
 ---
 
-## 质量评分
+## Kiểm tra theo thể loại
 
-交付前给自己打分（每项 1-10 分）：
+### Trinh thám
 
-| 维度 | 评分 | 说明 |
+- [ ] Có hé lộ manh mối
+- [ ] Có đặt ra bí ẩn mới
+- [ ] Logic không có lỗ hổng
+
+### Ngôn tình
+
+- [ ] Quan hệ có tiến triển
+- [ ] Có căng thẳng cảm xúc
+- [ ] Người đọc quan tâm đến cặp đôi
+
+### Kỳ ảo/Khoa học viễn tưởng
+
+- [ ] Thế giới quan nhất quán
+- [ ] Thiết lập quy tắc không bị phá vỡ
+- [ ] Giải thích không quá mức
+
+### Hành động
+
+- [ ] Cảnh hành động rõ ràng
+- [ ] Nhịp độ nhanh
+- [ ] Không gian địa lý rõ ràng
+
+---
+
+## Kiểm tra cuối cùng trước khi bàn giao
+
+- [ ] Đọc lại toàn văn, không có lỗi chính tả
+- [ ] Dấu câu chính xác
+- [ ] Nhãn đối thoại chính xác
+- [ ] Phân đoạn rõ ràng
+- [ ] Định dạng nhất quán
+- [ ] Nếu là chương tiếp theo, xác nhận tính liền mạch với phần trước
+
+---
+
+## Điểm chất lượng
+
+Trước khi bàn giao, tự chấm điểm cho mình (mỗi mục 1-10 điểm):
+
+| Hạng mục | Điểm | Mô tả |
 |-----|------|-----|
-| 开头吸引力 | /10 | 前 3 段抓住读者？ |
-| 情节推进 | /10 | 本章推进主线？ |
-| 人物塑造 | /10 | 人物行为一致且有深度？ |
-| 对话质量 | /10 | 对话自然且推动情节？ |
-| 悬念设置 | /10 | 结尾钩子让读者想看下一章？ |
-| 节奏控制 | /10 | 张弛有度？ |
-| 展示而非讲述 | /10 | 用行动/对话而非陈述？ |
-| 语言质量 | /10 | 无 AI 痕迹，用词精确？ |
-| **总分** | **/80** | **>60 可交付，>70 优秀** |
+| Sức hút phần mở đầu | /10 | 3 đoạn đầu có giữ được người đọc không? |
+| Tiến triển cốt truyện | /10 | Chương này có thúc đẩy tuyến chính không? |
+| Xây dựng nhân vật | /10 | Hành vi nhân vật có nhất quán và có chiều sâu không? |
+| Chất lượng đối thoại | /10 | Đối thoại có tự nhiên và thúc đẩy tình tiết không? |
+| Thiết lập hồi hộp | /10 | Móc câu cuối có khiến người đọc muốn xem chương sau không? |
+| Kiểm soát nhịp độ | /10 | Có biết lúc căng lúc chùng không? |
+| Thể hiện thay vì kể | /10 | Dùng hành động/đối thoại thay vì tường thuật không? |
+| Chất lượng ngôn ngữ | /10 | Không có dấu vết AI, dùng từ chính xác? |
+| **Tổng điểm** | **/80** | **>60 có thể bàn giao, >70 là xuất sắc** |

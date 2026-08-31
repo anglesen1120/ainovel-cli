@@ -2,7 +2,7 @@ package domain
 
 import "time"
 
-// RuntimeQueuePriority 表示运行时队列优先级。
+// RuntimeQueuePriority biểu thị mức ưu tiên của hàng đợi thời gian chạy.
 type RuntimeQueuePriority string
 
 const (
@@ -10,7 +10,7 @@ const (
 	RuntimePriorityBackground RuntimeQueuePriority = "background"
 )
 
-// RuntimeQueueItem 是统一运行时队列的持久化记录。
+// RuntimeQueueItem là bản ghi bền vững của hàng đợi thời gian chạy thống nhất.
 type RuntimeQueueItem struct {
 	Seq      int64                `json:"seq"`
 	Time     time.Time            `json:"time"`
@@ -22,7 +22,7 @@ type RuntimeQueueItem struct {
 	Payload  any                  `json:"payload,omitempty"`
 }
 
-// RuntimeTaskLogEntry 是单任务运行日志的持久化记录。
+// RuntimeTaskLogEntry là bản ghi bền vững của nhật ký chạy cho một tác vụ đơn lẻ.
 type RuntimeTaskLogEntry struct {
 	Time    time.Time `json:"time"`
 	TaskID  string    `json:"task_id,omitempty"`

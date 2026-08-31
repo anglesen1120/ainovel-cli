@@ -12,25 +12,25 @@ import (
 )
 
 func TestUnitLessNumericNotLexical(t *testing.T) {
-	// 字典序会判 L900 > L1000、L1257.2 > L1800；数值序必须相反。
+	// Thứ tự từ điển sẽ kết luận L900 > L1000, L1257.2 > L1800; thứ tự số phải ngược lại.
 	if !unitLess(SourceUnit{Line: 900}, SourceUnit{Line: 1000}) {
-		t.Fatal("L900 应 < L1000（数值序）")
+		t.Fatal("L900 phải < L1000 (theo thứ tự số)")
 	}
 	if !unitLess(SourceUnit{Line: 1257, Part: 2}, SourceUnit{Line: 1800}) {
-		t.Fatal("L1257.2 应 < L1800")
+		t.Fatal("L1257.2 phải < L1800")
 	}
 	if !unitLess(SourceUnit{Line: 1257, Part: 1}, SourceUnit{Line: 1257, Part: 2}) {
-		t.Fatal("同行 part 应按数值序")
+		t.Fatal("part cùng dòng phải theo thứ tự số")
 	}
 	if unitLess(SourceUnit{Line: 5}, SourceUnit{Line: 5}) {
-		t.Fatal("相等不应 less")
+		t.Fatal("bằng nhau thì không được less")
 	}
 }
 
 func TestBuildSourceUnitsRoundtrip(t *testing.T) {
-	norm := []byte("第一章\n正文一\n\n第二章\n正文二")
+	norm := []byte("Chương một\nNội dung một\n\nChương hai\nNội dung hai")
 	units := buildSourceUnits(norm, 0)
-	// 拼回：每个 unit 文本 + 行间 '\n' 应还原归一化文本。
+	// Ghép lại: văn bản của từng unit + '\n' giữa các dòng phải khôi phục văn bản đã chuẩn hóa.
 	var b strings.Builder
 	for i, u := range units {
 		if i > 0 {
@@ -38,103 +38,103 @@ func TestBuildSourceUnitsRoundtrip(t *testing.T) {
 		}
 		b.WriteString(u.Text)
 		if u.Text != string(norm[u.StartByte:u.EndByte]) {
-			t.Fatalf("unit %s 字节范围与文本不符", u.ID)
+			t.Fatalf("phạm vi byte của unit %s không khớp với văn bản", u.ID)
 		}
 	}
 	if b.String() != string(norm) {
-		t.Fatalf("拼回不符：%q", b.String())
+		t.Fatalf("ghép lại không khớp: %q", b.String())
 	}
 	if units[0].ID != "L1" || units[3].ID != "L4" {
-		t.Fatalf("ID 不符：%s %s", units[0].ID, units[3].ID)
+		t.Fatalf("ID không khớp: %s %s", units[0].ID, units[3].ID)
 	}
 }
 
 func TestBuildSourceUnitsVirtualShard(t *testing.T) {
-	// 一整行远超预算 → 拆多个虚拟 unit，边界在 UTF-8 字符边界。
-	long := strings.Repeat("字", 100) // 每字 3 字节 = 300 字节
+	// Một dòng nguyên vẹn vượt xa ngân sách -> tách thành nhiều unit ảo, ranh giới nằm ở biên ký tự UTF-8.
+	long := strings.Repeat("ấ", 100) // mỗi ký tự 3 byte = 300 byte
 	units := buildSourceUnits([]byte(long), 30)
 	if len(units) < 2 {
-		t.Fatalf("超预算行应分片，得到 %d", len(units))
+		t.Fatalf("dòng vượt ngân sách phải được phân mảnh, nhận được %d", len(units))
 	}
 	var b strings.Builder
 	for _, u := range units {
 		if u.Line != 1 || u.Part == 0 {
-			t.Fatalf("虚拟分片应同 Line、Part>=1：%+v", u)
+			t.Fatalf("phân mảnh ảo phải cùng Line, Part>=1: %+v", u)
 		}
-		b.WriteString(u.Text) // 分片同一行，无换行分隔
+		b.WriteString(u.Text) // các mảnh cùng một dòng, không phân tách bằng xuống dòng
 	}
 	if b.String() != long {
-		t.Fatal("虚拟分片拼回丢字")
+		t.Fatal("ghép lại phân mảnh ảo bị mất chữ")
 	}
 }
 
 func TestResolveBoundaryByteAnchor(t *testing.T) {
-	units := []SourceUnit{{ID: "L1", Line: 1, StartByte: 0, EndByte: 10, Text: "楔子风起楔"}}
+	units := []SourceUnit{{ID: "L1", Line: 1, StartByte: 0, EndByte: 9, Text: "mo gio mo"}}
 	m := map[string]SourceUnit{"L1": units[0]}
-	if _, err := resolveBoundaryByte(m, "L1", "风起"); err != nil {
-		t.Fatalf("唯一锚点应成功：%v", err)
+	if _, err := resolveBoundaryByte(m, "L1", "gio"); err != nil {
+		t.Fatalf("anchor duy nhất phải thành công: %v", err)
 	}
-	if _, err := resolveBoundaryByte(m, "L1", "楔"); err == nil {
-		t.Fatal("重复锚点应失败")
+	if _, err := resolveBoundaryByte(m, "L1", "mo"); err == nil {
+		t.Fatal("anchor lặp phải thất bại")
 	}
-	if _, err := resolveBoundaryByte(m, "L1", "缺失"); err == nil {
-		t.Fatal("不存在锚点应失败")
+	if _, err := resolveBoundaryByte(m, "L1", "vang"); err == nil {
+		t.Fatal("anchor không tồn tại phải thất bại")
 	}
 	if _, err := resolveBoundaryByte(m, "L9", ""); err == nil {
-		t.Fatal("不存在 unit 应失败")
+		t.Fatal("unit không tồn tại phải thất bại")
 	}
 }
 
 func TestPlanChunksCoversWithoutGap(t *testing.T) {
-	units := buildSourceUnits([]byte(strings.Repeat("行内容\n", 50)), 0)
+	units := buildSourceUnits([]byte(strings.Repeat("noi dung dong\n", 50)), 0)
 	chunks := planChunks(units, 40)
 	if len(chunks) < 2 {
-		t.Fatalf("应分多块，得 %d", len(chunks))
+		t.Fatalf("phải chia thành nhiều khối, nhận được %d", len(chunks))
 	}
-	// 无缝无重叠且完整覆盖。
+	// Không hở, không chồng lấp và phủ đầy đủ.
 	if chunks[0][0] != 0 || chunks[len(chunks)-1][1] != len(units) {
-		t.Fatal("未完整覆盖")
+		t.Fatal("chưa phủ đầy đủ")
 	}
 	for i := 1; i < len(chunks); i++ {
 		if chunks[i][0] != chunks[i-1][1] {
-			t.Fatalf("块 %d 与前块不相接：%v", i, chunks)
+			t.Fatalf("khối %d không nối với khối trước: %v", i, chunks)
 		}
 	}
 }
 
 func segFixture() ([]byte, []SourceUnit) {
-	norm := []byte("前言\n感谢阅读\n第一章 风起\n正文一\n卷二\n第二章 云涌\n正文二")
+	norm := []byte("Mở đầu\nCảm ơn\nChương một\nNội dung 1\nQuyển hai\nChương hai\nNội dung 2")
 	return norm, buildSourceUnits(norm, 0)
 }
 
 func TestResolveSegmentationHappy(t *testing.T) {
 	norm, units := segFixture()
-	// L1 前言(front) / L3 第一章 / L5 卷二(group) / L6 第二章
+	// L1 mở đầu (front) / L3 chương một / L5 quyển hai (group) / L6 chương hai
 	decisions := []BoundaryDecision{
-		{UnitID: "L1", Kind: kindFrontMatter, Title: "前言"},
-		{UnitID: "L3", Kind: kindChapter, Title: "第一章 风起"},
-		{UnitID: "L5", Kind: kindGroup, Title: "卷二"},
-		{UnitID: "L6", Kind: kindChapter, Title: "第二章 云涌"},
+		{UnitID: "L1", Kind: kindFrontMatter, Title: "Mở đầu"},
+		{UnitID: "L3", Kind: kindChapter, Title: "Chương một"},
+		{UnitID: "L5", Kind: kindGroup, Title: "Quyển hai"},
+		{UnitID: "L6", Kind: kindChapter, Title: "Chương hai"},
 	}
 	seg, err := resolveSegmentation(norm, units, decisions)
 	if err != nil {
-		t.Fatalf("覆盖校验应通过：%v", err)
+		t.Fatalf("kiểm tra phủ phải qua: %v", err)
 	}
 	if len(seg.Chapters) != 2 {
-		t.Fatalf("章节数应为 2（group 不计），得 %d", len(seg.Chapters))
+		t.Fatalf("số chương phải là 2 (không tính group), nhận được %d", len(seg.Chapters))
 	}
 	if seg.Chapters[0].Number != 1 || seg.Chapters[1].Number != 2 {
-		t.Fatal("章节号应连续")
+		t.Fatal("số thứ tự chương phải liên tục")
 	}
-	if !strings.Contains(seg.Content(norm, 0), "正文一") {
-		t.Fatalf("章一正文不符：%q", seg.Content(norm, 0))
+	if !strings.Contains(seg.Content(norm, 0), "Nội dung 1") {
+		t.Fatalf("nội dung chương một không khớp: %q", seg.Content(norm, 0))
 	}
-	// 覆盖：首段(front_matter)从 0 起，末章覆盖到文本尾。
+	// Phủ: đoạn đầu(front_matter) bắt đầu từ 0, chương cuối phủ đến cuối văn bản.
 	if len(seg.Matter) == 0 || seg.Matter[0].Kind != kindFrontMatter || seg.Matter[0].Start != 0 {
-		t.Fatalf("首段应为从 0 起的 front_matter：%+v", seg.Matter)
+		t.Fatalf("đoạn đầu phải là front_matter bắt đầu từ 0: %+v", seg.Matter)
 	}
 	if seg.Chapters[len(seg.Chapters)-1].End != len(norm) {
-		t.Fatal("末章应覆盖到文本尾")
+		t.Fatal("chương cuối phải phủ đến cuối văn bản")
 	}
 }
 
@@ -144,99 +144,99 @@ func TestResolveSegmentationRejections(t *testing.T) {
 		name string
 		ds   []BoundaryDecision
 	}{
-		{"无章节", []BoundaryDecision{
+		{"không có chương", []BoundaryDecision{
 			{UnitID: "L1", Kind: kindFrontMatter},
 		}},
-		{"非法kind", []BoundaryDecision{
+		{"kind không hợp lệ", []BoundaryDecision{
 			{UnitID: "L1", Kind: "verse"},
 		}},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			if _, err := resolveSegmentation(norm, units, c.ds); err == nil {
-				t.Fatalf("应被拒绝：%s", c.name)
+				t.Fatalf("phải bị từ chối: %s", c.name)
 			}
 		})
 	}
 }
 
-// TestResolveSegmentationReordersAndDedups 守护终局兜底的坐标纪律：块内模型偶发乱序按
-// 字节排序确定性恢复（实测 319 个边界曾败于 1 处倒序，且块缓存会让失败确定性复现）；
-// 同字节重复保留先出现者并记 Notes 交确认预览。
+// TestResolveSegmentationReordersAndDedups bảo vệ kỷ luật tọa độ của bước dự phòng cuối: khi model trong khối thỉnh thoảng trả sai thứ tự,
+// khôi phục xác định bằng cách sắp xếp theo byte (thực đo 319 ranh giới từng thất bại vì 1 chỗ đảo thứ tự, và cache khối sẽ khiến lỗi tái hiện xác định);
+// các mục trùng cùng byte giữ mục xuất hiện trước và ghi Notes để đưa vào phần xem trước xác nhận.
 func TestResolveSegmentationReordersAndDedups(t *testing.T) {
 	norm, units := segFixture()
 	seg, err := resolveSegmentation(norm, units, []BoundaryDecision{
-		{UnitID: "L3", Kind: kindChapter, Title: "第一章 风起"},
-		{UnitID: "L1", Kind: kindChapter, Title: "开篇"}, // 乱序：位置在 L3 之前
-		{UnitID: "L6", Kind: kindChapter, Title: "第二章 云涌"},
-		{UnitID: "L6", Kind: kindChapter, Title: "第二章 重复"}, // 同字节重复
+		{UnitID: "L3", Kind: kindChapter, Title: "Chương một"},
+		{UnitID: "L1", Kind: kindChapter, Title: "Mở đầu"},
+		{UnitID: "L6", Kind: kindChapter, Title: "Chương hai"},
+		{UnitID: "L6", Kind: kindChapter, Title: "Chương hai Trùng lặp"},
 	})
 	if err != nil {
-		t.Fatalf("乱序/重复应被确定性修复而非拒绝：%v", err)
+		t.Fatalf("sai thứ tự/trùng lặp phải được sửa xác định thay vì bị từ chối: %v", err)
 	}
 	if len(seg.Chapters) != 3 {
-		t.Fatalf("应得 3 章，得 %d：%+v", len(seg.Chapters), seg.Chapters)
+		t.Fatalf("phải có 3 chương, nhận được %d: %+v", len(seg.Chapters), seg.Chapters)
 	}
-	if seg.Chapters[0].Title != "开篇" || seg.Chapters[0].Start != 0 {
-		t.Fatalf("排序后首章应为位置最前的边界：%+v", seg.Chapters[0])
+	if seg.Chapters[0].Title != "Mở đầu" || seg.Chapters[0].Start != 0 {
+		t.Fatalf("sau khi sắp xếp, chương đầu phải là ranh giới có vị trí sớm nhất: %+v", seg.Chapters[0])
 	}
-	if seg.Chapters[2].Title != "第二章 云涌" {
-		t.Fatalf("同字节重复应保留先出现者：%+v", seg.Chapters[2])
+	if seg.Chapters[2].Title != "Chương hai" {
+		t.Fatalf("trùng cùng byte phải giữ mục xuất hiện trước: %+v", seg.Chapters[2])
 	}
-	if len(seg.Notes) != 1 || !strings.Contains(seg.Notes[0], "重合") {
-		t.Fatalf("重复边界应记入 Notes：%v", seg.Notes)
+	if len(seg.Notes) != 1 || !strings.Contains(seg.Notes[0], "trùng") {
+		t.Fatalf("ranh giới trùng phải được ghi vào Notes: %v", seg.Notes)
 	}
 }
 
-// TestResolveSegmentationAbsorbsLeadingText 守护起始漏报的确定性修复：书首简介/广告等非空
-// 头部文本若被模型漏报边界，不得终局否决——漏报已进块缓存，否决会让重跑零调用确定性复现
-// 失败。Go 补一个 front_matter 兜住 [0, first) 并记 Notes 交确认预览。
+// TestResolveSegmentationAbsorbsLeadingText bảo vệ sửa chữa xác định cho trường hợp bỏ sót phần đầu: nếu phần giới thiệu/quảng cáo v.v. không rỗng
+// ở đầu sách bị model bỏ sót ranh giới, không được phủ quyết ở bước cuối -- phần bỏ sót đã đi vào cache khối, phủ quyết sẽ khiến chạy lại không gọi gì mà tái hiện xác định
+// lỗi. Go bổ sung một front_matter để giữ [0, first) và ghi Notes cho phần xem trước xác nhận.
 func TestResolveSegmentationAbsorbsLeadingText(t *testing.T) {
 	norm, units := segFixture()
-	// 只报了 L3 起的章节：L1/L2 非空文本无归属。
+	// Chỉ báo cáo các chương bắt đầu từ L3: văn bản không rỗng L1/L2 không có nơi thuộc về.
 	seg, err := resolveSegmentation(norm, units, []BoundaryDecision{
-		{UnitID: "L3", Kind: kindChapter, Title: "第一章 风起"},
-		{UnitID: "L6", Kind: kindChapter, Title: "第二章 云涌"},
+		{UnitID: "L3", Kind: kindChapter, Title: "Chương một"},
+		{UnitID: "L6", Kind: kindChapter, Title: "Chương hai"},
 	})
 	if err != nil {
-		t.Fatalf("起始未归属文本应被收为 front_matter 而非拒绝：%v", err)
+		t.Fatalf("văn bản đầu chưa được gán phải được thu vào front_matter thay vì bị từ chối: %v", err)
 	}
 	if len(seg.Matter) != 1 || seg.Matter[0].Kind != kindFrontMatter || seg.Matter[0].Start != 0 {
-		t.Fatalf("应补出从 0 起的 front_matter：%+v", seg.Matter)
+		t.Fatalf("phải bổ sung front_matter bắt đầu từ 0: %+v", seg.Matter)
 	}
 	if len(seg.Chapters) != 2 || seg.Chapters[0].Start == 0 {
-		t.Fatalf("章节不应吞掉头部文本：%+v", seg.Chapters)
+		t.Fatalf("chương không được nuốt văn bản phần đầu: %+v", seg.Chapters)
 	}
-	if len(seg.Notes) != 1 || !strings.Contains(seg.Notes[0], "未被模型归属") {
-		t.Fatalf("应记录人工核对说明：%v", seg.Notes)
+	if len(seg.Notes) != 1 || !strings.Contains(seg.Notes[0], "chưa được mô hình gán") {
+		t.Fatalf("phải ghi mô tả để con người kiểm tra: %v", seg.Notes)
 	}
 }
 
-// TestResolveSegmentationNotesDuplicateTitles 守护同名章的可见性：有标题规约的源里章名
-// 不该重复，重复是"同章被误切"的确定性信号——只记 Notes（阻断 --yes、预览呈现）交人工
-// 核对，是否合并不由 Go 裁定。
+// TestResolveSegmentationNotesDuplicateTitles bảo vệ tính hiển thị của chương cùng tên: trong nguồn có quy ước tiêu đề,
+// tên chương không nên trùng; trùng là tín hiệu xác định của "cùng một chương bị cắt nhầm" -- chỉ ghi Notes (chặn --yes, hiển thị trong preview) để con người
+// kiểm tra, Go không quyết định có gộp hay không.
 func TestResolveSegmentationNotesDuplicateTitles(t *testing.T) {
 	norm, units := segFixture()
 	seg, err := resolveSegmentation(norm, units, []BoundaryDecision{
-		{UnitID: "L1", Kind: kindFrontMatter, Title: "前言"},
-		{UnitID: "L3", Kind: kindChapter, Title: "第一章 风起"},
-		{UnitID: "L6", Kind: kindChapter, Title: "第一章风起"}, // 同名（空白差异忽略）
+		{UnitID: "L1", Kind: kindFrontMatter, Title: "Mở đầu"},
+		{UnitID: "L3", Kind: kindChapter, Title: "Chương một"},
+		{UnitID: "L6", Kind: kindChapter, Title: "Chương một"},
 	})
 	if err != nil {
-		t.Fatalf("同名章应放行并记 Notes：%v", err)
+		t.Fatalf("chương cùng tên phải được cho qua và ghi Notes: %v", err)
 	}
 	if len(seg.Chapters) != 2 {
-		t.Fatalf("应得 2 章，得 %d", len(seg.Chapters))
+		t.Fatalf("phải có 2 chương, nhận được %d", len(seg.Chapters))
 	}
-	if len(seg.Notes) != 1 || !strings.Contains(seg.Notes[0], "标题相同") {
-		t.Fatalf("应记一条同名核对说明：%v", seg.Notes)
+	if len(seg.Notes) != 1 || !strings.Contains(seg.Notes[0], "cùng tiêu đề") {
+		t.Fatalf("phải ghi một mô tả kiểm tra cùng tên: %v", seg.Notes)
 	}
 }
 
-// TestChunkValidatorOwnedDiscipline 守护调用期校验的覆盖面：owned 区内的非法 kind、
-// 坏 anchor、同位语义冲突、首块起始未归属必须在调用期带反馈重问——放行会随块进缓存，
-// 终局 resolve 才发现时重跑零调用复读同一份坏数据；上下文区边界注定被裁掉，不为其重问；
-// 同位完全相同的重复是机械冗余，放行后由 resolve 静默去重。
+// TestChunkValidatorOwnedDiscipline bảo vệ phạm vi bao phủ của kiểm tra trong giai đoạn gọi: kind không hợp lệ trong vùng owned,
+// anchor hỏng, xung đột ngữ nghĩa cùng vị trí, và phần đầu khối đầu chưa được gán đều phải phản hồi để hỏi lại trong giai đoạn gọi -- nếu cho qua sẽ đi vào cache cùng khối,
+// đến cuối resolve mới phát hiện thì chạy lại sẽ không gọi gì và lặp lại đúng dữ liệu xấu đó; ranh giới trong vùng ngữ cảnh chắc chắn bị cắt bỏ, không hỏi lại vì nó;
+// mục trùng hoàn toàn cùng vị trí là dư thừa cơ học, cho qua rồi resolve sẽ lặng lẽ khử trùng.
 func TestChunkValidatorOwnedDiscipline(t *testing.T) {
 	norm, units := segFixture()
 	unitByID := map[string]SourceUnit{}
@@ -253,73 +253,73 @@ func TestChunkValidatorOwnedDiscipline(t *testing.T) {
 		bs      []BoundaryDecision
 		wantErr bool
 	}{
-		{"owned 非法 kind", []BoundaryDecision{{UnitID: "L1", Kind: "volume"}}, true},
-		{"owned 坏 anchor", []BoundaryDecision{{UnitID: "L3", Kind: kindChapter, Anchor: "不存在的锚"}}, true},
-		{"owned 合法 anchor", []BoundaryDecision{{UnitID: "L3", Kind: kindChapter, Anchor: "第一章"}}, false},
-		{"上下文区非法 kind 不重问", []BoundaryDecision{{UnitID: "L6", Kind: "volume"}}, false},
-		{"投影外幻觉 ID", []BoundaryDecision{{UnitID: "L99", Kind: kindChapter}}, true},
-		{"同位语义冲突重问", []BoundaryDecision{
-			{UnitID: "L1", Kind: kindChapter, Title: "前言"},
-			{UnitID: "L1", Kind: kindFrontMatter, Title: "前言"},
+		{"owned kind không hợp lệ", []BoundaryDecision{{UnitID: "L1", Kind: "volume"}}, true},
+		{"owned anchor hỏng", []BoundaryDecision{{UnitID: "L3", Kind: kindChapter, Anchor: "anchor không tồn tại"}}, true},
+		{"owned anchor hợp lệ", []BoundaryDecision{{UnitID: "L3", Kind: kindChapter, Anchor: "Chương một"}}, false},
+		{"kind không hợp lệ trong vùng ngữ cảnh không hỏi lại", []BoundaryDecision{{UnitID: "L6", Kind: "volume"}}, false},
+		{"ID ảo giác ngoài projection", []BoundaryDecision{{UnitID: "L99", Kind: kindChapter}}, true},
+		{"xung đột ngữ nghĩa cùng vị trí hỏi lại", []BoundaryDecision{
+			{UnitID: "L1", Kind: kindChapter, Title: "Mở đầu"},
+			{UnitID: "L1", Kind: kindFrontMatter, Title: "Mở đầu"},
 		}, true},
-		{"同位完全重复放行", []BoundaryDecision{
-			{UnitID: "L1", Kind: kindChapter, Title: "前言"},
-			{UnitID: "L1", Kind: kindChapter, Title: "前言"},
+		{"trùng hoàn toàn cùng vị trí cho qua", []BoundaryDecision{
+			{UnitID: "L1", Kind: kindChapter, Title: "Mở đầu"},
+			{UnitID: "L1", Kind: kindChapter, Title: "Mở đầu"},
 		}, false},
-		// 标题回显：章名/卷名必须真实存在于边界单元原文——幻影边界的编造标题在此被拦。
-		{"编造章节标题重问", []BoundaryDecision{{UnitID: "L2", Kind: kindChapter, Title: "第某章 我编的"}}, true},
-		{"归纳标题须 uncertain 放行", []BoundaryDecision{{UnitID: "L2", Kind: kindChapter, Title: "第某章 我编的", Uncertain: true}}, false},
-		{"回显容忍空白差异", []BoundaryDecision{{UnitID: "L3", Kind: kindChapter, Title: "第一章风起"}}, false},
-		{"编造卷名重问", []BoundaryDecision{{UnitID: "L2", Kind: kindGroup, Title: "卷九"}}, true},
-		{"附属描述性标题不核对", []BoundaryDecision{{UnitID: "L2", Kind: kindFrontMatter, Title: "引言"}}, false},
+		// Phản chiếu tiêu đề: tên chương/tên quyển phải thật sự tồn tại trong nguyên văn unit ranh giới -- tiêu đề bịa của ranh giới ảo bị chặn ở đây.
+		{"tiêu đề chương bịa hỏi lại", []BoundaryDecision{{UnitID: "L2", Kind: kindChapter, Title: "Chương nào đó do tôi bịa"}}, true},
+		{"tiêu đề suy luận phải uncertain thì cho qua", []BoundaryDecision{{UnitID: "L2", Kind: kindChapter, Title: "Chương nào đó do tôi bịa", Uncertain: true}}, false},
+		{"phản chiếu cho phép khác biệt khoảng trắng", []BoundaryDecision{{UnitID: "L3", Kind: kindChapter, Title: "Chươngmột"}}, false},
+		{"tên quyển bịa hỏi lại", []BoundaryDecision{{UnitID: "L2", Kind: kindGroup, Title: "Quyển chín"}}, true},
+		{"tiêu đề mô tả phụ thuộc không kiểm tra", []BoundaryDecision{{UnitID: "L2", Kind: kindFrontMatter, Title: "Dẫn nhập"}}, false},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			if err := v.validate(c.bs); (err != nil) != c.wantErr {
-				t.Fatalf("wantErr=%v，得 %v", c.wantErr, err)
+				t.Fatalf("wantErr=%v, nhận được %v", c.wantErr, err)
 			}
 		})
 	}
 
-	// 首块起始覆盖：L1/L2 非空却无边界归属 → 重问；补上起点边界后通过。
+	// Phủ phần đầu khối đầu: L1/L2 không rỗng nhưng không có ranh giới gán -> hỏi lại; bổ sung ranh giới điểm đầu thì qua.
 	vs := v
 	vs.coverStart = true
 	if err := vs.validate([]BoundaryDecision{{UnitID: "L3", Kind: kindChapter}}); err == nil {
-		t.Fatal("首块起始未归属应重问")
+		t.Fatal("phần đầu khối đầu chưa được gán phải hỏi lại")
 	}
 	if err := vs.validate([]BoundaryDecision{
 		{UnitID: "L1", Kind: kindFrontMatter}, {UnitID: "L3", Kind: kindChapter},
 	}); err != nil {
-		t.Fatalf("起点已覆盖应通过：%v", err)
+		t.Fatalf("điểm đầu đã được phủ thì phải qua: %v", err)
 	}
 	if err := vs.validate(nil); err == nil {
-		t.Fatal("首块零边界应重问（全部起始文本未归属）")
+		t.Fatal("khối đầu không có ranh giới phải hỏi lại (toàn bộ văn bản đầu chưa được gán)")
 	}
 }
 
-// TestSegmentClearsChunksOnResolveFailure 守护「缓存确定性复现」的总闸：终局整合失败时
-// 块缓存已无价值（digest 恒匹配，重跑零调用复读同一批边界再死一次），必须清除换取下次
-// 重新切分的模型机会；决策快照经 errSemantic 统一落 failures/。
+// TestSegmentClearsChunksOnResolveFailure bảo vệ "cổng tổng" của việc tái hiện xác định từ cache: khi tích hợp cuối thất bại,
+// cache khối đã không còn giá trị (digest luôn khớp, chạy lại không gọi gì và đọc lại cùng loạt ranh giới rồi chết thêm lần nữa), phải xóa để đổi lấy cơ hội
+// model chia lại lần sau; snapshot quyết định được đưa thống nhất qua errSemantic vào failures/.
 func TestSegmentClearsChunksOnResolveFailure(t *testing.T) {
 	norm, units := segFixture()
-	// 模型把全书标成 front_matter：无章节，Go 无法确定性修复，终局失败。
-	m := &mockModel{responses: []string{boundariesJSON(boundaryFixture("L1", "", kindFrontMatter, "前言"))}}
+	// Model đánh dấu toàn bộ sách là front_matter: không có chương, Go không thể sửa xác định, bước cuối thất bại.
+	m := &mockModel{responses: []string{boundariesJSON(boundaryFixture("L1", "", kindFrontMatter, "Mở đầu"))}}
 	w := &Workspace{dir: t.TempDir()}
 	_, err := Segment(context.Background(), m, "sys", norm, units, "", 0, 0, 4096, callProfile{}, w, "id-1")
 	if err == nil {
-		t.Fatal("无章节应终局失败")
+		t.Fatal("không có chương phải thất bại ở bước cuối")
 	}
 	var se *errSemantic
 	if !errors.As(err, &se) {
-		t.Fatalf("终局失败应为 errSemantic（统一落 failures/），得 %T", err)
+		t.Fatalf("thất bại cuối phải là errSemantic (thống nhất đưa vào failures/), nhận được %T", err)
 	}
 	if _, statErr := os.Stat(filepath.Join(w.dir, dirSegmentChunks)); !os.IsNotExist(statErr) {
-		t.Fatalf("终局失败后块缓存应被清除：%v", statErr)
+		t.Fatalf("sau thất bại cuối, cache khối phải bị xóa: %v", statErr)
 	}
 }
 
-// mockModel 顺序返回预设响应，供 typed-call 契约测试。
-// stops 可为每次调用指定 stop reason；缺省用 stop 或 StopReasonStop。
+// mockModel trả về các response đặt sẵn theo thứ tự, dùng cho test hợp đồng typed-call.
+// stops có thể chỉ định stop reason cho từng lần gọi; mặc định dùng stop hoặc StopReasonStop.
 type mockModel struct {
 	responses []string
 	stops     []agentcore.StopReason
@@ -345,34 +345,34 @@ func (m *mockModel) Generate(_ context.Context, _ []agentcore.Message, _ []agent
 	}}, nil
 }
 
-// TestResolveSegmentationSingleLineChapters 守护 #9：无换行的单行段（锚点切分场景）整段即正文，
-// 单行/单行多章小说不应被误判"正文为空"拒绝。
+// TestResolveSegmentationSingleLineChapters bảo vệ #9: đoạn một dòng không xuống dòng (kịch bản cắt theo anchor) thì cả đoạn là nội dung,
+// tiểu thuyết một dòng/một dòng nhiều chương không được bị phán nhầm là "nội dung rỗng" rồi từ chối.
 func TestResolveSegmentationSingleLineChapters(t *testing.T) {
-	normalized := []byte("第一章甲的故事第二章乙的故事") // 整篇一行，无换行
+	normalized := []byte("Chương một chuyện của A Chương hai chuyện của B") // cả bài một dòng, không xuống dòng
 	units := buildSourceUnits(normalized, 0)
 	decisions := []BoundaryDecision{
-		{UnitID: "L1", Kind: kindChapter, Title: "第一章"},                // 无锚点 → byte 0
-		{UnitID: "L1", Anchor: "第二章", Kind: kindChapter, Title: "第二章"}, // 行内锚点切出第二章
+		{UnitID: "L1", Kind: kindChapter, Title: "Chương một"},                       // không anchor -> byte 0
+		{UnitID: "L1", Anchor: "Chương hai", Kind: kindChapter, Title: "Chương hai"}, // anchor trong dòng cắt ra chương hai
 	}
 	seg, err := resolveSegmentation(normalized, units, decisions)
 	if err != nil {
-		t.Fatalf("单行多章应被接受：%v", err)
+		t.Fatalf("một dòng nhiều chương phải được chấp nhận: %v", err)
 	}
 	if len(seg.Chapters) != 2 {
-		t.Fatalf("应切出 2 章，得 %d", len(seg.Chapters))
+		t.Fatalf("phải cắt ra 2 chương, nhận được %d", len(seg.Chapters))
 	}
-	if got := seg.Content(normalized, 0); got != "第一章甲的故事" {
-		t.Fatalf("首章正文范围不对：%q", got)
+	if got := seg.Content(normalized, 0); got != "Chương một chuyện của A " {
+		t.Fatalf("phạm vi nội dung chương đầu không đúng: %q", got)
 	}
 }
 
 func TestSegmentWithMockModel(t *testing.T) {
 	norm, units := segFixture()
 	resp := boundariesJSON(
-		boundaryFixture("L1", "", kindFrontMatter, "前言"),
-		boundaryFixture("L3", "", kindChapter, "第一章 风起"),
-		boundaryFixture("L5", "", kindGroup, "卷二"),
-		boundaryFixture("L6", "", kindChapter, "第二章 云涌"),
+		boundaryFixture("L1", "", kindFrontMatter, "Mở đầu"),
+		boundaryFixture("L3", "", kindChapter, "Chương một"),
+		boundaryFixture("L5", "", kindGroup, "Quyển hai"),
+		boundaryFixture("L6", "", kindChapter, "Chương hai"),
 	)
 	m := &mockModel{responses: []string{resp}}
 	seg, err := Segment(context.Background(), m, "sys", norm, units, "", 0, 0, 4096, callProfile{}, nil, "")
@@ -380,59 +380,59 @@ func TestSegmentWithMockModel(t *testing.T) {
 		t.Fatalf("Segment: %v", err)
 	}
 	if len(seg.Chapters) != 2 {
-		t.Fatalf("应得 2 章，得 %d", len(seg.Chapters))
+		t.Fatalf("phải có 2 chương, nhận được %d", len(seg.Chapters))
 	}
 }
 
-// TestResolveSegmentationAbsorbsEmptyChapter 守护脏源容错：真实网络小说源常见"已锁定/付费章节"
-// 占位标题（标题在、正文缺失）。这类边界不得整体失败——终局一票否决会浪费切分阶段全部模型调用；
-// 占位段并入前段（文本一字不丢），记入 Notes 由确认预览呈现人工核对。
+// TestResolveSegmentationAbsorbsEmptyChapter bảo vệ khả năng chịu nguồn bẩn: nguồn tiểu thuyết mạng thực tế thường gặp tiêu đề giữ chỗ kiểu "đã khóa/chương trả phí"
+// (có tiêu đề, thiếu nội dung). Những ranh giới này không được làm toàn bộ thất bại -- phủ quyết một phiếu ở bước cuối sẽ lãng phí toàn bộ model call của giai đoạn cắt;
+// đoạn giữ chỗ được nhập vào đoạn trước (không mất một chữ văn bản nào), ghi vào Notes để phần xem trước xác nhận hiển thị cho con người kiểm tra.
 func TestResolveSegmentationAbsorbsEmptyChapter(t *testing.T) {
 	norm, units := segFixture()
-	// L5 "卷二" 行被模型标成章节标题：其 span [L5,L6) 无正文 → 并入第一章。
+	// Dòng L5 "Quyển hai" bị model đánh dấu là tiêu đề chương: span [L5,L6) không có nội dung -> nhập vào chương một.
 	decisions := []BoundaryDecision{
-		{UnitID: "L1", Kind: kindFrontMatter, Title: "前言"},
-		{UnitID: "L3", Kind: kindChapter, Title: "第一章 风起"},
-		{UnitID: "L5", Kind: kindChapter, Title: "第五章 [本章节已锁定]"},
-		{UnitID: "L6", Kind: kindChapter, Title: "第二章 云涌"},
+		{UnitID: "L1", Kind: kindFrontMatter, Title: "Mở đầu"},
+		{UnitID: "L3", Kind: kindChapter, Title: "Chương một"},
+		{UnitID: "L5", Kind: kindChapter, Title: "Chương năm [chương này đã bị khóa]"},
+		{UnitID: "L6", Kind: kindChapter, Title: "Chương hai"},
 	}
 	seg, err := resolveSegmentation(norm, units, decisions)
 	if err != nil {
-		t.Fatalf("空正文占位章应被吸收而非整体失败：%v", err)
+		t.Fatalf("chương giữ chỗ có nội dung rỗng phải được hấp thụ thay vì làm toàn bộ thất bại: %v", err)
 	}
 	if len(seg.Chapters) != 2 {
-		t.Fatalf("应得 2 章（占位并入前段），得 %d", len(seg.Chapters))
+		t.Fatalf("phải có 2 chương (đoạn giữ chỗ nhập vào đoạn trước), nhận được %d", len(seg.Chapters))
 	}
-	if got := seg.Content(norm, 0); !strings.Contains(got, "卷二") {
-		t.Fatalf("占位段应并入第一章（文本不丢）：%q", got)
+	if got := seg.Content(norm, 0); !strings.Contains(got, "Quyển hai") {
+		t.Fatalf("đoạn giữ chỗ phải nhập vào chương một (không mất văn bản): %q", got)
 	}
-	if len(seg.Notes) != 1 || !strings.Contains(seg.Notes[0], "已锁定") {
-		t.Fatalf("应记录一条人工核对说明：%v", seg.Notes)
+	if len(seg.Notes) != 1 || !strings.Contains(seg.Notes[0], "đã bị khóa") {
+		t.Fatalf("phải ghi một mô tả để con người kiểm tra: %v", seg.Notes)
 	}
-	// 首点即空正文章节：无前段可并 → 落为 front_matter，同样不失败。
+	// Nếu điểm đầu tiên là chương nội dung rỗng: không có đoạn trước để nhập -> chuyển thành front_matter, cũng không thất bại.
 	seg, err = resolveSegmentation(norm, units, []BoundaryDecision{
-		{UnitID: "L1", Kind: kindChapter, Title: "占位"}, // [L1,L2) 单行标题无正文
-		{UnitID: "L2", Kind: kindChapter, Title: "第一章"},
+		{UnitID: "L1", Kind: kindChapter, Title: "Giữ chỗ"}, // [L1,L2) một dòng tiêu đề không nội dung
+		{UnitID: "L2", Kind: kindChapter, Title: "Chương một"},
 	})
 	if err != nil {
-		t.Fatalf("首点空正文应落为 front_matter：%v", err)
+		t.Fatalf("điểm đầu nội dung rỗng phải chuyển thành front_matter: %v", err)
 	}
 	if len(seg.Matter) != 1 || seg.Matter[0].Kind != kindFrontMatter {
-		t.Fatalf("首点空正文应为 front_matter：%+v", seg.Matter)
+		t.Fatalf("điểm đầu nội dung rỗng phải là front_matter: %+v", seg.Matter)
 	}
 }
 
-// TestSegmentClipsContextBoundaries 守护坐标纪律的 Go 侧执行：模型在上下文区返回的边界
-// 不触发语义重问（弱模型常 3 次耗尽拖垮整块），由代码直接裁掉——该边界归相邻块管辖，
-// 相邻块会在自己的 owned 区间报告它，保留会造成跨块重复/乱序。
+// TestSegmentClipsContextBoundaries bảo vệ việc thực thi kỷ luật tọa độ ở phía Go: ranh giới model trả về trong vùng ngữ cảnh
+// không kích hoạt hỏi lại ngữ nghĩa (model yếu thường cạn 3 lần và kéo sập cả khối), mà được code cắt bỏ trực tiếp -- ranh giới đó thuộc quyền quản lý của khối liền kề,
+// khối liền kề sẽ báo cáo nó trong khoảng owned của mình; giữ lại sẽ gây trùng/sai thứ tự xuyên khối.
 func TestSegmentClipsContextBoundaries(t *testing.T) {
 	norm, units := segFixture()
-	chunks := planChunks(units, planningBudget(40, "sys", "")) // 与 Segment 内部规划一致
+	chunks := planChunks(units, planningBudget(40, "sys", "")) // nhất quán với quy hoạch bên trong Segment
 	if len(chunks) < 2 {
-		t.Fatalf("fixture 应分出至少 2 块，得 %d", len(chunks))
+		t.Fatalf("fixture phải chia ra ít nhất 2 khối, nhận được %d", len(chunks))
 	}
-	// 每块响应：owned 首单元一个章节边界（无标题走 firstLine 回退，规避标题回显核对——
-	// 这里测的是坐标纪律）；第一块额外夹带一个下一块首单元（上下文区）的边界。
+	// Response mỗi khối: một ranh giới chương ở unit đầu của owned (không tiêu đề thì dùng firstLine fallback, tránh kiểm tra phản chiếu tiêu đề --
+	// ở đây kiểm thử kỷ luật tọa độ); khối đầu tiên kèm thêm một ranh giới của unit đầu khối kế tiếp (vùng ngữ cảnh).
 	responses := make([]string, len(chunks))
 	for ci, owned := range chunks {
 		boundaries := []map[string]any{boundaryFixture(units[owned[0]].ID, "", kindChapter, "")}
@@ -441,30 +441,30 @@ func TestSegmentClipsContextBoundaries(t *testing.T) {
 		}
 		responses[ci] = boundariesJSON(boundaries...)
 	}
-	// 裁剪说明走普通进度回显（例行坐标纪律，非警示——warn 色会让用户误以为出错）。
+	// Mô tả cắt xén đi theo echo tiến độ thông thường (kỷ luật tọa độ định kỳ, không phải cảnh báo -- màu warn sẽ khiến người dùng tưởng là lỗi).
 	var clipNotes int
 	prof := callProfile{progress: func(_, _ int, s string) {
-		if strings.Contains(s, "裁掉") {
+		if strings.Contains(s, "đã cắt") {
 			clipNotes++
 		}
 	}}
 	seg, err := Segment(context.Background(), &mockModel{responses: responses}, "sys", norm, units, "", 40, 2, 4096, prof, nil, "")
 	if err != nil {
-		t.Fatalf("上下文区边界应被裁掉而非失败：%v", err)
+		t.Fatalf("ranh giới vùng ngữ cảnh phải bị cắt bỏ thay vì thất bại: %v", err)
 	}
 	if len(seg.Chapters) != len(chunks) {
-		t.Fatalf("应得 %d 章（越界边界不重复计入），得 %d", len(chunks), len(seg.Chapters))
+		t.Fatalf("phải có %d chương (ranh giới vượt biên không tính trùng), nhận được %d", len(chunks), len(seg.Chapters))
 	}
 	if clipNotes != 1 {
-		t.Fatalf("应回显 1 条裁剪说明，得 %d", clipNotes)
+		t.Fatalf("phải echo 1 mô tả cắt xén, nhận được %d", clipNotes)
 	}
 }
 
-// TestSegmentReusesChunkArtifacts 守护块级断点：切分逐块落盘边界缓存，重跑时 digest 匹配的块
-// 零模型调用直接复用——切分是最昂贵阶段，任何一块失败不应重付已完成块（与 analyze/synthesize 同哲学）。
+// TestSegmentReusesChunkArtifacts bảo vệ điểm tiếp tục cấp khối: cắt phân đoạn ghi cache ranh giới từng khối ra đĩa,
+// khi chạy lại, khối có digest khớp được tái sử dụng trực tiếp với không model call -- cắt phân đoạn là giai đoạn đắt nhất, bất kỳ khối nào thất bại không nên phải trả lại chi phí các khối đã hoàn tất (cùng triết lý với analyze/synthesize).
 func TestSegmentReusesChunkArtifacts(t *testing.T) {
 	norm, units := segFixture()
-	chunks := planChunks(units, planningBudget(40, "sys", "")) // 与 Segment 内部规划一致
+	chunks := planChunks(units, planningBudget(40, "sys", "")) // nhất quán với quy hoạch bên trong Segment
 	responses := make([]string, len(chunks))
 	for ci, owned := range chunks {
 		responses[ci] = boundariesJSON(boundaryFixture(units[owned[0]].ID, "", kindChapter, ""))
@@ -473,76 +473,76 @@ func TestSegmentReusesChunkArtifacts(t *testing.T) {
 	m1 := &mockModel{responses: responses}
 	seg1, err := Segment(context.Background(), m1, "sys", norm, units, "", 40, 2, 4096, callProfile{}, w, "id-1")
 	if err != nil {
-		t.Fatalf("首跑：%v", err)
+		t.Fatalf("lần chạy đầu: %v", err)
 	}
 	if m1.i != len(chunks) {
-		t.Fatalf("首跑应调用 %d 次，得 %d", len(chunks), m1.i)
+		t.Fatalf("lần chạy đầu phải gọi %d lần, nhận được %d", len(chunks), m1.i)
 	}
 	m2 := &mockModel{responses: responses}
 	seg2, err := Segment(context.Background(), m2, "sys", norm, units, "", 40, 2, 4096, callProfile{}, w, "id-1")
 	if err != nil {
-		t.Fatalf("重跑：%v", err)
+		t.Fatalf("chạy lại: %v", err)
 	}
 	if m2.i != 0 {
-		t.Fatalf("digest 匹配的块应零调用复用，实际调用 %d 次", m2.i)
+		t.Fatalf("khối có digest khớp phải tái sử dụng với không lần gọi, thực tế gọi %d lần", m2.i)
 	}
 	if len(seg2.Chapters) != len(seg1.Chapters) {
-		t.Fatalf("复用结果应一致：%d != %d", len(seg2.Chapters), len(seg1.Chapters))
+		t.Fatalf("kết quả tái sử dụng phải nhất quán: %d != %d", len(seg2.Chapters), len(seg1.Chapters))
 	}
-	// 身份变化（换 prompt 版本/指导/源）→ 缓存自然失配，全部重做。
+	// Đổi danh tính (đổi phiên bản prompt/hướng dẫn/nguồn) -> cache tự nhiên không khớp, làm lại toàn bộ.
 	m3 := &mockModel{responses: responses}
 	if _, err := Segment(context.Background(), m3, "sys", norm, units, "", 40, 2, 4096, callProfile{}, w, "id-2"); err != nil {
-		t.Fatalf("身份变化重跑：%v", err)
+		t.Fatalf("chạy lại khi danh tính thay đổi: %v", err)
 	}
 	if m3.i != len(chunks) {
-		t.Fatalf("身份变化应全部重做（%d 次调用），得 %d", len(chunks), m3.i)
+		t.Fatalf("danh tính thay đổi phải làm lại toàn bộ (%d lần gọi), nhận được %d", len(chunks), m3.i)
 	}
 }
 
-// TestSegmentShrinksChunkOnTruncation 守护输出预算回路：大量短章节会让单块边界 JSON
-// 超出可见输出（stop=length），必须对半缩块重试而非整体失败——与 analyze 缩批同哲学。
+// TestSegmentShrinksChunkOnTruncation bảo vệ vòng lặp ngân sách đầu ra: lượng lớn chương ngắn sẽ khiến JSON ranh giới một khối
+// vượt quá đầu ra nhìn thấy được (stop=length), phải thử lại bằng cách thu nhỏ khối còn một nửa thay vì thất bại toàn bộ -- cùng triết lý thu nhỏ batch với analyze.
 func TestSegmentShrinksChunkOnTruncation(t *testing.T) {
-	norm, units := segFixture() // 7 个 unit，单块 [0,7)，mid=3
+	norm, units := segFixture() // 7 unit, một khối [0,7), mid=3
 	left := boundariesJSON(boundaryFixture("L1", "", kindChapter, ""))
-	right := boundariesJSON(boundaryFixture("L6", "", kindChapter, "第二章 云涌"))
+	right := boundariesJSON(boundaryFixture("L6", "", kindChapter, "Chương hai"))
 	m := &mockModel{
 		responses: []string{`{"boundaries":[]}`, left, right},
-		stops:     []agentcore.StopReason{agentcore.StopReasonLength}, // 首调截断，两个半块正常
+		stops:     []agentcore.StopReason{agentcore.StopReasonLength}, // lần gọi đầu bị cắt cụt, hai nửa khối bình thường
 	}
 	seg, err := Segment(context.Background(), m, "sys", norm, units, "", 0, 0, 4096, callProfile{}, nil, "")
 	if err != nil {
-		t.Fatalf("截断应缩块重试而非失败：%v", err)
+		t.Fatalf("bị cắt cụt phải thu nhỏ khối và thử lại thay vì thất bại: %v", err)
 	}
 	if m.i != 3 {
-		t.Fatalf("应为 1 次截断 + 2 次半块调用，得 %d", m.i)
+		t.Fatalf("phải là 1 lần cắt cụt + 2 lần gọi nửa khối, nhận được %d", m.i)
 	}
 	if len(seg.Chapters) != 2 {
-		t.Fatalf("缩块结果应完整覆盖（2 章），得 %d", len(seg.Chapters))
+		t.Fatalf("kết quả thu nhỏ khối phải phủ đầy đủ (2 chương), nhận được %d", len(seg.Chapters))
 	}
 }
 
-// TestPlanningBudget 守护切分规划预算的结构性开销扣除：owned 正文只是请求的一部分。
+// TestPlanningBudget bảo vệ phần trừ chi phí cấu trúc của ngân sách quy hoạch cắt phân đoạn: phần nội dung owned chỉ là một phần của request.
 func TestPlanningBudget(t *testing.T) {
 	if got := planningBudget(0, "sys", "g"); got != 0 {
-		t.Fatalf("无预算应透传，得 %d", got)
+		t.Fatalf("không có ngân sách thì phải truyền nguyên, nhận được %d", got)
 	}
 	if got := planningBudget(1000, strings.Repeat("s", 100), strings.Repeat("g", 100)); got != 600 {
-		t.Fatalf("(1000-200)*3/4 应为 600，得 %d", got)
+		t.Fatalf("(1000-200)*3/4 phải là 600, nhận được %d", got)
 	}
 	if got := planningBudget(1000, strings.Repeat("s", 2000), ""); got != 250 {
-		t.Fatalf("超长提示应触发下限 chunkBytes/4=250，得 %d", got)
+		t.Fatalf("prompt siêu dài phải kích hoạt sàn chunkBytes/4=250, nhận được %d", got)
 	}
 }
 
-// TestBuildProjectionContextByteCap 守护上下文区字节上限：超长行虚拟分片（单片可达
-// MaxUnitBytes）会吞掉输入预算，上下文只是参考信息，按字节上限收缩而非照单全收。
+// TestBuildProjectionContextByteCap bảo vệ giới hạn byte trên của vùng ngữ cảnh: phân mảnh ảo của dòng siêu dài (một mảnh có thể đạt
+// MaxUnitBytes) sẽ nuốt ngân sách đầu vào; ngữ cảnh chỉ là thông tin tham khảo, phải co lại theo giới hạn byte thay vì nhận toàn bộ.
 func TestBuildProjectionContextByteCap(t *testing.T) {
 	_, units := segFixture()
 	if _, ids := buildProjection(units, [2]int{2, 3}, 2, 1, ""); len(ids) != 1 || !ids["L3"] {
-		t.Fatalf("字节上限应裁掉上下文单元，只剩 owned：%v", ids)
+		t.Fatalf("giới hạn byte phải cắt bỏ unit ngữ cảnh, chỉ còn owned: %v", ids)
 	}
 	if _, ids := buildProjection(units, [2]int{2, 3}, 2, 0, ""); len(ids) != 5 {
-		t.Fatalf("无字节上限时应含前后各 2 个上下文单元（共 5），得 %v", ids)
+		t.Fatalf("khi không có giới hạn byte phải chứa 2 unit ngữ cảnh trước và sau (tổng 5), nhận được %v", ids)
 	}
 }
 
@@ -551,7 +551,7 @@ func TestCallStructuredTruncation(t *testing.T) {
 	_, err := callStructured[boundaryBatch](context.Background(), m, segmentContract, "s", "p", 16, callProfile{}, nil)
 	var trunc *errTruncated
 	if err == nil || !asTruncated(err, &trunc) {
-		t.Fatalf("长度截断应返回 *errTruncated，得 %v", err)
+		t.Fatalf("cắt cụt do độ dài phải trả về *errTruncated, nhận được %v", err)
 	}
 }
 
